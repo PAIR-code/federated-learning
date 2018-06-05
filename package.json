@@ -1,0 +1,27 @@
+{
+  "name": "federated-learning",
+  "version": "0.0.1",
+  "description": "Hardware-accelerated JavaScript library for machine intelligence",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PAIR-code/federated-learning.git"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc",
+    "lint": "tslint -p . -t verbose",
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@types/jasmine": "~2.5.53",
+    "@types/node": "~9.6.0",
+    "@types/seedrandom": "~2.4.27",
+    "clang-format": "~1.2.2",
+    "jasmine-core": "~3.1.0",
+    "rimraf": "~2.6.2",
+    "tslint": "~5.8.0",
+    "typescript": "2.7.2"
+  }
+}
