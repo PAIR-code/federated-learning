@@ -10,7 +10,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "start": "node dist/server/server.js",
-    "build": "tsc && cp -r views/ dist/views/",
+    "build": "tsc && cp -r demo/ dist/demo/",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {

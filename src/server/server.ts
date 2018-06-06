@@ -18,10 +18,10 @@
 /** Server code */
 
 import * as express from 'express';
+import {Request, Response} from 'express';
 import * as http from 'http';
-import * as socketIO from 'socket.io';
 import * as path from 'path';
-import { Request, Response } from 'express';
+import * as socketIO from 'socket.io';
 
 const app = express();
 const server = http.createServer(app);
@@ -37,4 +37,4 @@ io.on('connection', (socket: socketIO.Socket) => {
 
 server.listen(3000, () => {
   console.log('listening on 3000');
-})
+});
