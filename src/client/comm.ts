@@ -58,8 +58,14 @@ class ParamsSynchroniser {
 
   public async initialise(url: string): Promise<ModelFitConfig> {
     this.connMsg = await this.connect(url);
-    this.version = this.connMsg.version;
     await this.setParamsFromMessage(this.connMsg.initParams);
+    this.version = this.connMsg.version;
+
+    this.socket.on(Events.Download, (msg: ParamsMsg) => {
+      this.setParamsFromMessage(msg.params);
+      this.version = msg.version;
+    });
+
     return this.connMsg.fitConfig;
   }
 
@@ -112,7 +118,6 @@ async function exampleUsageToSilenceTSLint() {
   const l = ParamsSynchroniser.fromLayers([m.getLayer('hello.layer')]);
   const fitConfig = await l.initialise('hello.com');
   m.fit(tf.ones([1]), tf.ones([1]), fitConfig);
-
   await l.uploadParams();
 }
 
