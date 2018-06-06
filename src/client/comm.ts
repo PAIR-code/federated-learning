@@ -24,15 +24,11 @@ async function fromEvent<T>(
          }) as Promise<T>;
 }
 
-type ParamMap = {
-  [key: string]: Variable
-};
-
 function flatten<T>(arr: T[][]) {
   return arr.reduce((x, y) => x.concat(y), []);
 }
 
-class ParamsSynchroniser {
+class VariableSynchroniser {
   public version: string;
   private socket: SocketIOClient.Socket;
   private connMsg: ConnectionMsg;
@@ -46,7 +42,7 @@ class ParamsSynchroniser {
 
   public static fromLayers(layers: Layer[]) {
     const layerWeights = layers.map(l => l.trainableWeights);
-    return new ParamsSynchroniser(flatten(layerWeights));
+    return new VariableSynchroniser(flatten(layerWeights));
   }
 
   private async connect(url: string): Promise<ConnectionMsg> {
@@ -115,7 +111,7 @@ class ParamsSynchroniser {
 
 async function exampleUsageToSilenceTSLint() {
   const m = await tf.loadModel('hello.model');
-  const l = ParamsSynchroniser.fromLayers([m.getLayer('hello.layer')]);
+  const l = VariableSynchroniser.fromLayers([m.getLayer('hello.layer')]);
   const fitConfig = await l.initialise('hello.com');
   m.fit(tf.ones([1]), tf.ones([1]), fitConfig);
   await l.uploadParams();

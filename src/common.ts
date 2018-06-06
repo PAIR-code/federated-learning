@@ -17,7 +17,6 @@
 
 /** Shared between client and server */
 import {ModelFitConfig, Variable} from '@tensorflow/tfjs';
-import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
 
 export enum Events {
   Connect = 'connect',
