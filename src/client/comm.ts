@@ -28,21 +28,39 @@ function flatten<T>(arr: T[][]) {
   return arr.reduce((x, y) => x.concat(y), []);
 }
 
+/**
+ * Synchronises tf.Variables between a client and a server.
+ * Example usage:
+ * ```js
+ * const model = tf.loadModel('a-model.json');
+ * const sync = VariableSynchroniser.fromLayers(model.getLayer('classifier'))
+ * const clientFitConfig = await sync.initialise('http://server.com')
+ * model.fit(data.X, data.y, clientFitConfig)
+ * await sync.uploadVars()
+ * ```
+ * The server->client synchronisation happens transparently whenever the server
+ * broadcasts weights.
+ * The client->server sync must be triggered manually with uploadVars
+ */
 export class VariableSynchroniser {
   public version: string;
   private socket: SocketIOClient.Socket;
   private connMsg: ConnectionMsg;
   private vars: Map<string, Variable|LayerVariable>;
 
-  constructor(syncVars: Array<Variable|LayerVariable>) {
-    for (const param of syncVars) {
-      this.vars.set(param.name, param);
+  /**
+   * Construct a synchroniser from a list of tf.Variables of tf.LayerVariables.
+   * @param {Array<Variable|LayerVariable>} vars - Variables to track and sync
+   */
+  constructor(vars: Array<Variable|LayerVariable>) {
+    for (const variable of vars) {
+      this.vars.set(variable.name, variable);
     }
   }
 
-  /*
-   * Construct a VariableSynchroniser from an array of layers
-   * This will synchronise the weights of the layers
+  /**
+   * Construct a VariableSynchroniser from an array of layers.
+   * This will synchronise the weights of the layers.
    * @param layers: An array of layers to extract variables from
    */
   public static fromLayers(layers: Layer[]) {
@@ -57,7 +75,7 @@ export class VariableSynchroniser {
         this.socket, Events.Connect, CONNECTION_TIMEOUT);
   }
 
-  /*
+  /**
    * Connect to a server, synchronise the variables to their
    * initial values and return the hyperparameters for this client
    * @param url: The URL of the server
@@ -77,7 +95,7 @@ export class VariableSynchroniser {
     return this.connMsg.fitConfig;
   }
 
-  /*
+  /**
    * Upload the current values of the tracked variables to the server
    * @return A promise that resolves when the server has recieved the variables
    */
