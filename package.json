@@ -9,10 +9,15 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build": "tsc",
-    "lint": "tslint -p . -t verbose",
+    "start": "node dist/server/server.js",
+    "build": "tsc && cp -r demo/ dist/demo/",
+    "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
+    "@types/express": "^4.16.0",
+    "@types/socket.io": "^1.4.34",
+    "express": "^4.16.3",
+    "socketio": "^1.0.0"
   },
   "devDependencies": {
     "@types/jasmine": "~2.5.53",

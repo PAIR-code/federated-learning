@@ -17,5 +17,24 @@
 
 /** Server code */
 
-import {hello} from '../common';
-hello();
+import * as express from 'express';
+import {Request, Response} from 'express';
+import * as http from 'http';
+import * as path from 'path';
+import * as socketIO from 'socket.io';
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIO(server);
+
+app.get('/', (req: Request, res: Response) => {
+  res.sendFile(path.resolve(__dirname + '/../views/index.html'));
+});
+
+io.on('connection', (socket: socketIO.Socket) => {
+  console.log('a user connected');
+});
+
+server.listen(3000, () => {
+  console.log('listening on 3000');
+});
