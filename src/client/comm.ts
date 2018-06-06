@@ -40,6 +40,11 @@ export class VariableSynchroniser {
     }
   }
 
+  /*
+   * Construct a VariableSynchroniser from an array of layers
+   * This will synchronise the weights of the layers
+   * @param layers: An array of layers to extract variables from
+   */
   public static fromLayers(layers: Layer[]) {
     const layerWeights = layers.map(l => l.trainableWeights);
     return new VariableSynchroniser(flatten(layerWeights));
@@ -52,9 +57,16 @@ export class VariableSynchroniser {
         this.socket, Events.Connect, CONNECTION_TIMEOUT);
   }
 
+  /*
+   * Connect to a server, synchronise the variables to their
+   * initial values and return the hyperparameters for this client
+   * @param url: The URL of the server
+   * @return A promise that resolves when the connection has been established
+   * and variables set to their inital values.
+   */
   public async initialise(url: string): Promise<ModelFitConfig> {
     this.connMsg = await this.connect(url);
-    await this.setVarsFromMessage(this.connMsg.initVars);
+    this.setVarsFromMessage(this.connMsg.initVars);
     this.version = this.connMsg.version;
 
     this.socket.on(Events.Download, (msg: VarsMsg) => {
@@ -65,8 +77,12 @@ export class VariableSynchroniser {
     return this.connMsg.fitConfig;
   }
 
+  /*
+   * Upload the current values of the tracked variables to the server
+   * @return A promise that resolves when the server has recieved the variables
+   */
   public async uploadVars(): Promise<{}> {
-    const msg: VarsMsg = await this.serializeCurrentVars();
+    const msg: VarsMsg = this.serializeCurrentVars();
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
@@ -79,7 +95,7 @@ export class VariableSynchroniser {
     return prom;
   }
 
-  protected async serializeCurrentVars(): Promise<VarsMsg> {
+  protected serializeCurrentVars(): VarsMsg {
     const vars: Variable[] = [];
 
     this.vars.forEach((value, key) => {
@@ -93,7 +109,7 @@ export class VariableSynchroniser {
     return {clientId: this.connMsg.clientId, version: this.version, vars};
   }
 
-  protected async setVarsFromMessage(newVars: Variable[]) {
+  protected setVarsFromMessage(newVars: Variable[]) {
     for (const param of newVars) {
       if (!this.vars.has(param.name)) {
         throw new Error(`Recieved message with unexpected param ${
