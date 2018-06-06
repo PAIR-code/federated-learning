@@ -16,6 +16,26 @@
  */
 
 /** Shared between client and server */
+import {ModelFitConfig} from '@tensorflow/tfjs';
+import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
+
+export enum Events {
+  Connect = 'connect',
+  Download = 'downloadParams',
+  Upload = 'uploadParams'
+}
+
+export type ParamsMsg = {
+  version: string,
+  clientId: string,
+  params: Layer
+};
+
+type ConnectionMsg = {
+  clientId: string,
+  fitConfig: ModelFitConfig,
+  initParams: Layer
+};
 
 export function hello() {
   return 'hello world';
