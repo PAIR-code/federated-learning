@@ -20,21 +20,21 @@ import {ModelFitConfig, Variable} from '@tensorflow/tfjs';
 
 export enum Events {
   Connect = 'connect',
-  Download = 'downloadParams',
-  Upload = 'uploadParams'
+  Download = 'downloadVars',
+  Upload = 'uploadVars'
 }
 
-export type ParamsMsg = {
+export type VarsMsg = {
   version: string,
   clientId: string,
-  params: Variable[]
+  vars: Variable[]
 };
 
 export type ConnectionMsg = {
   clientId: string,
   fitConfig: ModelFitConfig,
   version: string,
-  initParams: Variable[]
+  initVars: Variable[]
 };
 
 export function hello() {

@@ -4,7 +4,7 @@ import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 import * as socketio from 'socket.io-client';
 
-import {ConnectionMsg, Events, ParamsMsg} from '../common';
+import {ConnectionMsg, Events, VarsMsg} from '../common';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 1 * 1000;
@@ -28,15 +28,15 @@ function flatten<T>(arr: T[][]) {
   return arr.reduce((x, y) => x.concat(y), []);
 }
 
-class VariableSynchroniser {
+export class VariableSynchroniser {
   public version: string;
   private socket: SocketIOClient.Socket;
   private connMsg: ConnectionMsg;
-  private params: Map<string, Variable|LayerVariable>;
+  private vars: Map<string, Variable|LayerVariable>;
 
-  constructor(syncParams: Array<Variable|LayerVariable>) {
-    for (const param of syncParams) {
-      this.params.set(param.name, param);
+  constructor(syncVars: Array<Variable|LayerVariable>) {
+    for (const param of syncVars) {
+      this.vars.set(param.name, param);
     }
   }
 
@@ -54,22 +54,22 @@ class VariableSynchroniser {
 
   public async initialise(url: string): Promise<ModelFitConfig> {
     this.connMsg = await this.connect(url);
-    await this.setParamsFromMessage(this.connMsg.initParams);
+    await this.setVarsFromMessage(this.connMsg.initVars);
     this.version = this.connMsg.version;
 
-    this.socket.on(Events.Download, (msg: ParamsMsg) => {
-      this.setParamsFromMessage(msg.params);
+    this.socket.on(Events.Download, (msg: VarsMsg) => {
+      this.setVarsFromMessage(msg.vars);
       this.version = msg.version;
     });
 
     return this.connMsg.fitConfig;
   }
 
-  public async uploadParams(): Promise<{}> {
-    const msg: ParamsMsg = await this.serializeCurrentParams();
+  public async uploadVars(): Promise<{}> {
+    const msg: VarsMsg = await this.serializeCurrentVars();
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
-          setTimeout(() => reject(`uploadParams timed out`), UPLOAD_TIMEOUT);
+          setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
 
       this.socket.emit(Events.Upload, msg, () => {
         clearTimeout(rejectTimer);
@@ -79,27 +79,27 @@ class VariableSynchroniser {
     return prom;
   }
 
-  protected async serializeCurrentParams() {
-    const params: Variable[] = [];
+  protected async serializeCurrentVars(): Promise<VarsMsg> {
+    const vars: Variable[] = [];
 
-    this.params.forEach((value, key) => {
+    this.vars.forEach((value, key) => {
       if (value instanceof LayerVariable) {
-        params.push(tf.variable(value.read()));
+        vars.push(tf.variable(value.read()));
       } else {
-        params.push(value);
+        vars.push(value);
       }
     });
 
-    return {clientId: this.connMsg.clientId, version: this.version, params};
+    return {clientId: this.connMsg.clientId, version: this.version, vars};
   }
 
-  protected async setParamsFromMessage(newParams: Variable[]) {
-    for (const param of newParams) {
-      if (!this.params.has(param.name)) {
+  protected async setVarsFromMessage(newVars: Variable[]) {
+    for (const param of newVars) {
+      if (!this.vars.has(param.name)) {
         throw new Error(`Recieved message with unexpected param ${
-            param.name}, should be one of ${this.params.keys()}`);
+            param.name}, should be one of ${this.vars.keys()}`);
       }
-      const varOrLVar = this.params.get(param.name);
+      const varOrLVar = this.vars.get(param.name);
       if (varOrLVar instanceof LayerVariable) {
         varOrLVar.write(param);
       } else {
@@ -108,13 +108,3 @@ class VariableSynchroniser {
     }
   }
 }
-
-async function exampleUsageToSilenceTSLint() {
-  const m = await tf.loadModel('hello.model');
-  const l = VariableSynchroniser.fromLayers([m.getLayer('hello.layer')]);
-  const fitConfig = await l.initialise('hello.com');
-  m.fit(tf.ones([1]), tf.ones([1]), fitConfig);
-  await l.uploadParams();
-}
-
-exampleUsageToSilenceTSLint();
