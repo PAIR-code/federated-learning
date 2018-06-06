@@ -36,7 +36,3 @@ export type ConnectionMsg = {
   version: string,
   initVars: Variable[]
 };
-
-export function hello() {
-  return 'hello world';
-}
