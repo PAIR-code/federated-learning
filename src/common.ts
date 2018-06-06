@@ -16,7 +16,7 @@
  */
 
 /** Shared between client and server */
-import {ModelFitConfig} from '@tensorflow/tfjs';
+import {ModelFitConfig, Variable} from '@tensorflow/tfjs';
 import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
 
 export enum Events {
@@ -28,13 +28,14 @@ export enum Events {
 export type ParamsMsg = {
   version: string,
   clientId: string,
-  params: Layer
+  params: Variable[]
 };
 
-type ConnectionMsg = {
+export type ConnectionMsg = {
   clientId: string,
   fitConfig: ModelFitConfig,
-  initParams: Layer
+  version: string,
+  initParams: Variable[]
 };
 
 export function hello() {
