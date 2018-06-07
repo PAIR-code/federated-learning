@@ -87,7 +87,7 @@ export class VariableSynchroniser {
   private async connect(url: string): Promise<ConnectionMsg> {
     this.socket = socketio(url);
     return fromEvent<ConnectionMsg>(
-        this.socket, Events.Connect, CONNECTION_TIMEOUT);
+        this.socket, Events.Initialise, CONNECTION_TIMEOUT);
   }
 
   /**

@@ -29,7 +29,9 @@ export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
   // Because socket.io will deserialise JS ArrayBuffers into Nodejs Buffers
   if (dataBuffer instanceof ArrayBuffer) {
     data = dataBuffer;
+    // tslint:disable-next-line no-any
   } else if ((dataBuffer as any) instanceof Buffer) {
+    // tslint:disable-next-line no-any
     const dataAsBuffer = dataBuffer as any as Buffer;
     data = dataAsBuffer.buffer.slice(
         dataAsBuffer.byteOffset,
@@ -37,7 +39,6 @@ export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
   }
   const numel = shape.reduce((x, y) => x * y, 1);
   const ctor = dtypeToTypedArrayCtor[dtype];
-  // const elementByteSize = dtypeToElementByteSize[dtype];
   const array = new ctor(data, 0, numel);
   return tf.tensor(array, shape, dtype);
 }

@@ -20,7 +20,7 @@ import {ModelFitConfig} from '@tensorflow/tfjs';
 import {SerializedVariable} from './serialization';
 
 export enum Events {
-  Connect = 'connectI',
+  Initialise = 'initialise',
   Download = 'downloadVars',
   Upload = 'uploadVars'
 }
