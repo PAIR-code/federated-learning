@@ -16,10 +16,11 @@
  */
 
 /** Shared between client and server */
-import {ModelFitConfig, Variable} from '@tensorflow/tfjs';
+import {ModelFitConfig} from '@tensorflow/tfjs';
+import {SerializedVariable} from './serialization';
 
 export enum Events {
-  Connect = 'connect',
+  Connect = 'connectI',
   Download = 'downloadVars',
   Upload = 'uploadVars'
 }
@@ -31,7 +32,7 @@ export type TrainingInfo = {
 export type VarsMsg = {
   modelId: string,
   clientId: string,
-  vars: Variable[],
+  vars: SerializedVariable[],
   history?: TrainingInfo
 };
 
@@ -39,5 +40,5 @@ export type ConnectionMsg = {
   clientId: string,
   fitConfig: ModelFitConfig,
   modelId: string,
-  initVars: Variable[]
+  initVars: SerializedVariable[]
 };

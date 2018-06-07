@@ -11,8 +11,7 @@ export type SerializedVariable = {
 export async function serializeVar(variable: tf.Variable):
     Promise<SerializedVariable> {
   const data = await variable.data();
-  // TODO(aman): is this copy neccesary? (TypedArray might be a view into a
-  // shared buffer)
+  // small TypedArrays are views into a larger buffer
   const copy =
       data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   return {
@@ -24,14 +23,27 @@ export async function serializeVar(variable: tf.Variable):
   };
 }
 
-export function deserializeVar(serialized: SerializedVariable): tf.Variable {
-  const {dtype, shape, name, data, trainable} = serialized;
-  const ctor = dtypeToTypedArrayCtor(dtype);
-  const array = new ctor(data);
-  const tensor = tf.tensor(array, shape, dtype);
-  return tf.variable(tensor, trainable, name, dtype);
+export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
+  const {dtype, shape, data: dataBuffer} = serialized;
+  let data;
+  // Because socket.io will deserialise JS ArrayBuffers into Nodejs Buffers
+  if (dataBuffer instanceof ArrayBuffer) {
+    data = dataBuffer;
+  } else if ((dataBuffer as any) instanceof Buffer) {
+    const dataAsBuffer = dataBuffer as any as Buffer;
+    data = dataAsBuffer.buffer.slice(
+        dataAsBuffer.byteOffset,
+        dataAsBuffer.byteOffset + dataAsBuffer.byteLength);
+  }
+  const numel = shape.reduce((x, y) => x * y, 1);
+  const ctor = dtypeToTypedArrayCtor[dtype];
+  // const elementByteSize = dtypeToElementByteSize[dtype];
+  const array = new ctor(data, 0, numel);
+  return tf.tensor(array, shape, dtype);
 }
 
-function dtypeToTypedArrayCtor(dt: tf.DataType) {
-  return {'float32': Float32Array, 'int32': Int32Array, 'bool': Uint8Array}[dt];
-}
+const dtypeToTypedArrayCtor = {
+  'float32': Float32Array,
+  'int32': Int32Array,
+  'bool': Uint8Array
+};

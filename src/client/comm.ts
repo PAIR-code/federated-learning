@@ -22,6 +22,8 @@ import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 import * as socketio from 'socket.io-client';
 
 import {ConnectionMsg, Events, VarsMsg} from '../common';
+// tslint:disable-next-line:max-line-length
+import {deserializeVar, SerializedVariable, serializeVar} from '../serialization';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 1 * 1000;
@@ -53,7 +55,7 @@ export class VariableSynchroniser {
   public modelId: string;
   private socket: SocketIOClient.Socket;
   private connMsg: ConnectionMsg;
-  private vars: Map<string, Variable|LayerVariable>;
+  private vars = new Map<string, Variable|LayerVariable>();
   private acceptUpdate: (msg: VarsMsg) => boolean;
   /**
    * Construct a synchroniser from a list of tf.Variables of tf.LayerVariables.
@@ -84,7 +86,6 @@ export class VariableSynchroniser {
 
   private async connect(url: string): Promise<ConnectionMsg> {
     this.socket = socketio(url);
-
     return fromEvent<ConnectionMsg>(
         this.socket, Events.Connect, CONNECTION_TIMEOUT);
   }
@@ -116,7 +117,7 @@ export class VariableSynchroniser {
    * @return A promise that resolves when the server has recieved the variables
    */
   public async uploadVars(): Promise<{}> {
-    const msg: VarsMsg = this.serializeCurrentVars();
+    const msg: VarsMsg = await this.serializeCurrentVars();
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
@@ -129,21 +130,21 @@ export class VariableSynchroniser {
     return prom;
   }
 
-  protected serializeCurrentVars(): VarsMsg {
-    const vars: Variable[] = [];
+  protected async serializeCurrentVars(): Promise<VarsMsg> {
+    const varsP: Array<Promise<SerializedVariable>> = [];
 
     this.vars.forEach((value, key) => {
       if (value instanceof LayerVariable) {
-        vars.push(tf.variable(value.read()));
+        varsP.push(serializeVar(tf.variable(value.read())));
       } else {
-        vars.push(value);
+        varsP.push(serializeVar(value));
       }
     });
-
+    const vars = await Promise.all(varsP);
     return {clientId: this.connMsg.clientId, modelId: this.modelId, vars};
   }
 
-  protected setVarsFromMessage(newVars: Variable[]) {
+  protected setVarsFromMessage(newVars: SerializedVariable[]) {
     for (const param of newVars) {
       if (!this.vars.has(param.name)) {
         throw new Error(`Recieved message with unexpected param ${
@@ -151,9 +152,9 @@ export class VariableSynchroniser {
       }
       const varOrLVar = this.vars.get(param.name);
       if (varOrLVar instanceof LayerVariable) {
-        varOrLVar.write(param);
+        varOrLVar.write(deserializeVar(param));
       } else {
-        varOrLVar.assign(param);
+        varOrLVar.assign(deserializeVar(param));
       }
     }
   }
