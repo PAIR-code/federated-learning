@@ -28,7 +28,7 @@ const server = http.createServer(app);
 const io = socketIO(server);
 
 app.get('/', (req: Request, res: Response) => {
-  res.sendFile(path.resolve(__dirname + '/../views/index.html'));
+  res.sendFile(path.resolve(__dirname + '/../demo/index.html'));
 });
 
 io.on('connection', (socket: socketIO.Socket) => {

@@ -10,14 +10,17 @@
   "license": "Apache-2.0",
   "scripts": {
     "start": "node dist/server/server.js",
+    "dev": "ts-node src/server/server.ts",
     "build": "tsc && cp -r demo/ dist/demo/",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
+    "@tensorflow/tfjs": "0.11.4",
     "@types/express": "^4.16.0",
     "@types/socket.io": "^1.4.34",
+    "@types/socket.io-client": "^1.4.32",
     "express": "^4.16.3",
-    "socketio": "^1.0.0"
+    "socket.io": "^2.1.1"
   },
   "devDependencies": {
     "@types/jasmine": "~2.5.53",
@@ -27,6 +30,7 @@
     "jasmine-core": "~3.1.0",
     "rimraf": "~2.6.2",
     "tslint": "~5.8.0",
-    "typescript": "2.7.2"
+    "typescript": "2.7.2",
+    "ts-node-dev": "^1.0.0-pre.26"
   }
 }
