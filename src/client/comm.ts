@@ -21,7 +21,7 @@ import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 import * as socketio from 'socket.io-client';
 
-import {ConnectionMsg, Events, VarsMsg} from '../common';
+import {ConnectionMsg, Events, TrainingInfo, VarsMsg} from '../common';
 // tslint:disable-next-line:max-line-length
 import {deserializeVar, SerializedVariable, serializeVar} from '../serialization';
 
@@ -47,9 +47,21 @@ const UPLOAD_TIMEOUT = 1 * 1000;
  * const h = await model.fit(data.X, data.y, clientFitConfig)
  * await sync.uploadVars(metaInfo)
  * ```
- * The server->client synchronisation happens transparently whenever the server
- * broadcasts weights.
- * The client->server sync must be triggered manually with uploadVars
+ * The constructor also takes a callback that can be used to determine whether
+ * to accept to reject the server's updates. For instance, the following code
+ * will only accept every sixth update from the server.
+ * ```js
+ * let nUpdatesSkipped = 0;
+ * const sync = new VariableSynchroniser(vars, (msg) => {
+ *  if(nUpdatesSkipped > 5) {
+ *    nUpdatesSkipped = 0;
+ *    return true;
+ *  else {
+ *    nUpdatesSkipped++;
+ *    return false;
+ *  }
+ * })
+ * ```
  */
 export class VariableSynchroniser {
   public modelId: string;
@@ -58,7 +70,7 @@ export class VariableSynchroniser {
   private vars = new Map<string, Variable|LayerVariable>();
   private acceptUpdate: (msg: VarsMsg) => boolean;
   /**
-   * Construct a synchroniser from a list of tf.Variables of tf.LayerVariables.
+   * Construct a synchroniser from a list of tf.Variables or tf.LayerVariables.
    * @param {Array<Variable|LayerVariable>} vars - Variables to track and sync
    */
   constructor(
@@ -79,9 +91,11 @@ export class VariableSynchroniser {
    * This will synchronise the weights of the layers.
    * @param layers: An array of layers to extract variables from
    */
-  public static fromLayers(layers: Layer[]) {
+  public static fromLayers(
+      layers: Layer[], updateCallback?: (msg: VarsMsg) => boolean) {
     const layerWeights = layers.map(l => l.trainableWeights);
-    return new VariableSynchroniser(tf.util.flatten(layerWeights, []));
+    return new VariableSynchroniser(
+        tf.util.flatten(layerWeights, []), updateCallback);
   }
 
   private async connect(url: string): Promise<ConnectionMsg> {
@@ -116,8 +130,9 @@ export class VariableSynchroniser {
    * Upload the current values of the tracked variables to the server
    * @return A promise that resolves when the server has recieved the variables
    */
-  public async uploadVars(): Promise<{}> {
+  public async uploadVars(metaInfo?: TrainingInfo): Promise<{}> {
     const msg: VarsMsg = await this.serializeCurrentVars();
+    msg.history = metaInfo;
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
