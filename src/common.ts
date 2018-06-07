@@ -24,15 +24,20 @@ export enum Events {
   Upload = 'uploadVars'
 }
 
+export type TrainingInfo = {
+  nSteps: number
+};
+
 export type VarsMsg = {
-  version: string,
+  modelId: string,
   clientId: string,
-  vars: Variable[]
+  vars: Variable[],
+  history?: TrainingInfo
 };
 
 export type ConnectionMsg = {
   clientId: string,
   fitConfig: ModelFitConfig,
-  version: string,
+  modelId: string,
   initVars: Variable[]
 };

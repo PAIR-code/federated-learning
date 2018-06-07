@@ -1,3 +1,20 @@
+/**
+ * @license
+ * Copyright 2018 Google LLC. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =============================================================================
+ */
+
 import * as tf from '@tensorflow/tfjs';
 import {ModelFitConfig, Variable} from '@tensorflow/tfjs';
 import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
@@ -9,52 +26,49 @@ import {ConnectionMsg, Events, VarsMsg} from '../common';
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 1 * 1000;
 
-async function fromEvent<T>(
-    emitter: SocketIOClient.Socket, eventName: string, timeout: number) {
-  return new Promise((resolve, reject) => {
-           const rejectTimer = setTimeout(
-               () => reject(`${eventName} event timed out`), timeout);
-           const listener = (evtArgs: T) => {
-             emitter.removeListener(eventName, listener);
-             clearTimeout(rejectTimer);
-
-             resolve(evtArgs);
-           };
-           emitter.on(eventName, listener);
-         }) as Promise<T>;
-}
-
-function flatten<T>(arr: T[][]) {
-  return arr.reduce((x, y) => x.concat(y), []);
-}
-
 /**
  * Synchronises tf.Variables between a client and a server.
- * Example usage:
+ * Example usage with bare tf.Variables:
+ * ```js
+ * const { loss, vars } = setupModel()
+ * const sync = new VariableSynchroniser(vars)
+ * const clientHyperparams = await sync.initialise('http://server.com')
+ * // train the model or otherwise update vars
+ * const metaInfo = { nSteps: 1 } // optional
+ * await sync.uploadVars(metaInfo)
+ * ```
+ * Example usage with a tf.Model:
  * ```js
  * const model = tf.loadModel('a-model.json');
  * const sync = VariableSynchroniser.fromLayers(model.getLayer('classifier'))
  * const clientFitConfig = await sync.initialise('http://server.com')
- * model.fit(data.X, data.y, clientFitConfig)
- * await sync.uploadVars()
+ * const h = await model.fit(data.X, data.y, clientFitConfig)
+ * await sync.uploadVars(metaInfo)
  * ```
  * The server->client synchronisation happens transparently whenever the server
  * broadcasts weights.
  * The client->server sync must be triggered manually with uploadVars
  */
 export class VariableSynchroniser {
-  public version: string;
+  public modelId: string;
   private socket: SocketIOClient.Socket;
   private connMsg: ConnectionMsg;
   private vars: Map<string, Variable|LayerVariable>;
-
+  private acceptUpdate: (msg: VarsMsg) => boolean;
   /**
    * Construct a synchroniser from a list of tf.Variables of tf.LayerVariables.
    * @param {Array<Variable|LayerVariable>} vars - Variables to track and sync
    */
-  constructor(vars: Array<Variable|LayerVariable>) {
+  constructor(
+      vars: Array<Variable|LayerVariable>,
+      updateCallback?: (msg: VarsMsg) => boolean) {
     for (const variable of vars) {
       this.vars.set(variable.name, variable);
+    }
+    if (updateCallback) {
+      this.acceptUpdate = updateCallback;
+    } else {
+      this.acceptUpdate = () => true;
     }
   }
 
@@ -65,7 +79,7 @@ export class VariableSynchroniser {
    */
   public static fromLayers(layers: Layer[]) {
     const layerWeights = layers.map(l => l.trainableWeights);
-    return new VariableSynchroniser(flatten(layerWeights));
+    return new VariableSynchroniser(tf.util.flatten(layerWeights, []));
   }
 
   private async connect(url: string): Promise<ConnectionMsg> {
@@ -85,11 +99,13 @@ export class VariableSynchroniser {
   public async initialise(url: string): Promise<ModelFitConfig> {
     this.connMsg = await this.connect(url);
     this.setVarsFromMessage(this.connMsg.initVars);
-    this.version = this.connMsg.version;
+    this.modelId = this.connMsg.modelId;
 
     this.socket.on(Events.Download, (msg: VarsMsg) => {
-      this.setVarsFromMessage(msg.vars);
-      this.version = msg.version;
+      if (this.acceptUpdate(msg)) {
+        this.setVarsFromMessage(msg.vars);
+        this.modelId = msg.modelId;
+      }
     });
 
     return this.connMsg.fitConfig;
@@ -124,7 +140,7 @@ export class VariableSynchroniser {
       }
     });
 
-    return {clientId: this.connMsg.clientId, version: this.version, vars};
+    return {clientId: this.connMsg.clientId, modelId: this.modelId, vars};
   }
 
   protected setVarsFromMessage(newVars: Variable[]) {
@@ -141,4 +157,20 @@ export class VariableSynchroniser {
       }
     }
   }
+}
+
+async function fromEvent<T>(
+    emitter: SocketIOClient.Socket, eventName: string,
+    timeout: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+           const rejectTimer = setTimeout(
+               () => reject(`${eventName} event timed out`), timeout);
+           const listener = (evtArgs: T) => {
+             emitter.removeListener(eventName, listener);
+             clearTimeout(rejectTimer);
+
+             resolve(evtArgs);
+           };
+           emitter.on(eventName, listener);
+         }) as Promise<T>;
 }
