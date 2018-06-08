@@ -17,6 +17,8 @@
 
 /** Server code */
 
+import './fetch_polyfill';
+
 import * as express from 'express';
 import {Request, Response} from 'express';
 import * as fs from 'fs';
@@ -39,20 +41,19 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 const writeFile = promisify(fs.writeFile);
-
-const dataDir = path.resolve(__dirname + '/../data');
 const indexPath = path.resolve(__dirname + '/../demo/index.html');
+const dataDir = path.resolve(__dirname + '/../data');
 const modelDB = new ModelDB(dataDir);
-
-app.get('/', (req: Request, res: Response) => {
-  res.sendFile(indexPath);
-});
 
 async function downloadMsg(): Promise<DownloadMsg> {
   const varsJson = await modelDB.currentVars();
   const varsSeri = await Promise.all(varsJson.map(serializeVar));
   return {fitConfig: FIT_CONFIG, modelId: modelDB.modelId, vars: varsSeri};
 }
+
+app.get('/', (req: Request, res: Response) => {
+  res.sendFile(indexPath);
+});
 
 io.on('connection', async (socket: socketIO.Socket) => {
   // Send current variables to newly connected client

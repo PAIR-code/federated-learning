@@ -1,4 +1,6 @@
 import * as tf from '@tensorflow/tfjs';
+import {Tensor, Variable} from '@tensorflow/tfjs';
+import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
 export type SerializedVariable = {
   dtype: tf.DataType,
@@ -13,6 +15,19 @@ export async function serializeVar(variable: tf.Tensor):
   const copy =
       data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   return {dtype: variable.dtype, shape: variable.shape.slice(), data: copy};
+}
+
+export async function serializeVars(
+    vars: Array<Variable|LayerVariable|Tensor>) {
+  const varsP: Array<Promise<SerializedVariable>> = [];
+  vars.forEach((value, key) => {
+    if (value instanceof LayerVariable) {
+      varsP.push(serializeVar(tf.variable(value.read())));
+    } else {
+      varsP.push(serializeVar(value));
+    }
+  });
+  return Promise.all(varsP);
 }
 
 export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
@@ -42,9 +57,15 @@ export type TensorJson = {
 };
 
 export function tensorToJson(t: tf.Tensor): TensorJson {
+  let data;
+  if (t instanceof LayerVariable) {
+    data = t.read().dataSync();
+  } else {
+    data = t.dataSync();
+  }
   // Note: could make this async / use base64 encoding on the buffer data
   return {
-    'values': Array.from(t.dataSync()), 'shape': t.shape, 'dtype': t.dtype
+    'values': Array.from(data), 'shape': t.shape, 'dtype': t.dtype
   }
 }
 
