@@ -15,10 +15,11 @@
  * =============================================================================
  */
 
+// tslint:disable-next-line:max-line-length
+import {expectArraysClose, expectArraysEqual} from '@tensorflow/tfjs-core/dist/test_util';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as rimraf from 'rimraf';
-import {expectArraysClose, expectArraysEqual} from '../test_util';
 
 import {ModelDB} from './model_db';
 
