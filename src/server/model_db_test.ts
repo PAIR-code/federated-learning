@@ -94,7 +94,8 @@ describe('ModelDB', () => {
 
   it('only performs update after passing a threshold', async () => {
     const db = new ModelDB(dataDir, 3);
-    await db.possiblyUpdate();
+    let updated = await db.possiblyUpdate();
+    expect(updated).toBe(false);
     expect(db.modelId).toBe(modelId);
     const oldUpdateFiles = await db.listUpdateFiles();
     expect(oldUpdateFiles.length).toBe(2);
@@ -107,7 +108,8 @@ describe('ModelDB', () => {
         {values: [0, 0, 0, 0], shape: [1, 4]}
       ]
     }));
-    await db.possiblyUpdate();
+    updated = await db.possiblyUpdate();
+    expect(updated).toBe(true);
     expect(db.modelId).not.toBe(modelId);
     const newUpdateFiles = await db.listUpdateFiles();
     expect(newUpdateFiles.length).toBe(0);
