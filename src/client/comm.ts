@@ -24,7 +24,7 @@ import * as socketio from 'socket.io-client';
 
 import {DownloadMsg, Events, UploadMsg} from '../common';
 // tslint:disable-next-line:max-line-length
-import {deserializeVar, SerializedVariable, serializeVar} from '../serialization';
+import {deserializeVar, SerializedVariable, serializeVars} from '../serialization';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 1 * 1000;
@@ -137,16 +137,8 @@ export class VariableSynchroniser {
   protected async serializeCurrentVars(): Promise<UploadMsg> {
     assert(this.numExamples > 0, 'should only serialize if we\'ve seen data');
 
-    const varsP: Array<Promise<SerializedVariable>> = [];
+    const vars = await serializeVars(this.vars);
 
-    this.vars.forEach((value, key) => {
-      if (value instanceof LayerVariable) {
-        varsP.push(serializeVar(tf.variable(value.read())));
-      } else {
-        varsP.push(serializeVar(value));
-      }
-    });
-    const vars = await Promise.all(varsP);
     return {
       numExamples: this.numExamples, /* TODO: ensure this gets updated */
       modelId: this.modelId,

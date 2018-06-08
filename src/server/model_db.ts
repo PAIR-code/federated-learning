@@ -19,9 +19,12 @@ import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
 import * as path from 'path';
 import {promisify} from 'util';
+
+import {setupUserModel} from '../model';
 import {jsonToTensor, TensorJson, tensorToJson} from '../serialization';
 
 const DEFAULT_MIN_UPDATES = 10;
+const NO_MODELS_IN_FOLDER = '0';
 const mkdir = promisify(fs.mkdir);
 const readdir = promisify(fs.readdir);
 const readFile = promisify(fs.readFile);
@@ -35,7 +38,7 @@ function getLatestId(dir: string) {
     } else {
       return acc;
     }
-  }, '0');
+  }, NO_MODELS_IN_FOLDER);
 }
 
 function generateNewId() {
@@ -55,7 +58,17 @@ export class ModelDB {
 
   constructor(dataDir: string, minUpdates?: number, currentModelId?: string) {
     this.dataDir = dataDir;
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir);
+    }
+
     this.modelId = currentModelId || getLatestId(dataDir);
+    if (this.modelId == NO_MODELS_IN_FOLDER) {
+      setupUserModel().then((dict) => {
+        this.writeNewVars(dict.vars as tf.Tensor[]);
+      });
+    }
+
     this.updating = false;
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
   }
@@ -107,11 +120,14 @@ export class ModelDB {
     });
 
     // Save results and update key
+    await this.writeNewVars(updatedVars);
+  }
+
+  async writeNewVars(newVars: tf.Tensor[]) {
     const newModelId = generateNewId();
     const newModelDir = path.join(this.dataDir, newModelId);
     const newModelPath = path.join(this.dataDir, newModelId + '.json');
-    const newModelJSON =
-        JSON.stringify({'vars': updatedVars.map(tensorToJson)});
+    const newModelJSON = JSON.stringify({'vars': newVars.map(tensorToJson)});
     await writeFile(newModelPath, newModelJSON);
     await mkdir(newModelDir);
     this.modelId = newModelId;

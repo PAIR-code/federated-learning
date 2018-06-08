@@ -11,7 +11,7 @@
   "scripts": {
     "start": "node dist/server/server.js",
     "dev": "ts-node src/server/server.ts",
-    "build": "tsc && cp -r demo/ dist/demo/",
+    "build": "tsc && cp -r demo/ dist/",
     "test": "ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json",
     "lint": "tslint -p . -t verbose"
   },
@@ -35,8 +35,8 @@
     "jasmine-core": "~3.1.0",
     "rimraf": "^2.6.2",
     "ts-node": "^6.1.0",
+    "ts-node-dev": "^1.0.0-pre.26",
     "tslint": "~5.8.0",
-    "typescript": "2.7.2",
-    "ts-node-dev": "^1.0.0-pre.26"
+    "typescript": "2.7.2"
   }
 }
