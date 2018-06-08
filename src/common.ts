@@ -20,28 +20,9 @@ import {ModelFitConfig} from '@tensorflow/tfjs';
 import {SerializedVariable} from './serialization';
 
 export enum Events {
-  Initialise = 'initialise',
   Download = 'downloadVars',
   Upload = 'uploadVars'
 }
-
-export type TrainingInfo = {
-  nSteps: number
-};
-
-export type VarsMsg = {
-  modelId: string,
-  clientId: string,
-  vars: SerializedVariable[],
-  history?: TrainingInfo
-};
-
-export type ConnectionMsg = {
-  clientId: string,
-  fitConfig: ModelFitConfig,
-  modelId: string,
-  initVars: SerializedVariable[]
-};
 
 export type UploadMsg = {
   modelId: string,
@@ -50,7 +31,7 @@ export type UploadMsg = {
 };
 
 export type DownloadMsg = {
-  fitConfig: ModelFitConfig,
   modelId: string,
   vars: SerializedVariable[]
+  fitConfig: ModelFitConfig,
 };
