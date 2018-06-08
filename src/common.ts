@@ -42,3 +42,15 @@ export type ConnectionMsg = {
   modelId: string,
   initVars: SerializedVariable[]
 };
+
+export type UploadMsg = {
+  modelId: string,
+  vars: SerializedVariable[],
+  numExamples: number
+};
+
+export type DownloadMsg = {
+  fitConfig: ModelFitConfig,
+  modelId: string,
+  vars: SerializedVariable[]
+};

@@ -19,20 +19,73 @@
 
 import * as express from 'express';
 import {Request, Response} from 'express';
+import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
 import * as socketIO from 'socket.io';
+import {promisify} from 'util';
+import * as uuid from 'uuid/v4';
+
+import {DownloadMsg, Events, UploadMsg} from '../common';
+import {serializedToJson, serializeVar} from '../serialization';
+
+import {ModelDB} from './model_db';
+
+const FIT_CONFIG = {
+  batchSize: 10
+};
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
+const writeFile = promisify(fs.writeFile);
+
+const dataDir = path.resolve(__dirname + '/../data');
+const indexPath = path.resolve(__dirname + '/../demo/index.html');
+const modelDB = new ModelDB(dataDir);
 
 app.get('/', (req: Request, res: Response) => {
-  res.sendFile(path.resolve(__dirname + '/../demo/index.html'));
+  res.sendFile(indexPath);
 });
 
-io.on('connection', (socket: socketIO.Socket) => {
-  console.log('a user connected');
+async function downloadMsg(): Promise<DownloadMsg> {
+  const varsJson = await modelDB.currentVars();
+  const varsSeri = await Promise.all(varsJson.map(serializeVar));
+  return {fitConfig: FIT_CONFIG, modelId: modelDB.modelId, vars: varsSeri};
+}
+
+io.on('connection', async (socket: socketIO.Socket) => {
+  // Send current variables to newly connected client
+  const initVars = await downloadMsg();
+  socket.emit(Events.Download, initVars);
+
+  // When a client sends us updated weights
+  socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
+    // Save them to a file
+    const modelId = msg.modelId;
+    const updateId = uuid();
+    const updatePath = path.join(dataDir, modelId, updateId + '.json');
+    const updateJSON = JSON.stringify({
+      clientId: socket.client.id,
+      modelId: modelId,
+      numExamples: msg.numExamples,
+      vars: msg.vars.map(serializedToJson)
+    });
+    await writeFile(updatePath, updateJSON);
+
+    // Let them know we're done saving
+    ack(true);
+
+    // Potentially update the model (asynchronously)
+    if (modelId == modelDB.modelId) {
+      const updated = await modelDB.possiblyUpdate();
+      if (updated) {
+        // Send new variables to all clients if we updated
+        const newVars = downloadMsg();
+        io.sockets.emit(Events.Download, newVars)
+      }
+    }
+  })
 });
 
 server.listen(3000, () => {
