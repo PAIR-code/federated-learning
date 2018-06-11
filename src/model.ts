@@ -15,7 +15,8 @@
  * =============================================================================
  */
 
+// tslint:disable-next-line:max-line-length
 import {MnistTransferLearningModel} from '../demo/mnist_transfer_learning_model';
 
 // TODO: some kind of flag to determine what model we use
-export default MnistTransferLearningModel;
+export const Model = MnistTransferLearningModel;

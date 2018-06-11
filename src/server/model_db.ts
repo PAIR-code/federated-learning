@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {promisify} from 'util';
 
-import Model from '../model';
+import {Model} from '../model';
 import {jsonToTensor, TensorJson, tensorToJson} from '../serialization';
 
 const DEFAULT_MIN_UPDATES = 10;
