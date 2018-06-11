@@ -15,10 +15,10 @@
  * =============================================================================
  */
 
-import {Tensor, Variable} from '@tensorflow/tfjs';
+import {Scalar, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
-export type LossFun = (inputs: Tensor, labels: Tensor) => Tensor;
+export type LossFun = (inputs: Tensor, labels: Tensor) => Scalar;
 export type PredFun = (inputs: Tensor) => Tensor|Tensor[];
 export type VarList = Array<Variable|LayerVariable>;
 export type ModelDict = {

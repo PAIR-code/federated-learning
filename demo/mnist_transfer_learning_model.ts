@@ -16,7 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs'
-import {Tensor} from '@tensorflow/tfjs';
+import {Scalar, Tensor} from '@tensorflow/tfjs';
 import {FederatedModel, ModelDict} from '../src/types';
 
 // https://github.com/tensorflow/tfjs-examples/tree/master/mnist-transfer-cnn
@@ -35,7 +35,7 @@ export class MnistTransferLearningModel implements FederatedModel {
     const loss =
         (inputs: Tensor, labels: Tensor) => {
           const logits = model.predict(inputs) as Tensor;
-          return tf.losses.softmaxCrossEntropy(logits, labels);
+          return tf.losses.softmaxCrossEntropy(logits, labels).mean() as Scalar;
         }
 
     return {
