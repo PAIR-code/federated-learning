@@ -15,10 +15,11 @@
  * =============================================================================
  */
 
+// tslint:disable-next-line:max-line-length
+import {test_util} from '@tensorflow/tfjs-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as rimraf from 'rimraf';
-import {expectArraysClose, expectArraysEqual} from '../test_util';
 
 import {ModelDB} from './model_db';
 
@@ -74,10 +75,10 @@ describe('ModelDB', () => {
   it('loads variables from JSON', async () => {
     const db = new ModelDB(dataDir);
     const vars = await db.currentVars();
-    expectArraysClose(vars[0], [0, 0, 0, 0]);
-    expectArraysClose(vars[1], [1, 2, 3, 4]);
-    expectArraysEqual(vars[0].shape, [2, 2]);
-    expectArraysEqual(vars[1].shape, [1, 4]);
+    test_util.expectArraysClose(vars[0], [0, 0, 0, 0]);
+    test_util.expectArraysClose(vars[1], [1, 2, 3, 4]);
+    test_util.expectArraysEqual(vars[0].shape, [2, 2]);
+    test_util.expectArraysEqual(vars[1].shape, [1, 4]);
     expect(vars[0].dtype).toBe('float32');
     expect(vars[1].dtype).toBe('float32');
   });
@@ -87,8 +88,8 @@ describe('ModelDB', () => {
     await db.update();
     expect(db.modelId).not.toBe(modelId);
     const newVars = await db.currentVars();
-    expectArraysClose(newVars[0], [0.4, -0.4, 0.6, -0.6]);
-    expectArraysClose(newVars[1], [1.2, 2.8, 3.2, 4.8]);
+    test_util.expectArraysClose(newVars[0], [0.4, -0.4, 0.6, -0.6]);
+    test_util.expectArraysClose(newVars[1], [1.2, 2.8, 3.2, 4.8]);
   });
 
   it('only performs update after passing a threshold', async () => {
