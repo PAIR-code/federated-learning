@@ -15,7 +15,18 @@
  * =============================================================================
  */
 
-import {MnistTransferLearningModel} from '../demo/mnist_transfer_learning_model';
+import {Tensor, Variable} from '@tensorflow/tfjs';
+import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
-// TODO: some kind of flag to determine what model we use
-export default MnistTransferLearningModel;
+export type LossFun = (inputs: Tensor, labels: Tensor) => Tensor;
+export type PredFun = (inputs: Tensor) => Tensor|Tensor[];
+export type VarList = Array<Variable|LayerVariable>;
+export type ModelDict = {
+  vars: VarList,
+  loss: LossFun,
+  predict: PredFun
+};
+
+export interface FederatedModel {
+  setup(): Promise<ModelDict>;
+}

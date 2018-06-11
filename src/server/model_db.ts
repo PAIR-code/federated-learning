@@ -20,25 +20,28 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {promisify} from 'util';
 
-import {setupUserModel} from '../model';
+import Model from '../model';
 import {jsonToTensor, TensorJson, tensorToJson} from '../serialization';
 
 const DEFAULT_MIN_UPDATES = 10;
-const NO_MODELS_IN_FOLDER = '0';
 const mkdir = promisify(fs.mkdir);
+const exists = promisify(fs.exists);
 const readdir = promisify(fs.readdir);
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 
-function getLatestId(dir: string) {
-  const files = fs.readdirSync(dir);
-  return files.reduce((acc, val) => {
-    if (val.endsWith('.json') && val.slice(0, -5) > acc) {
-      return val.slice(0, -5);
-    } else {
-      return acc;
+async function getLatestId(dir: string) {
+  const files = await readdir(dir);
+  let latestId: string = null;
+  files.forEach((name) => {
+    if (name.endsWith('.json')) {
+      const id = name.slice(0, -5);
+      if (latestId == null || id > latestId) {
+        latestId = id;
+      }
     }
-  }, NO_MODELS_IN_FOLDER);
+  });
+  return latestId;
 }
 
 function generateNewId() {
@@ -56,21 +59,25 @@ export class ModelDB {
   updating: boolean;
   minUpdates: number;
 
-  constructor(dataDir: string, minUpdates?: number, currentModelId?: string) {
+  constructor(dataDir: string, minUpdates?: number) {
     this.dataDir = dataDir;
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir);
-    }
-
-    this.modelId = currentModelId || getLatestId(dataDir);
-    if (this.modelId == NO_MODELS_IN_FOLDER) {
-      setupUserModel().then((dict) => {
-        this.writeNewVars(dict.vars as tf.Tensor[]);
-      });
-    }
-
+    this.modelId = null;
     this.updating = false;
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
+  }
+
+  async setup() {
+    const dirExists = await exists(this.dataDir);
+    if (!dirExists) {
+      await mkdir(this.dataDir);
+    }
+
+    this.modelId = await getLatestId(this.dataDir);
+    if (this.modelId == null) {
+      const model = new Model();
+      const dict = await model.setup();
+      await this.writeNewVars(dict.vars as tf.Tensor[]);
+    }
   }
 
   async listUpdateFiles(): Promise<string[]> {
@@ -86,7 +93,7 @@ export class ModelDB {
     return json['vars'].map(jsonToTensor);
   }
 
-  async possiblyUpdate() {
+  async possiblyUpdate(): Promise<boolean> {
     const updateFiles = await this.listUpdateFiles();
     if (updateFiles.length < this.minUpdates || this.updating) {
       return false;

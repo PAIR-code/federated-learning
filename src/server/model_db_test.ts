@@ -67,13 +67,15 @@ describe('ModelDB', () => {
     rimraf.sync(dataDir);
   });
 
-  it('defaults to treating the latest model as current', () => {
+  it('defaults to treating the latest model as current', async () => {
     const db = new ModelDB(dataDir);
+    await db.setup();
     expect(db.modelId).toBe(modelId);
   });
 
   it('loads variables from JSON', async () => {
     const db = new ModelDB(dataDir);
+    await db.setup();
     const vars = await db.currentVars();
     test_util.expectArraysClose(vars[0], [0, 0, 0, 0]);
     test_util.expectArraysClose(vars[1], [1, 2, 3, 4]);
@@ -85,6 +87,7 @@ describe('ModelDB', () => {
 
   it('updates the model using a weighted average', async () => {
     const db = new ModelDB(dataDir);
+    await db.setup();
     await db.update();
     expect(db.modelId).not.toBe(modelId);
     const newVars = await db.currentVars();
@@ -94,6 +97,7 @@ describe('ModelDB', () => {
 
   it('only performs update after passing a threshold', async () => {
     const db = new ModelDB(dataDir, 3);
+    await db.setup();
     let updated = await db.possiblyUpdate();
     expect(updated).toBe(false);
     expect(db.modelId).toBe(modelId);

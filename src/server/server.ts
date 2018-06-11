@@ -41,8 +41,8 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 const writeFile = promisify(fs.writeFile);
-const indexPath = path.resolve(__dirname + '/../demo/index.html');
-const dataDir = path.resolve(__dirname + '/../data');
+const indexPath = path.resolve(__dirname + '/../../demo/index.html');
+const dataDir = path.resolve(__dirname + '/../../data');
 const modelDB = new ModelDB(dataDir);
 
 async function downloadMsg(): Promise<DownloadMsg> {
@@ -89,6 +89,8 @@ io.on('connection', async (socket: socketIO.Socket) => {
   })
 });
 
-server.listen(3000, () => {
-  console.log('listening on 3000');
+modelDB.setup().then(() => {
+  server.listen(3000, () => {
+    console.log('listening on 3000');
+  });
 });
