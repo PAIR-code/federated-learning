@@ -56,12 +56,12 @@ export type TensorJson = {
   dtype?: tf.DataType
 };
 
-export function tensorToJson(t: tf.Tensor): TensorJson {
+export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
   let data;
   if (t instanceof LayerVariable) {
-    data = t.read().dataSync();
+    data = await t.read().data();
   } else {
-    data = t.dataSync();
+    data = await t.data();
   }
   // Note: could make this async / use base64 encoding on the buffer data
   return {
@@ -73,8 +73,9 @@ export function jsonToTensor(j: TensorJson): tf.Tensor {
   return tf.tensor(j.values, j.shape, j.dtype || 'float32');
 }
 
-export function serializedToJson(serialized: SerializedVariable): TensorJson {
-  return tensorToJson(deserializeVar(serialized));
+export async function serializedToJson(s: SerializedVariable):
+    Promise<TensorJson> {
+  return tensorToJson(deserializeVar(s));
 }
 
 export async function jsonToSerialized(j: TensorJson):

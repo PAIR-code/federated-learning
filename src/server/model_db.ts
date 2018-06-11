@@ -134,7 +134,8 @@ export class ModelDB {
     const newModelId = generateNewId();
     const newModelDir = path.join(this.dataDir, newModelId);
     const newModelPath = path.join(this.dataDir, newModelId + '.json');
-    const newModelJSON = JSON.stringify({'vars': newVars.map(tensorToJson)});
+    const newVarsJSON = await Promise.all(newVars.map(tensorToJson));
+    const newModelJSON = JSON.stringify({'vars': newVarsJSON});
     await writeFile(newModelPath, newModelJSON);
     await mkdir(newModelDir);
     this.modelId = newModelId;

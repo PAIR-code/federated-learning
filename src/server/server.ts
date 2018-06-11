@@ -66,11 +66,12 @@ io.on('connection', async (socket: socketIO.Socket) => {
     const modelId = msg.modelId;
     const updateId = uuid();
     const updatePath = path.join(dataDir, modelId, updateId + '.json');
+    const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
     const updateJSON = JSON.stringify({
       clientId: socket.client.id,
       modelId: modelId,
       numExamples: msg.numExamples,
-      vars: msg.vars.map(serializedToJson)
+      vars: updatedVars
     });
     await writeFile(updatePath, updateJSON);
 
