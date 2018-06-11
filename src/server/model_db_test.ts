@@ -91,7 +91,7 @@ describe('ModelDB', () => {
     expect(db.modelId).not.toBe(modelId);
     const newVars = await db.currentVars();
     test_util.expectArraysClose(newVars[0], [0.4, -0.4, 0.6, -0.6]);
-    test_util.expectArraysClose(newVars[1], [1.2, 2.8, 3.2, 4.8]);
+    test_util.expectArraysClose(newVars[1], [0.2, 0.8, 0.2, 0.8]);
   });
 
   it('only performs update after passing a threshold', async () => {

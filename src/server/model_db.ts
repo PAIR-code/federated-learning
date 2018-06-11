@@ -105,7 +105,8 @@ export class ModelDB {
   }
 
   async update() {
-    const updatedVars = await this.currentVars();
+    const currentVars = await this.currentVars();
+    const updatedVars = currentVars.map(v => tf.zerosLike(v));
     const updateFiles = await this.listUpdateFiles();
     const updatesJSON = await Promise.all(updateFiles.map(readJSON));
 
