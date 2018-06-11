@@ -15,7 +15,6 @@
  * =============================================================================
  */
 
-// tslint:disable-next-line:max-line-length
 import {test_util} from '@tensorflow/tfjs-core';
 import * as fs from 'fs';
 import * as path from 'path';
