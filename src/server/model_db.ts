@@ -20,37 +20,28 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {promisify} from 'util';
 
+import {Model} from '../model';
+import {jsonToTensor, TensorJson, tensorToJson} from '../serialization';
+
 const DEFAULT_MIN_UPDATES = 10;
 const mkdir = promisify(fs.mkdir);
+const exists = promisify(fs.exists);
 const readdir = promisify(fs.readdir);
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 
-function getLatestId(dir: string) {
-  const files = fs.readdirSync(dir);
-  return files.reduce((acc, val) => {
-    if (val.endsWith('.json') && val.slice(0, -5) > acc) {
-      return val.slice(0, -5);
-    } else {
-      return acc;
+async function getLatestId(dir: string) {
+  const files = await readdir(dir);
+  let latestId: string = null;
+  files.forEach((name) => {
+    if (name.endsWith('.json')) {
+      const id = name.slice(0, -5);
+      if (latestId == null || id > latestId) {
+        latestId = id;
+      }
     }
-  }, '0');
-}
-
-type TensorJSON = {
-  values: number[],
-  shape: number[],
-  dtype?: tf.DataType
-};
-
-function dumpTensor(t: tf.Tensor) {
-  return {
-    'values': Array.from(t.dataSync()), 'shape': t.shape, 'dtype': t.dtype
-  }
-}
-
-function loadTensor(obj: TensorJSON) {
-  return tf.tensor(obj.values, obj.shape, obj.dtype || 'float32');
+  });
+  return latestId;
 }
 
 function generateNewId() {
@@ -68,11 +59,25 @@ export class ModelDB {
   updating: boolean;
   minUpdates: number;
 
-  constructor(dataDir: string, minUpdates?: number, currentModelId?: string) {
+  constructor(dataDir: string, minUpdates?: number) {
     this.dataDir = dataDir;
-    this.modelId = currentModelId || getLatestId(dataDir);
+    this.modelId = null;
     this.updating = false;
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
+  }
+
+  async setup() {
+    const dirExists = await exists(this.dataDir);
+    if (!dirExists) {
+      await mkdir(this.dataDir);
+    }
+
+    this.modelId = await getLatestId(this.dataDir);
+    if (this.modelId == null) {
+      const model = new Model();
+      const dict = await model.setup();
+      await this.writeNewVars(dict.vars as tf.Tensor[]);
+    }
   }
 
   async listUpdateFiles(): Promise<string[]> {
@@ -85,21 +90,23 @@ export class ModelDB {
   async currentVars(): Promise<tf.Tensor[]> {
     const file = path.join(this.dataDir, this.modelId + '.json');
     const json = await readJSON(file);
-    return json['vars'].map(loadTensor);
+    return json['vars'].map(jsonToTensor);
   }
 
-  async possiblyUpdate() {
+  async possiblyUpdate(): Promise<boolean> {
     const updateFiles = await this.listUpdateFiles();
     if (updateFiles.length < this.minUpdates || this.updating) {
-      return;
+      return false;
     }
     this.updating = true;
     await this.update();
     this.updating = false;
+    return true;
   }
 
   async update() {
-    const updatedVars = await this.currentVars();
+    const currentVars = await this.currentVars();
+    const updatedVars = currentVars.map(v => tf.zerosLike(v));
     const updateFiles = await this.listUpdateFiles();
     const updatesJSON = await Promise.all(updateFiles.map(readJSON));
 
@@ -114,17 +121,22 @@ export class ModelDB {
     updatesJSON.forEach((u) => {
       const nk = tf.scalar(u['numExamples']);
       const frac = nk.div(n);
-      u['vars'].forEach((v: TensorJSON, i: number) => {
-        const update = loadTensor(v).mul(frac);
+      u['vars'].forEach((v: TensorJson, i: number) => {
+        const update = jsonToTensor(v).mul(frac);
         updatedVars[i] = updatedVars[i].add(update);
       });
     });
 
     // Save results and update key
+    await this.writeNewVars(updatedVars);
+  }
+
+  async writeNewVars(newVars: tf.Tensor[]) {
     const newModelId = generateNewId();
     const newModelDir = path.join(this.dataDir, newModelId);
     const newModelPath = path.join(this.dataDir, newModelId + '.json');
-    const newModelJSON = JSON.stringify({'vars': updatedVars.map(dumpTensor)});
+    const newVarsJSON = await Promise.all(newVars.map(tensorToJson));
+    const newModelJSON = JSON.stringify({'vars': newVarsJSON});
     await writeFile(newModelPath, newModelJSON);
     await mkdir(newModelDir);
     this.modelId = newModelId;

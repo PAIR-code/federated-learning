@@ -15,23 +15,16 @@
  * =============================================================================
  */
 
-/** Shared between client and server */
-import {ModelFitConfig} from '@tensorflow/tfjs';
-import {SerializedVariable} from './serialization';
+import * as es6Promise from 'es6-promise';
+es6Promise.polyfill();
 
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars'
+eval(`
+var realFetch = require('node-fetch');
+
+if (!global.fetch) {
+  global.fetch = realFetch;
+  global.Response = realFetch.Response;
+  global.Headers = realFetch.Headers;
+  global.Request = realFetch.Request;
 }
-
-export type UploadMsg = {
-  modelId: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DownloadMsg = {
-  modelId: string,
-  vars: SerializedVariable[]
-  fitConfig: ModelFitConfig,
-};
+`);

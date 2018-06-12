@@ -1,5 +1,5 @@
 /**
- * @license
+ * * @license
  * Copyright 2018 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,23 +15,4 @@
  * =============================================================================
  */
 
-/** Shared between client and server */
-import {ModelFitConfig} from '@tensorflow/tfjs';
-import {SerializedVariable} from './serialization';
-
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars'
-}
-
-export type UploadMsg = {
-  modelId: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DownloadMsg = {
-  modelId: string,
-  vars: SerializedVariable[]
-  fitConfig: ModelFitConfig,
-};
+export * from './types';

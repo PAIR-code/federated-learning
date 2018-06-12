@@ -15,23 +15,8 @@
  * =============================================================================
  */
 
-/** Shared between client and server */
-import {ModelFitConfig} from '@tensorflow/tfjs';
-import {SerializedVariable} from './serialization';
+// tslint:disable-next-line:max-line-length
+import {MnistTransferLearningModel} from '../demo/mnist_transfer_learning_model';
 
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars'
-}
-
-export type UploadMsg = {
-  modelId: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DownloadMsg = {
-  modelId: string,
-  vars: SerializedVariable[]
-  fitConfig: ModelFitConfig,
-};
+// TODO: some kind of flag to determine what model we use
+export class Model extends MnistTransferLearningModel {}

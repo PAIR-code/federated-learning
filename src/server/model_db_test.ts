@@ -15,7 +15,6 @@
  * =============================================================================
  */
 
-// tslint:disable-next-line:max-line-length
 import {test_util} from '@tensorflow/tfjs-core';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -67,13 +66,15 @@ describe('ModelDB', () => {
     rimraf.sync(dataDir);
   });
 
-  it('defaults to treating the latest model as current', () => {
+  it('defaults to treating the latest model as current', async () => {
     const db = new ModelDB(dataDir);
+    await db.setup();
     expect(db.modelId).toBe(modelId);
   });
 
   it('loads variables from JSON', async () => {
     const db = new ModelDB(dataDir);
+    await db.setup();
     const vars = await db.currentVars();
     test_util.expectArraysClose(vars[0], [0, 0, 0, 0]);
     test_util.expectArraysClose(vars[1], [1, 2, 3, 4]);
@@ -85,16 +86,19 @@ describe('ModelDB', () => {
 
   it('updates the model using a weighted average', async () => {
     const db = new ModelDB(dataDir);
+    await db.setup();
     await db.update();
     expect(db.modelId).not.toBe(modelId);
     const newVars = await db.currentVars();
     test_util.expectArraysClose(newVars[0], [0.4, -0.4, 0.6, -0.6]);
-    test_util.expectArraysClose(newVars[1], [1.2, 2.8, 3.2, 4.8]);
+    test_util.expectArraysClose(newVars[1], [0.2, 0.8, 0.2, 0.8]);
   });
 
   it('only performs update after passing a threshold', async () => {
     const db = new ModelDB(dataDir, 3);
-    await db.possiblyUpdate();
+    await db.setup();
+    let updated = await db.possiblyUpdate();
+    expect(updated).toBe(false);
     expect(db.modelId).toBe(modelId);
     const oldUpdateFiles = await db.listUpdateFiles();
     expect(oldUpdateFiles.length).toBe(2);
@@ -107,9 +111,10 @@ describe('ModelDB', () => {
         {values: [0, 0, 0, 0], shape: [1, 4]}
       ]
     }));
-    await db.possiblyUpdate();
+    updated = await db.possiblyUpdate();
+    expect(updated).toBe(true);
     expect(db.modelId).not.toBe(modelId);
     const newUpdateFiles = await db.listUpdateFiles();
     expect(newUpdateFiles.length).toBe(0);
   });
-})
+});

@@ -1,26 +1,33 @@
 import * as tf from '@tensorflow/tfjs';
+import {Tensor, Variable} from '@tensorflow/tfjs';
+import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
 export type SerializedVariable = {
   dtype: tf.DataType,
   shape: number[],
-  name: string,
-  data: ArrayBuffer,
-  trainable: boolean
+  data: ArrayBuffer
 };
 
-export async function serializeVar(variable: tf.Variable):
+export async function serializeVar(variable: tf.Tensor):
     Promise<SerializedVariable> {
   const data = await variable.data();
   // small TypedArrays are views into a larger buffer
   const copy =
       data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-  return {
-    dtype: variable.dtype,
-    shape: variable.shape.slice(),
-    name: variable.name,
-    trainable: variable.trainable,
-    data: copy
-  };
+  return {dtype: variable.dtype, shape: variable.shape.slice(), data: copy};
+}
+
+export async function serializeVars(
+    vars: Array<Variable|LayerVariable|Tensor>) {
+  const varsP: Array<Promise<SerializedVariable>> = [];
+  vars.forEach((value, key) => {
+    if (value instanceof LayerVariable) {
+      varsP.push(serializeVar(tf.variable(value.read())));
+    } else {
+      varsP.push(serializeVar(value));
+    }
+  });
+  return Promise.all(varsP);
 }
 
 export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
@@ -41,6 +48,37 @@ export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
   const ctor = dtypeToTypedArrayCtor[dtype];
   const array = new ctor(data, 0, numel);
   return tf.tensor(array, shape, dtype);
+}
+
+export type TensorJson = {
+  values: number[],
+  shape: number[],
+  dtype?: tf.DataType
+};
+
+export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
+  let data;
+  if (t instanceof LayerVariable) {
+    data = await t.read().data();
+  } else {
+    data = await t.data();
+  }
+  // Note: could make this async / use base64 encoding on the buffer data
+  return {'values': Array.from(data), 'shape': t.shape, 'dtype': t.dtype};
+}
+
+export function jsonToTensor(j: TensorJson): tf.Tensor {
+  return tf.tensor(j.values, j.shape, j.dtype || 'float32');
+}
+
+export async function serializedToJson(s: SerializedVariable):
+    Promise<TensorJson> {
+  return tensorToJson(deserializeVar(s));
+}
+
+export async function jsonToSerialized(j: TensorJson):
+    Promise<SerializedVariable> {
+  return serializeVar(jsonToTensor(j));
 }
 
 const dtypeToTypedArrayCtor = {

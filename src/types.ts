@@ -15,23 +15,18 @@
  * =============================================================================
  */
 
-/** Shared between client and server */
-import {ModelFitConfig} from '@tensorflow/tfjs';
-import {SerializedVariable} from './serialization';
+import {Scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars'
+export type LossFun = (inputs: Tensor, labels: Tensor) => Scalar;
+export type PredFun = (inputs: Tensor) => Tensor|Tensor[];
+export type VarList = Array<Variable|LayerVariable>;
+export type ModelDict = {
+  vars: VarList,
+  loss: LossFun,
+  predict: PredFun
+};
+
+export interface FederatedModel {
+  setup(): Promise<ModelDict>;
 }
-
-export type UploadMsg = {
-  modelId: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DownloadMsg = {
-  modelId: string,
-  vars: SerializedVariable[]
-  fitConfig: ModelFitConfig,
-};
