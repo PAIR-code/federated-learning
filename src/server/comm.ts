@@ -66,7 +66,7 @@ export class SocketAPI {
         const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
         const updateJSON = JSON.stringify({
           clientId: socket.client.id,
-          modelId: modelId,
+          modelId,
           numExamples: msg.numExamples,
           vars: updatedVars
         });
@@ -76,15 +76,15 @@ export class SocketAPI {
         ack(true);
 
         // Potentially update the model (asynchronously)
-        if (modelId == this.modelDB.modelId) {
+        if (modelId === this.modelDB.modelId) {
           const updated = await this.modelDB.possiblyUpdate();
           if (updated) {
             // Send new variables to all clients if we updated
             const newVars = await this.downloadMsg();
-            this.io.sockets.emit(Events.Download, newVars)
+            this.io.sockets.emit(Events.Download, newVars);
           }
         }
-      })
+      });
     });
   }
 }

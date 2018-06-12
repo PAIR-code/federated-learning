@@ -142,7 +142,7 @@ export class VariableSynchroniser {
     return {
       numExamples: this.numExamples, /* TODO: ensure this gets updated */
       modelId: this.modelId,
-      vars: vars
+      vars
     };
   }
 

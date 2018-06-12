@@ -15,13 +15,13 @@
  * =============================================================================
  */
 
-import * as tf from '@tensorflow/tfjs'
+import * as tf from '@tensorflow/tfjs';
 import {Scalar, Tensor} from '@tensorflow/tfjs';
 import {FederatedModel, ModelDict} from '../src/index';
 
 // https://github.com/tensorflow/tfjs-examples/tree/master/mnist-transfer-cnn
-// tslint:disable-next-line:max-line-length
 const mnistTransferLearningModelURL =
+    // tslint:disable-next-line:max-line-length
     'https://storage.googleapis.com/tfjs-models/tfjs/mnist_transfer_cnn_v1/model.json';
 
 export class MnistTransferLearningModel implements FederatedModel {
@@ -32,15 +32,12 @@ export class MnistTransferLearningModel implements FederatedModel {
       model.layers[i].trainable = false;  // freeze conv layers
     }
 
-    const loss =
-        (inputs: Tensor, labels: Tensor) => {
-          const logits = model.predict(inputs) as Tensor;
-          const losses = tf.losses.softmaxCrossEntropy(logits, labels);
-          return losses.mean() as Scalar;
-        }
+    const loss = (inputs: Tensor, labels: Tensor) => {
+      const logits = model.predict(inputs) as Tensor;
+      const losses = tf.losses.softmaxCrossEntropy(logits, labels);
+      return losses.mean() as Scalar;
+    };
 
-    return {
-      predict: model.predict, vars: model.trainableWeights, loss: loss
-    }
+    return {predict: model.predict, vars: model.trainableWeights, loss};
   }
 }

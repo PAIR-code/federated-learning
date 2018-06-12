@@ -23,7 +23,7 @@ import * as ser from './serialization';
 describe('serialization', () => {
   const floatTensor =
       tf.tensor3d([[[1.1, 2.2], [3.3, 4.4]], [[5.5, 6.6], [7.7, 8.8]]]);
-  const boolTensor = tf.tensor1d([true, false], 'bool')
+  const boolTensor = tf.tensor1d([true, false], 'bool');
   const intTensor = tf.tensor2d([[1, 2], [3, 4]], [2, 2], 'int32');
 
   it('converts back and forth to JSON', async () => {

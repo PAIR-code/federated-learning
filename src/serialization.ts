@@ -64,9 +64,7 @@ export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
     data = await t.data();
   }
   // Note: could make this async / use base64 encoding on the buffer data
-  return {
-    'values': Array.from(data), 'shape': t.shape, 'dtype': t.dtype
-  }
+  return {'values': Array.from(data), 'shape': t.shape, 'dtype': t.dtype};
 }
 
 export function jsonToTensor(j: TensorJson): tf.Tensor {

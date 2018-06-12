@@ -19,4 +19,4 @@
 import {MnistTransferLearningModel} from '../demo/mnist_transfer_learning_model';
 
 // TODO: some kind of flag to determine what model we use
-export const Model = MnistTransferLearningModel;
+export class Model extends MnistTransferLearningModel {}

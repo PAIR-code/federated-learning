@@ -117,4 +117,4 @@ describe('ModelDB', () => {
     const newUpdateFiles = await db.listUpdateFiles();
     expect(newUpdateFiles.length).toBe(0);
   });
-})
+});

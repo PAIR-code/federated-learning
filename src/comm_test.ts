@@ -31,9 +31,7 @@ import {ModelDB} from './server/model_db';
 
 const modelId = '1528400733553';
 const batchSize = 42;
-const FIT_CONFIG = {
-  batchSize: batchSize
-};
+const FIT_CONFIG = {batchSize};
 const PORT = 3000;
 const socketURL = `http://0.0.0.0:${PORT}`;
 const initWeights =
@@ -48,7 +46,9 @@ function waitUntil(done: () => boolean, then: () => void, timeout?: number) {
   };
   const moveOnAnyway = setTimeout(moveOn, timeout || 100);
   const moveOnIfDone = setInterval(() => {
-    if (done()) moveOn();
+    if (done()) {
+      moveOn();
+    }
   }, 1);
 }
 
@@ -59,7 +59,7 @@ describe('Socket API', () => {
   let modelDB: ModelDB;
   let serverAPI: SocketAPI;
   let clientAPI: VariableSynchroniser;
-  let clientVars: Array<Variable>;
+  let clientVars: Variable[];
   let httpServer: http.Server;
 
   beforeEach(async () => {
@@ -125,14 +125,14 @@ describe('Socket API', () => {
     clientAPI.numExamples = 3;
     await clientAPI.uploadVars();
 
-    waitUntil(() => clientAPI.modelId != modelId, () => {
+    waitUntil(() => clientAPI.modelId !== modelId, () => {
       test_util.expectArraysClose(
-          clientVars[0], tf.tensor([1.25, 1.25, 1.25, 1.25], [2, 2]))
+          clientVars[0], tf.tensor([1.25, 1.25, 1.25, 1.25], [2, 2]));
       test_util.expectArraysClose(
-          clientVars[1], tf.tensor([3.25, 2.75, 2.25, 1.75], [1, 4]))
+          clientVars[1], tf.tensor([3.25, 2.75, 2.25, 1.75], [1, 4]));
       expect(clientAPI.numExamples).toBe(0);
       expect(clientAPI.modelId).toBe(modelDB.modelId);
       done();
     });
-  })
+  });
 });
