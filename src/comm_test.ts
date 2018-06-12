@@ -16,8 +16,6 @@
  * =============================================================================
  */
 
-// import * as tf from '@tensorflow/tfjs';
-// import {test_util} from '@tensorflow/tfjs-core';
 import * as tf from '@tensorflow/tfjs';
 import {test_util, Variable} from '@tensorflow/tfjs';
 import * as fs from 'fs';
@@ -41,6 +39,18 @@ const socketURL = `http://0.0.0.0:${PORT}`;
 const initWeights =
     [tf.tensor([1, 1, 1, 1], [2, 2]), tf.tensor([1, 2, 3, 4], [1, 4])];
 const updateThreshold = 2;
+
+function waitUntil(done: () => boolean, then: () => void, timeout?: number) {
+  const moveOn = () => {
+    clearInterval(moveOnIfDone);
+    clearTimeout(moveOnAnyway);
+    then();
+  };
+  const moveOnAnyway = setTimeout(moveOn, timeout || 100);
+  const moveOnIfDone = setInterval(() => {
+    if (done()) moveOn();
+  }, 1);
+}
 
 describe('Socket API', () => {
   let dataDir: string;
@@ -115,20 +125,14 @@ describe('Socket API', () => {
     clientAPI.numExamples = 3;
     await clientAPI.uploadVars();
 
-    const timeout = 100;
-    let elapsed = 0;
-    const interval = setInterval(() => {
-      elapsed += 1;
-      if (elapsed > timeout || clientAPI.modelId != modelId) {
-        clearInterval(interval);
-        test_util.expectArraysClose(
-            clientVars[0], tf.tensor([1.25, 1.25, 1.25, 1.25], [2, 2]))
-        test_util.expectArraysClose(
-            clientVars[1], tf.tensor([3.25, 2.75, 2.25, 1.75], [1, 4]))
-        expect(clientAPI.numExamples).toBe(0);
-        expect(clientAPI.modelId).toBe(modelDB.modelId);
-        done();
-      }
-    }, 1);
+    waitUntil(() => clientAPI.modelId != modelId, () => {
+      test_util.expectArraysClose(
+          clientVars[0], tf.tensor([1.25, 1.25, 1.25, 1.25], [2, 2]))
+      test_util.expectArraysClose(
+          clientVars[1], tf.tensor([3.25, 2.75, 2.25, 1.75], [1, 4]))
+      expect(clientAPI.numExamples).toBe(0);
+      expect(clientAPI.modelId).toBe(modelDB.modelId);
+      done();
+    });
   })
 });
