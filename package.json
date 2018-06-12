@@ -9,9 +9,10 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "start": "node dist/server/server.js",
-    "dev": "ts-node src/server/server.ts",
-    "build": "tsc && cp -r demo/ dist/demo/",
+    "start": "node dist/src/server/server.js",
+    "dev": "ts-node-dev src/server/server.ts",
+    "build": "tsc && cp demo/index.html dist/demo/",
+    "test": "ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
@@ -19,16 +20,22 @@
     "@types/express": "^4.16.0",
     "@types/socket.io": "^1.4.34",
     "@types/socket.io-client": "^1.4.32",
+    "es6-promise": "^4.2.4",
     "express": "^4.16.3",
+    "node-fetch": "^2.1.2",
     "socket.io": "^2.1.1"
   },
   "devDependencies": {
-    "@types/jasmine": "~2.5.53",
+    "@types/jasmine": "^2.8.8",
     "@types/node": "~9.6.0",
+    "@types/rimraf": "^2.0.2",
     "@types/seedrandom": "~2.4.27",
     "clang-format": "~1.2.2",
+    "jasmine": "^3.1.0",
     "jasmine-core": "~3.1.0",
-    "rimraf": "~2.6.2",
+    "rimraf": "^2.6.2",
+    "ts-node": "^6.1.0",
+    "ts-node-dev": "^1.0.0-pre.26",
     "tslint": "~5.8.0",
     "typescript": "2.7.2",
     "ts-node-dev": "^1.0.0-pre.26"
