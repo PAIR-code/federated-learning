@@ -44,12 +44,8 @@ function waitUntil(done: () => boolean, then: () => void, timeout?: number) {
     clearTimeout(moveOnAnyway);
     then();
   };
+  const moveOnIfDone = setInterval(() => done() && moveOn(), 1);
   const moveOnAnyway = setTimeout(moveOn, timeout || 100);
-  const moveOnIfDone = setInterval(() => {
-    if (done()) {
-      moveOn();
-    }
-  }, 1);
 }
 
 describe('Socket API', () => {
