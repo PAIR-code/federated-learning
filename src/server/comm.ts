@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {Server, Socket} from 'socket.io';
 import {promisify} from 'util';
-import * as uuid from 'uuid/v4';
+import {v4 as uuid} from 'uuid';
 
 import {DownloadMsg, Events, UploadMsg} from '../common';
 import {serializedToJson, serializeVar} from '../serialization';

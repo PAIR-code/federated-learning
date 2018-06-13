@@ -26,11 +26,14 @@ const mnistTransferLearningModelURL =
 
 export class MnistTransferLearningModel implements FederatedModel {
   async setup(): Promise<ModelDict> {
-    const model = await tf.loadModel(mnistTransferLearningModelURL);
+    const oriModel = await tf.loadModel(mnistTransferLearningModelURL);
+    const frozenLayers = oriModel.layers.slice(0, 10);
 
-    for (let i = 0; i < 7; ++i) {
-      model.layers[i].trainable = false;  // freeze conv layers
-    }
+    frozenLayers.forEach(layer => layer.trainable = false);
+
+    const headLayers = [tf.layers.dense({units: 10})];
+
+    const model = tf.sequential({layers: frozenLayers.concat(headLayers)});
 
     const loss = (inputs: Tensor, labels: Tensor) => {
       const logits = model.predict(inputs) as Tensor;
@@ -38,6 +41,6 @@ export class MnistTransferLearningModel implements FederatedModel {
       return losses.mean() as Scalar;
     };
 
-    return {predict: model.predict, vars: model.trainableWeights, loss};
+    return {predict: model.predict, vars: model.trainableWeights, loss, model};
   }
 }

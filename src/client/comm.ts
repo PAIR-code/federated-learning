@@ -108,12 +108,12 @@ export class VariableSynchroniser {
       if (this.acceptUpdate(msg)) {
         this.setVarsFromMessage(msg.vars);
         this.modelId = msg.modelId;
-        this.fitConfig = msg.fitConfig;
+        this.fitConfig = {...msg.fitConfig};
         this.numExamples = 0;
       }
     });
 
-    return this.fitConfig;
+    return {...this.fitConfig};
   }
 
   /**
