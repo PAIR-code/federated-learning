@@ -16,6 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+
 import {Scalar, Tensor} from '@tensorflow/tfjs';
 import {FederatedModel, ModelDict} from '../src/index';
 

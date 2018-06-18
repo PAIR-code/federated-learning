@@ -16,7 +16,7 @@
  */
 
 import '../src/server/fetch_polyfill';
-// import '@tensorflow/tfjs-node-gpu';
+// import '@tensorflow/tfjs-node';
 
 import * as tf from '@tensorflow/tfjs';
 import {v4 as uuid} from 'uuid';
@@ -34,16 +34,29 @@ function preprocess(img: tf.Tensor) {
   return tf.tidy(() => img.sub(tf.scalar(127.5)).div(tf.scalar(127.5)));
 }
 
-async function main(splitStart: number, splitEnd: number) {
-  const clientName = uuid().split('-')[1];
-  const log = (...args: any[]) => console.log(clientName, ...args);
+async function main(
+    splitStart: number, splitEnd: number, syncEvery = 1, verbose = true) {
+  const loggingClientName = uuid().split('-')[1];
+  const log = verbose ?
+      (...args: any[]) => console.log(loggingClientName, ...args) :
+      () => {};
+
+  let done = false;
+
   const localExamples = splitEnd - splitStart;
   const fedModel = new MnistTransferLearningModel();
   const {vars, loss} = await fedModel.setup();
-  let updateI = 0;
+  let updateIdx = 0;
   const sync = new VariableSynchroniser(vars, () => {
-    updateI++;
-    console.log(clientName + ' *********** update recv', updateI);
+    updateIdx++;
+    log('update recv', updateIdx);
+    if (done) {
+      const evalRes =
+          tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10)).mean())
+              .dataSync();
+      log('post update', updateIdx, 'sync loss', evalRes[0],
+          'init loss:', preEvalRes[0]);
+    }
     return true;
   });
   const fitConfig = await sync.initialise('http://localhost:3000');
@@ -67,7 +80,7 @@ async function main(splitStart: number, splitEnd: number) {
   if ((localExamples % batchSize) !== 0) {
     throw new Error(`${
         // tslint:disable-next-line:max-line-length
-        clientName} local batchsize must exactly divide number of local examples`);
+        loggingClientName} local batchsize must exactly divide number of local examples`);
   }
 
   const imgsBatches = tf.split(imgs, localExamples / batchSize).map(preprocess);
@@ -80,26 +93,38 @@ async function main(splitStart: number, splitEnd: number) {
   allValImgs.dispose();
   allValLabels.dispose();
 
-  const preEvalRes = loss(valImgs, tf.oneHot(valLabels, 10)).mean().dataSync();
+  const preEvalRes =
+      tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10)).mean()).dataSync();
   log('initial loss', preEvalRes[0]);
 
   let i = 0;
+  // so all the clients don't try and sync at once
+  let j = i + Math.floor(Math.random() * syncEvery);
   const optimizer = tf.train.sgd(0.0001);
   for (const [img, label] of zip(imgsBatches, labelsBatches)) {
     optimizer.minimize(() => loss(img, tf.oneHot(label, 10)));
     sync.numExamples += batchSize;
-    i += batchSize;
+    i++;
+    j++;
+    if (j % syncEvery) {
+      continue;
+    }
+
     try {
       await sync.uploadVars();
       log('up sync', i, 'batch loss',
           loss(img, tf.oneHot(label, 10)).mean().dataSync()[0]);
     } catch (exn) {
-      log(clientName, 'timeout', exn);
+      log('timeout', exn);
     }
   }
+  // process any pending updates
+  await new Promise((res, rej) => setTimeout(res(), 50));
   log('done, evaluating final loss');
-  const evalRes = loss(valImgs, tf.oneHot(valLabels, 10)).mean().dataSync();
-  log('final loss', evalRes[0], 'change:', evalRes[0] - preEvalRes[0]);
+  done = true;
+  const evalRes =
+      tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10)).mean()).dataSync();
+  log('final loss', evalRes[0], 'init loss:', preEvalRes[0]);
   return;
 }
 
@@ -107,7 +132,8 @@ async function main(splitStart: number, splitEnd: number) {
   try {
     main(
         parseInt(process.argv[2], 10),
-        parseInt(process.argv[2], 10) + parseInt(process.argv[3], 10));
+        parseInt(process.argv[2], 10) + parseInt(process.argv[3], 10),
+        parseInt(process.argv[4], 10));
   } catch (exn) {
     console.error(exn);
   }
