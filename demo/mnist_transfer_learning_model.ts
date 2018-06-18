@@ -29,12 +29,11 @@ export class MnistTransferLearningModel implements FederatedModel {
     const oriModel = await tf.loadModel(mnistTransferLearningModelURL);
     const frozenLayers = oriModel.layers.slice(0, 10);
 
-    frozenLayers.forEach(layer => layer.trainable = false);
+    // frozenLayers.forEach(layer => layer.trainable = false);
 
     const headLayers = [tf.layers.dense({units: 10})];
 
     const model = tf.sequential({layers: frozenLayers.concat(headLayers)});
-
     const loss = (inputs: Tensor, labels: Tensor) => {
       const logits = model.predict(inputs) as Tensor;
       const losses = tf.losses.softmaxCrossEntropy(logits, labels);

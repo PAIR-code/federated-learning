@@ -29,7 +29,13 @@ function zip<T, U>(x: T[], y: U[]) {
   return x.map((_, i) => [x[i], y[i]] as [T, U]);
 }
 
+function preprocess(img: tf.Tensor) {
+  return tf.tidy(() => img.sub(tf.scalar(127.5)).div(tf.scalar(127.5)));
+}
+
 async function main(splitStart: number, splitEnd: number) {
+  console.log(splitStart, splitEnd);
+
   const localExamples = splitEnd - splitStart;
   const fedModel = new MnistTransferLearningModel();
   const {vars, loss} = await fedModel.setup();
@@ -41,7 +47,6 @@ async function main(splitStart: number, splitEnd: number) {
   const batchSize = fitConfig.batchSize;
 
   const {imgs: allImgs, labels: allLabels} = loadMnist();
-
   const split = <T extends tf.Tensor>(t: T) =>
       tf.slice(t, [splitStart], [splitEnd - splitStart]);
 
@@ -52,7 +57,8 @@ async function main(splitStart: number, splitEnd: number) {
         'local batchsize must exactly divide number of local examples');
   }
 
-  const imgsBatches = tf.split(imgs, localExamples / batchSize);
+  const imgsBatches =
+      tf.split(imgs, localExamples / batchSize).map(img => preprocess(img));
   const labelsBatches = tf.split(labels, localExamples / batchSize);
 
   allImgs.dispose();
@@ -60,19 +66,20 @@ async function main(splitStart: number, splitEnd: number) {
   imgs.dispose();
   labels.dispose();
 
-  const optimizer = tf.train.sgd(0.01);
-
+  const optimizer = tf.train.sgd(0.0001);
   for (const [img, label] of zip(imgsBatches, labelsBatches)) {
+    console.log(img.max().dataSync(), img.min().dataSync());
     optimizer.minimize(() => loss(img, tf.oneHot(label, 10)));
     sync.numExamples += batchSize;
     await sync.uploadVars();
-    console.log('synced');
+    console.log(
+        'synced', sync.numExamples, loss(img, tf.oneHot(label, 10)).dataSync());
   }
 }
 
 (async () => {
   try {
-    main(0, 16);
+    main(parseInt(process.argv[2], 10), parseInt(process.argv[2], 10) + 16);
   } catch (exn) {
     console.error(exn);
   }
