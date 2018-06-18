@@ -29,7 +29,7 @@ export class MnistTransferLearningModel implements FederatedModel {
     const oriModel = await tf.loadModel(mnistTransferLearningModelURL);
     const frozenLayers = oriModel.layers.slice(0, 10);
 
-    // frozenLayers.forEach(layer => layer.trainable = false);
+    frozenLayers.forEach(layer => layer.trainable = false);
 
     const headLayers = [tf.layers.dense({units: 10})];
 

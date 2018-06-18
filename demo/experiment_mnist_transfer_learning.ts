@@ -15,15 +15,16 @@
  * =============================================================================
  */
 
-import fetch from 'node-fetch';
-
-(global as any).fetch = fetch;
+import '../src/server/fetch_polyfill';
+// import '@tensorflow/tfjs-node-gpu';
 
 import * as tf from '@tensorflow/tfjs';
+import {v4 as uuid} from 'uuid';
 
 import {VariableSynchroniser} from '../src/client/comm';
-import {MnistTransferLearningModel} from './mnist_transfer_learning_model';
+
 import {loadMnist} from './mnist_data';
+import {MnistTransferLearningModel} from './mnist_transfer_learning_model';
 
 function zip<T, U>(x: T[], y: U[]) {
   return x.map((_, i) => [x[i], y[i]] as [T, U]);
@@ -34,52 +35,79 @@ function preprocess(img: tf.Tensor) {
 }
 
 async function main(splitStart: number, splitEnd: number) {
-  console.log(splitStart, splitEnd);
-
+  const clientName = uuid().split('-')[1];
+  const log = (...args: any[]) => console.log(clientName, ...args);
   const localExamples = splitEnd - splitStart;
   const fedModel = new MnistTransferLearningModel();
   const {vars, loss} = await fedModel.setup();
-
-  const sync = new VariableSynchroniser(vars);
+  let updateI = 0;
+  const sync = new VariableSynchroniser(vars, () => {
+    updateI++;
+    console.log(clientName + ' *********** update recv', updateI);
+    return true;
+  });
   const fitConfig = await sync.initialise('http://localhost:3000');
-  console.log('connected to server');
+  log('connected to server', 'processing split', splitStart, splitEnd);
 
   const batchSize = fitConfig.batchSize;
 
-  const {imgs: allImgs, labels: allLabels} = loadMnist();
+  const {train: {imgs: allImgs, labels: allLabels}, val: valData} = loadMnist();
+
+  const {imgs: allValImgs, labels: allValLabels} = valData;
+
   const split = <T extends tf.Tensor>(t: T) =>
       tf.slice(t, [splitStart], [splitEnd - splitStart]);
 
   const [imgs, labels] = [split(allImgs), split(allLabels)];
+  const [valImgs, valLabels] = [
+    tf.slice(allValImgs, [splitStart], [50]),
+    tf.slice(allValLabels, [splitStart], [50])
+  ];
 
   if ((localExamples % batchSize) !== 0) {
-    throw new Error(
-        'local batchsize must exactly divide number of local examples');
+    throw new Error(`${
+        // tslint:disable-next-line:max-line-length
+        clientName} local batchsize must exactly divide number of local examples`);
   }
 
-  const imgsBatches =
-      tf.split(imgs, localExamples / batchSize).map(img => preprocess(img));
+  const imgsBatches = tf.split(imgs, localExamples / batchSize).map(preprocess);
   const labelsBatches = tf.split(labels, localExamples / batchSize);
 
   allImgs.dispose();
   allLabels.dispose();
   imgs.dispose();
   labels.dispose();
+  allValImgs.dispose();
+  allValLabels.dispose();
 
+  const preEvalRes = loss(valImgs, tf.oneHot(valLabels, 10)).mean().dataSync();
+  log('initial loss', preEvalRes[0]);
+
+  let i = 0;
   const optimizer = tf.train.sgd(0.0001);
   for (const [img, label] of zip(imgsBatches, labelsBatches)) {
-    console.log(img.max().dataSync(), img.min().dataSync());
     optimizer.minimize(() => loss(img, tf.oneHot(label, 10)));
     sync.numExamples += batchSize;
-    await sync.uploadVars();
-    console.log(
-        'synced', sync.numExamples, loss(img, tf.oneHot(label, 10)).dataSync());
+    i += batchSize;
+    try {
+      await sync.uploadVars();
+      log('up sync', i, 'batch loss',
+          loss(img, tf.oneHot(label, 10)).mean().dataSync()[0]);
+    } catch (exn) {
+      log(clientName, 'timeout', exn);
+    }
   }
+  log('done, evaluating final loss');
+  const evalRes = loss(valImgs, tf.oneHot(valLabels, 10)).mean().dataSync();
+  log('final loss', evalRes[0], 'change:', evalRes[0] - preEvalRes[0]);
+  return;
 }
 
 (async () => {
   try {
-    main(parseInt(process.argv[2], 10), parseInt(process.argv[2], 10) + 16);
+    main(
+        parseInt(process.argv[2], 10),
+        parseInt(process.argv[2], 10) + parseInt(process.argv[3], 10));
   } catch (exn) {
     console.error(exn);
   }

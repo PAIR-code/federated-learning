@@ -16,5 +16,5 @@
  */
 
 import fetch from 'node-fetch';
-
+// tslint:disable-next-line:no-any
 (global as any).fetch = fetch;

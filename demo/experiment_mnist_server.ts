@@ -17,9 +17,7 @@
 
 /** Server code */
 
-import fetch from 'node-fetch';
-
-(global as any).fetch = fetch;
+import '../src/server/fetch_polyfill';
 
 import * as express from 'express';
 import * as http from 'http';
@@ -32,8 +30,8 @@ import {ModelDB} from '../src/server/model_db';
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
-const dataDir = path.resolve(__dirname + '/data');
-const modelDB = new ModelDB(dataDir);
+const dataDir = path.resolve(process.argv[2]);
+const modelDB = new ModelDB(dataDir, 10);
 const FIT_CONFIG = {
   batchSize: 1
 };

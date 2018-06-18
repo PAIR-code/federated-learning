@@ -7,15 +7,19 @@ const TRAIN_DATA = {
   labels: path.resolve(__dirname, 'train-labels-idx1-ubyte')
 };
 
+const TEST_DATA = {
+  imgs: path.resolve(__dirname, 't10k-images-idx3-ubyte'),
+  labels: path.resolve(__dirname, 't10k-labels-idx1-ubyte')
+};
+
 function sliceIntoOwnBuffer(arr: Buffer): ArrayBuffer {
   return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
 }
 
-export function loadMnist() {
-  const trainImgsBytes =
-      sliceIntoOwnBuffer(readFileSync(TRAIN_DATA.imgs).swap32());
+function loadMnistFormat(imgsPath: string, labelsPath: string) {
+  const trainImgsBytes = sliceIntoOwnBuffer(readFileSync(imgsPath).swap32());
   const trainLabelsBytes =
-      sliceIntoOwnBuffer(readFileSync(TRAIN_DATA.labels).swap32());
+      sliceIntoOwnBuffer(readFileSync(labelsPath).swap32());
   const trainImgsI32View = new Int32Array(trainImgsBytes);
   const trainLabelsI32View = new Int32Array(trainLabelsBytes);
 
@@ -46,5 +50,14 @@ export function loadMnist() {
   const labelsData = new Uint8Array(trainLabelsBytes, 8, numItems);
   const labelsTensor = tensor1d(labelsData, 'int32');
 
-  return {imgs: imgsTensor, labels: labelsTensor};
+  return {
+    imgs: imgsTensor, labels: labelsTensor
+  }
+}
+
+export function loadMnist() {
+  return {
+    train: loadMnistFormat(TRAIN_DATA.imgs, TRAIN_DATA.labels),
+    val: loadMnistFormat(TEST_DATA.imgs, TEST_DATA.labels)
+  };
 }
