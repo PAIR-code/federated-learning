@@ -15,8 +15,10 @@
  * =============================================================================
  */
 
+Error.stackTraceLimit = Infinity;
+
 import '../src/server/fetch_polyfill';
-// import '@tensorflow/tfjs-node';
+import '@tensorflow/tfjs-node';
 
 import * as tf from '@tensorflow/tfjs';
 import {v4 as uuid} from 'uuid';
@@ -47,13 +49,14 @@ async function main(
   const fedModel = new MnistTransferLearningModel();
   const {vars, loss} = await fedModel.setup();
   let updateIdx = 0;
+  const evaluate = () =>
+      tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10).toFloat()).mean())
+          .dataSync();
   const sync = new VariableSynchroniser(vars, () => {
     updateIdx++;
     log('update recv', updateIdx);
     if (done) {
-      const evalRes =
-          tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10)).mean())
-              .dataSync();
+      const evalRes = evaluate();
       log('post update', updateIdx, 'sync loss', evalRes[0],
           'init loss:', preEvalRes[0]);
     }
@@ -73,8 +76,8 @@ async function main(
 
   const [imgs, labels] = [split(allImgs), split(allLabels)];
   const [valImgs, valLabels] = [
-    tf.slice(allValImgs, [splitStart], [50]),
-    tf.slice(allValLabels, [splitStart], [50])
+    tf.slice(allValImgs, [splitStart], [512]),
+    tf.slice(allValLabels, [splitStart], [512])
   ];
 
   if ((localExamples % batchSize) !== 0) {
@@ -93,8 +96,7 @@ async function main(
   allValImgs.dispose();
   allValLabels.dispose();
 
-  const preEvalRes =
-      tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10)).mean()).dataSync();
+  const preEvalRes = evaluate();
   log('initial loss', preEvalRes[0]);
 
   let i = 0;
@@ -102,19 +104,21 @@ async function main(
   let j = i + Math.floor(Math.random() * syncEvery);
   const optimizer = tf.train.sgd(0.0001);
   for (const [img, label] of zip(imgsBatches, labelsBatches)) {
-    optimizer.minimize(() => loss(img, tf.oneHot(label, 10)));
+    optimizer.minimize(() => loss(img, tf.oneHot(label, 10).toFloat()));
     sync.numExamples += batchSize;
     i++;
     j++;
     if (j % syncEvery) {
       continue;
     }
+    await new Promise((res, rej) => setTimeout(res(), 100));
 
     try {
       await sync.uploadVars();
       log('up sync', i, 'batch loss',
-          loss(img, tf.oneHot(label, 10)).mean().dataSync()[0]);
+          loss(img, tf.oneHot(label, 10).toFloat()).mean().dataSync()[0]);
     } catch (exn) {
+      j--;  // try again next iter
       log('timeout', exn);
     }
   }
@@ -122,18 +126,19 @@ async function main(
   await new Promise((res, rej) => setTimeout(res(), 50));
   log('done, evaluating final loss');
   done = true;
-  const evalRes =
-      tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10)).mean()).dataSync();
+  const evalRes = evaluate();
   log('final loss', evalRes[0], 'init loss:', preEvalRes[0]);
+  sync.dispose();
   return;
 }
 
 (async () => {
   try {
-    main(
+    await main(
         parseInt(process.argv[2], 10),
         parseInt(process.argv[2], 10) + parseInt(process.argv[3], 10),
         parseInt(process.argv[4], 10));
+    console.log('exited');
   } catch (exn) {
     console.error(exn);
   }

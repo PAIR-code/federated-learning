@@ -33,8 +33,11 @@ export class SocketAPI {
   modelDB: ModelDB;
   fitConfig: ModelFitConfig;
   io: Server;
+  numClients = 0;
 
-  constructor(modelDB: ModelDB, fitConfig: ModelFitConfig, io: Server) {
+  constructor(
+      modelDB: ModelDB, fitConfig: ModelFitConfig, io: Server,
+      private exitOnClientExit = false) {
     this.modelDB = modelDB;
     this.fitConfig = fitConfig;
     this.io = io;
@@ -52,6 +55,21 @@ export class SocketAPI {
 
   async setup() {
     this.io.on('connection', async (socket: Socket) => {
+      socket.on('disconnect', () => {
+        this.numClients--;
+        console.error(this.io.clients().connected);
+        if (this.exitOnClientExit && this.numClients <= 0) {
+          console.error(this.io.clients().connected);
+          this.io.close();
+          process.exit(0);
+        }
+      });
+
+      console.error(this.io.clients().connected);
+
+      this.numClients++;
+      console.error('nclients inc', this.numClients);
+
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();
       socket.emit(Events.Download, initVars);

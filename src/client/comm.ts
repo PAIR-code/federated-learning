@@ -125,7 +125,7 @@ export class VariableSynchroniser {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
-
+      rejectTimer.unref();
       this.socket.emit(Events.Upload, msg, () => {
         clearTimeout(rejectTimer);
         resolve();
@@ -157,6 +157,10 @@ export class VariableSynchroniser {
       }
     }
   }
+
+  public dispose() {
+    this.socket.disconnect();
+  }
 }
 
 async function fromEvent<T>(
@@ -165,6 +169,7 @@ async function fromEvent<T>(
   return new Promise((resolve, reject) => {
            const rejectTimer = setTimeout(
                () => reject(`${eventName} event timed out`), timeout);
+           rejectTimer.unref();
            const listener = (evtArgs: T) => {
              emitter.removeListener(eventName, listener);
              clearTimeout(rejectTimer);

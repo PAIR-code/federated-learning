@@ -16,6 +16,7 @@
  */
 
 /** Server code */
+import '@tensorflow/tfjs-node';
 
 import '../src/server/fetch_polyfill';
 
@@ -31,11 +32,11 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 const dataDir = path.resolve(process.argv[2]);
-const modelDB = new ModelDB(dataDir, 10);
+const modelDB = new ModelDB(dataDir, parseInt(process.argv[3], 10));
 const FIT_CONFIG = {
   batchSize: 1
 };
-const socketAPI = new SocketAPI(modelDB, FIT_CONFIG, io);
+const socketAPI = new SocketAPI(modelDB, FIT_CONFIG, io, true);
 
 // Plan:
 
