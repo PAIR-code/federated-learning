@@ -57,18 +57,14 @@ export class SocketAPI {
     this.io.on('connection', async (socket: Socket) => {
       socket.on('disconnect', () => {
         this.numClients--;
-        console.error(this.io.clients().connected);
         if (this.exitOnClientExit && this.numClients <= 0) {
-          console.error(this.io.clients().connected);
           this.io.close();
           process.exit(0);
         }
       });
 
-      console.error(this.io.clients().connected);
 
       this.numClients++;
-      console.error('nclients inc', this.numClients);
 
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();

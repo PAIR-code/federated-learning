@@ -51,7 +51,8 @@ async function main(
   let updateIdx = 0;
   const evaluate = () =>
       tf.tidy(() => loss(valImgs, tf.oneHot(valLabels, 10).toFloat()).mean())
-          .dataSync();
+          .dataSync()
+          .slice();
   const sync = new VariableSynchroniser(vars, () => {
     updateIdx++;
     log('update recv', updateIdx);
@@ -64,7 +65,7 @@ async function main(
   });
   const fitConfig = await sync.initialise('http://localhost:3000');
   log('connected to server', 'processing split', splitStart, splitEnd);
-
+  console.log(fitConfig);
   const batchSize = fitConfig.batchSize;
 
   const {train: {imgs: allImgs, labels: allLabels}, val: valData} = loadMnist();
@@ -100,25 +101,30 @@ async function main(
   log('initial loss', preEvalRes[0]);
 
   let i = 0;
+  let wait = 100 + 50 * Math.random();
   // so all the clients don't try and sync at once
   let j = i + Math.floor(Math.random() * syncEvery);
-  const optimizer = tf.train.sgd(0.0001);
+  const optimizer = tf.train.sgd(0.001);
   for (const [img, label] of zip(imgsBatches, labelsBatches)) {
     optimizer.minimize(() => loss(img, tf.oneHot(label, 10).toFloat()));
     sync.numExamples += batchSize;
     i++;
     j++;
+
     if (j % syncEvery) {
       continue;
     }
-    await new Promise((res, rej) => setTimeout(res(), 100));
+    await new Promise((res, rej) => setTimeout(res(), wait));
 
     try {
       await sync.uploadVars();
+
+      wait = 100 + 50 * Math.random();
       log('up sync', i, 'batch loss',
           loss(img, tf.oneHot(label, 10).toFloat()).mean().dataSync()[0]);
     } catch (exn) {
-      j--;  // try again next iter
+      wait = wait * 2.0;  // exp backoff
+      j--;                // try again next iter
       log('timeout', exn);
     }
   }
@@ -128,7 +134,7 @@ async function main(
   done = true;
   const evalRes = evaluate();
   log('final loss', evalRes[0], 'init loss:', preEvalRes[0]);
-  sync.dispose();
+  // sync.dispose();
   return;
 }
 
@@ -138,7 +144,6 @@ async function main(
         parseInt(process.argv[2], 10),
         parseInt(process.argv[2], 10) + parseInt(process.argv[3], 10),
         parseInt(process.argv[4], 10));
-    console.log('exited');
   } catch (exn) {
     console.error(exn);
   }

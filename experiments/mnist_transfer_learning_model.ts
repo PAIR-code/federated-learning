@@ -37,7 +37,7 @@ export class MnistTransferLearningModel implements FederatedModel {
     const model = tf.sequential({layers: frozenLayers.concat(headLayers)});
     const loss = (inputs: Tensor, labels: Tensor) => {
       const logits = model.predict(inputs) as Tensor;
-      const losses = tf.losses.softmaxCrossEntropy(logits, labels);
+      const losses = tf.losses.softmaxCrossEntropy(labels, logits);
       return losses.mean() as Scalar;
     };
 
