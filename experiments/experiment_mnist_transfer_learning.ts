@@ -40,7 +40,7 @@ async function main(
     splitStart: number, splitEnd: number, syncEvery = 1, verbose = true) {
   const loggingClientName = uuid().split('-')[1];
   const log = verbose ?
-      (...args: any[]) => console.log(loggingClientName, ...args) :
+      (...args: any[]) => console.log(loggingClientName, ...args, Date.now()) :
       () => {};
 
   let done = false;
