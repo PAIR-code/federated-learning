@@ -18,7 +18,7 @@
 /** Server code */
 import '@tensorflow/tfjs-node';
 
-import '../src/server/fetch_polyfill';
+import '../../src/server/fetch_polyfill';
 
 import * as express from 'express';
 import * as http from 'http';

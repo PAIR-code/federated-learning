@@ -17,7 +17,7 @@
 
 Error.stackTraceLimit = Infinity;
 
-import '../src/server/fetch_polyfill';
+import '../../src/server/fetch_polyfill';
 import '@tensorflow/tfjs-node';
 
 import * as tf from '@tensorflow/tfjs';
