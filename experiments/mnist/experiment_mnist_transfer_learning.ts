@@ -17,13 +17,13 @@
 
 Error.stackTraceLimit = Infinity;
 
-import '../src/server/fetch_polyfill';
+import '../../src/server/fetch_polyfill';
 import '@tensorflow/tfjs-node';
 
 import * as tf from '@tensorflow/tfjs';
 import {v4 as uuid} from 'uuid';
 
-import {VariableSynchroniser} from '../src/client/comm';
+import {VariableSynchroniser} from '../../src/client/comm';
 
 import {loadMnist} from './mnist_data';
 import {MnistTransferLearningModel} from './mnist_transfer_learning_model';

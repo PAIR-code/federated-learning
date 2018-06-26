@@ -18,7 +18,7 @@
 import * as tf from '@tensorflow/tfjs';
 
 import {Scalar, Tensor} from '@tensorflow/tfjs';
-import {FederatedModel, ModelDict} from '../src/index';
+import {FederatedModel, ModelDict} from '../../src/index';
 
 // https://github.com/tensorflow/tfjs-examples/tree/master/mnist-transfer-cnn
 const mnistTransferLearningModelURL =
