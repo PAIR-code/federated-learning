@@ -25,6 +25,8 @@ import * as http from 'http';
 import * as path from 'path';
 import * as socketIO from 'socket.io';
 
+import {FederatedModel} from '../types';
+
 import {SocketAPI} from './comm';
 import {ModelDB} from './model_db';
 
@@ -43,10 +45,12 @@ app.get('/', (req: Request, res: Response) => {
   res.sendFile(indexPath);
 });
 
-modelDB.setup().then(() => {
-  socketAPI.setup().then(() => {
-    server.listen(3000, () => {
-      console.log('listening on 3000');
+export async function setup(model: FederatedModel) {
+  return modelDB.setup(model).then(() => {
+    socketAPI.setup().then(() => {
+      server.listen(3000, () => {
+        console.log('listening on 3000');
+      });
     });
-  });
-});
+  })
+}
