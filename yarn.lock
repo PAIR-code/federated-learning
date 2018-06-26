@@ -63,6 +63,18 @@
   version "0.6.4"
   resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-layers/-/tfjs-layers-0.6.4.tgz#fc3ce40f1f7352299fe9220d9f5a960c5600c982"
 
+"@tensorflow/tfjs-node-gpu@^0.1.7":
+  version "0.1.7"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-node-gpu/-/tfjs-node-gpu-0.1.7.tgz#acc04e334c956e860b0b958fe20f915857b7ceb7"
+  dependencies:
+    bindings "~1.3.0"
+
+"@tensorflow/tfjs-node@^0.1.7":
+  version "0.1.7"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-node/-/tfjs-node-0.1.7.tgz#76b827c32504efed9cbd9b1b1394e4ec53e45fe5"
+  dependencies:
+    bindings "~1.3.0"
+
 "@tensorflow/tfjs@0.11.4":
   version "0.11.4"
   resolved "https://registry.yarnpkg.com/@tensorflow/tfjs/-/tfjs-0.11.4.tgz#8a6f1c835a653a94eeddc112b62992468352d27e"
@@ -128,6 +140,12 @@
   version "3.0.3"
   resolved "https://registry.yarnpkg.com/@types/minimatch/-/minimatch-3.0.3.tgz#3dca0e3f33b200fc7d1139c0cd96c1268cadfd9d"
 
+"@types/node-fetch@^2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@types/node-fetch/-/node-fetch-2.1.1.tgz#1e8d0abf4c438828ce9c74b45d564a8a93e48cec"
+  dependencies:
+    "@types/node" "*"
+
 "@types/node@*":
   version "10.3.1"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-10.3.1.tgz#51092fbacaed768a122a293814474fbf6e5e8b6d"
@@ -180,6 +198,12 @@
   version "0.0.30"
   resolved "https://registry.yarnpkg.com/@types/strip-json-comments/-/strip-json-comments-0.0.30.tgz#9aa30c04db212a9a0649d6ae6fd50accc40748a1"
 
+"@types/uuid@^3.4.3":
+  version "3.4.3"
+  resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-3.4.3.tgz#121ace265f5569ce40f4f6d0ff78a338c732a754"
+  dependencies:
+    "@types/node" "*"
+    
 abstract-leveldown@^5.0.0, abstract-leveldown@~5.0.0:
   version "5.0.0"
   resolved "https://registry.yarnpkg.com/abstract-leveldown/-/abstract-leveldown-5.0.0.tgz#f7128e1f86ccabf7d2893077ce5d06d798e386c6"
@@ -295,9 +319,6 @@ bl@^1.0.0:
     readable-stream "^2.3.5"
     safe-buffer "^5.1.1"
 
-blob@0.0.4:
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/blob/-/blob-0.0.4.tgz#bcf13052ca54463f30f9fc7e95b9a47630a94921"
 
 body-parser@1.18.2:
   version "1.18.2"
@@ -320,6 +341,12 @@ brace-expansion@^1.1.7:
   dependencies:
     balanced-match "^1.0.0"
     concat-map "0.0.1"
+
+bswap@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/bswap/-/bswap-1.2.0.tgz#82075529fe78cb27c41a678bdd2cffac4cb8608c"
+  dependencies:
+    nan "^2.4.0"
 
 buffer-alloc-unsafe@^1.1.0:
   version "1.1.0"
@@ -1851,6 +1878,10 @@ util-deprecate@~1.0.1:
 utils-merge@1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/utils-merge/-/utils-merge-1.0.1.tgz#9f95710f50a267947b2ccc124741c1028427e713"
+
+uuid@^3.2.1:
+  version "3.2.1"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.2.1.tgz#12c528bb9d58d0b9265d9a2f6f0fe8be17ff1f14"
 
 validate-npm-package-license@^3.0.1:
   version "3.0.3"

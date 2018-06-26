@@ -15,7 +15,7 @@
  * =============================================================================
  */
 
-import {Scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {Model, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
 export type LossFun = (inputs: Tensor, labels: Tensor) => Scalar;
@@ -24,7 +24,8 @@ export type VarList = Array<Variable|LayerVariable>;
 export type ModelDict = {
   vars: VarList,
   loss: LossFun,
-  predict: PredFun
+  predict: PredFun,
+  model?: Model
 };
 
 export interface FederatedModel {

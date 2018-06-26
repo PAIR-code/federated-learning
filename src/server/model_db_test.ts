@@ -14,7 +14,8 @@
  * limitations under the License.
  * =============================================================================
  */
-
+// tslint:disable-next-line:max-line-length
+import {scalar, tensor, Tensor, test_util, variable} from '@tensorflow/tfjs-core';
 import * as tf from '@tensorflow/tfjs';
 import {test_util} from '@tensorflow/tfjs-core';
 import EncodingDown from 'encoding-down';
@@ -23,6 +24,7 @@ import LevelDown from 'leveldown';
 import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
 
+import {FederatedModel} from '../types';
 import {tensorToJson} from '../serialization';
 
 import {ModelDB} from './model_db';
@@ -30,6 +32,18 @@ import {ModelDB} from './model_db';
 const modelId = '1528400733553';
 const updateId1 = '4c382c89-30cc-4f81-9197-c26e345cfb5b';
 const updateId2 = 'cdd749c0-8908-48d7-ba87-4844c831945c';
+
+class MockModel implements FederatedModel {
+  async setup() {
+    const var1 = variable(tensor([0, 0, 0, 0], [2, 2]));
+    const var2 = variable(tensor([-1, -1, -1, -1], [1, 4]));
+    return {
+      loss: (i: Tensor, l: Tensor) => scalar(1.0),
+      vars: [var1, var2],
+      predict: (_: Tensor) => _
+    };
+  }
+}
 
 describe('ModelDB', () => {
   let dataDir: string;
@@ -63,13 +77,13 @@ describe('ModelDB', () => {
 
   it('defaults to treating the latest model as current', async () => {
     const db = new ModelDB(dataDir);
-    await db.setup();
+    await db.setup(new MockModel());
     expect(db.modelId).toBe(modelId);
   });
 
   it('loads variables from JSON', async () => {
     const db = new ModelDB(dataDir);
-    await db.setup();
+    await db.setup(new MockModel());
     const vars = await db.currentVars();
     test_util.expectArraysClose(vars[0], [0, 0, 0, 0]);
     test_util.expectArraysClose(vars[1], [1, 2, 3, 4]);
@@ -81,7 +95,7 @@ describe('ModelDB', () => {
 
   it('updates the model using a weighted average', async () => {
     const db = new ModelDB(dataDir);
-    await db.setup();
+    await db.setup(new MockModel());
     await db.update();
     expect(db.modelId).not.toBe(modelId);
     const newVars = await db.currentVars();
@@ -91,7 +105,7 @@ describe('ModelDB', () => {
 
   it('only performs update after passing a threshold', async () => {
     const db = new ModelDB(dataDir, 3);
-    await db.setup();
+    await db.setup(new MockModel());
     let updated = await db.possiblyUpdate();
     expect(updated).toBe(false);
     expect(db.modelId).toBe(modelId);

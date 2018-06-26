@@ -17,6 +17,8 @@
 
 import {ModelFitConfig} from '@tensorflow/tfjs';
 import {Server, Socket} from 'socket.io';
+import {promisify} from 'util';
+import {v4 as uuid} from 'uuid';
 
 import {DownloadMsg, Events, UploadMsg} from '../common';
 import {serializedToJson, serializeVar} from '../serialization';
@@ -27,8 +29,11 @@ export class SocketAPI {
   modelDB: ModelDB;
   fitConfig: ModelFitConfig;
   io: Server;
+  numClients = 0;
 
-  constructor(modelDB: ModelDB, fitConfig: ModelFitConfig, io: Server) {
+  constructor(
+      modelDB: ModelDB, fitConfig: ModelFitConfig, io: Server,
+      private exitOnClientExit = false) {
     this.modelDB = modelDB;
     this.fitConfig = fitConfig;
     this.io = io;
@@ -46,6 +51,17 @@ export class SocketAPI {
 
   async setup() {
     this.io.on('connection', async (socket: Socket) => {
+      socket.on('disconnect', () => {
+        this.numClients--;
+        if (this.exitOnClientExit && this.numClients <= 0) {
+          this.io.close();
+          process.exit(0);
+        }
+      });
+
+
+      this.numClients++;
+
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();
       socket.emit(Events.Download, initVars);

@@ -22,7 +22,7 @@ import LevelUp from 'levelup';
 import {LevelUp as LevelDB} from 'levelup';
 import * as uuid from 'uuid/v4';
 
-import {Model} from '../model';
+import {FederatedModel} from '../types';
 // tslint:disable-next-line:max-line-length
 import {jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from '../serialization';
 
@@ -52,7 +52,6 @@ export class ModelDB {
     try {
       this.modelId = await this.db.get('currentModelId');
     } catch {
-      const model = new Model();
       const dict = await model.setup();
       await this.writeNewVars(dict.vars as tf.Tensor[]);
     }
