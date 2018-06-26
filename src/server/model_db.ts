@@ -20,8 +20,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {promisify} from 'util';
 
-import {Model} from '../model';
 import {jsonToTensor, TensorJson, tensorToJson} from '../serialization';
+import {FederatedModel} from '../types';
 
 const DEFAULT_MIN_UPDATES = 10;
 const mkdir = promisify(fs.mkdir);
@@ -66,7 +66,7 @@ export class ModelDB {
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
   }
 
-  async setup() {
+  async setup(model?: FederatedModel) {
     const dirExists = await exists(this.dataDir);
     if (!dirExists) {
       await mkdir(this.dataDir);
@@ -74,7 +74,6 @@ export class ModelDB {
 
     this.modelId = await getLatestId(this.dataDir);
     if (this.modelId == null) {
-      const model = new Model();
       const dict = await model.setup();
       await this.writeNewVars(dict.vars as tf.Tensor[]);
     }
