@@ -18,9 +18,11 @@
 
 import * as tf from '@tensorflow/tfjs';
 import {test_util, Variable} from '@tensorflow/tfjs';
+import EncodingDown from 'encoding-down';
 import * as fs from 'fs';
 import * as http from 'http';
-import * as path from 'path';
+import LevelDown from 'leveldown';
+import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
 import * as serverSocket from 'socket.io';
 
@@ -44,18 +46,12 @@ function waitUntil(done: () => boolean, then: () => void, timeout?: number) {
     clearTimeout(moveOnAnyway);
     then();
   };
+  const moveOnIfDone = setInterval(() => done() && moveOn(), 1);
   const moveOnAnyway = setTimeout(moveOn, timeout || 100);
-  const moveOnIfDone = setInterval(() => {
-    if (done()) {
-      moveOn();
-    }
-  }, 1);
 }
 
 describe('Socket API', () => {
   let dataDir: string;
-  let modelDir: string;
-  let modelPath: string;
   let modelDB: ModelDB;
   let serverAPI: SocketAPI;
   let clientAPI: VariableSynchroniser;
@@ -65,11 +61,13 @@ describe('Socket API', () => {
   beforeEach(async () => {
     // Set up model database with our initial weights
     dataDir = fs.mkdtempSync('/tmp/modeldb_test');
-    modelDir = path.join(dataDir, modelId);
-    modelPath = path.join(dataDir, modelId + '.json');
-    fs.mkdirSync(modelDir);
-    const modelJSON = await Promise.all(initWeights.map(tensorToJson));
-    fs.writeFileSync(modelPath, JSON.stringify({'vars': modelJSON}));
+    const lvl =
+        LevelUp(EncodingDown(LevelDown(dataDir), {valueEncoding: 'json'}));
+    const modelVars = await Promise.all(initWeights.map(tensorToJson));
+    await lvl.put('currentModelId', modelId);
+    await lvl.put(modelId, {'vars': modelVars});
+    await lvl.close();
+
     modelDB = new ModelDB(dataDir, updateThreshold);
     await modelDB.setup();
 
@@ -104,15 +102,15 @@ describe('Socket API', () => {
   });
 
   it('transmits updates', async () => {
-    let updateFiles = await modelDB.listUpdateFiles();
-    expect(updateFiles.length).toBe(0);
+    let numUpdates = await modelDB.countUpdates();
+    expect(numUpdates).toBe(0);
 
     clientVars[0].assign(tf.tensor([2, 2, 2, 2], [2, 2]));
     clientAPI.numExamples = 1;
     await clientAPI.uploadVars();
 
-    updateFiles = await modelDB.listUpdateFiles();
-    expect(updateFiles.length).toBe(1);
+    numUpdates = await modelDB.countUpdates();
+    expect(numUpdates).toBe(1);
   });
 
   it('triggers a download after enough uploads', async (done) => {

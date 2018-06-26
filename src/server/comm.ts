@@ -16,18 +16,12 @@
  */
 
 import {ModelFitConfig} from '@tensorflow/tfjs';
-import * as fs from 'fs';
-import * as path from 'path';
 import {Server, Socket} from 'socket.io';
-import {promisify} from 'util';
-import * as uuid from 'uuid/v4';
 
 import {DownloadMsg, Events, UploadMsg} from '../common';
 import {serializedToJson, serializeVar} from '../serialization';
 
 import {ModelDB} from './model_db';
-
-const writeFile = promisify(fs.writeFile);
 
 export class SocketAPI {
   modelDB: ModelDB;
@@ -59,24 +53,20 @@ export class SocketAPI {
       // When a client sends us updated weights
       socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
         // Save them to a file
-        const modelId = msg.modelId;
-        const updateId = uuid();
-        const updatePath =
-            path.join(this.modelDB.dataDir, modelId, updateId + '.json');
         const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
-        const updateJSON = JSON.stringify({
+        const update = {
           clientId: socket.client.id,
-          modelId,
+          modelId: msg.modelId,
           numExamples: msg.numExamples,
           vars: updatedVars
-        });
-        await writeFile(updatePath, updateJSON);
+        };
+        await this.modelDB.putUpdate(update);
 
         // Let them know we're done saving
         ack(true);
 
         // Potentially update the model (asynchronously)
-        if (modelId === this.modelDB.modelId) {
+        if (msg.modelId === this.modelDB.modelId) {
           const updated = await this.modelDB.possiblyUpdate();
           if (updated) {
             // Send new variables to all clients if we updated

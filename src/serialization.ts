@@ -56,6 +56,17 @@ export type TensorJson = {
   dtype?: tf.DataType
 };
 
+export type ModelJson = {
+  vars: TensorJson[]
+};
+
+export type UpdateJson = {
+  numExamples: number,
+  vars: TensorJson[],
+  modelId?: string,
+  clientId?: string
+};
+
 export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
   let data;
   if (t instanceof LayerVariable) {
