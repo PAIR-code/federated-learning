@@ -16,11 +16,16 @@
  */
 // tslint:disable-next-line:max-line-length
 import {scalar, tensor, Tensor, test_util, variable} from '@tensorflow/tfjs-core';
+import * as tf from '@tensorflow/tfjs';
+import {test_util} from '@tensorflow/tfjs-core';
+import EncodingDown from 'encoding-down';
 import * as fs from 'fs';
-import * as path from 'path';
+import LevelDown from 'leveldown';
+import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
 
 import {FederatedModel} from '../types';
+import {tensorToJson} from '../serialization';
 
 import {ModelDB} from './model_db';
 
@@ -42,38 +47,28 @@ class MockModel implements FederatedModel {
 
 describe('ModelDB', () => {
   let dataDir: string;
-  let modelDir: string;
-  let modelPath: string;
-  let updatePath1: string;
-  let updatePath2: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dataDir = fs.mkdtempSync('/tmp/modeldb_test');
-    modelDir = path.join(dataDir, modelId);
-    modelPath = path.join(dataDir, modelId + '.json');
-    updatePath1 = path.join(modelDir, updateId1 + '.json');
-    updatePath2 = path.join(modelDir, updateId2 + '.json');
-    fs.mkdirSync(modelDir);
-    fs.writeFileSync(modelPath, JSON.stringify({
-      vars: [
-        {values: [0, 0, 0, 0], shape: [2, 2]},
-        {values: [1, 2, 3, 4], shape: [1, 4]}
-      ]
-    }));
-    fs.writeFileSync(updatePath1, JSON.stringify({
-      numExamples: 2,
-      vars: [
-        {values: [1, -1, 0, 0], shape: [2, 2]},
-        {values: [-1, -1, -1, -1], shape: [1, 4]}
-      ]
-    }));
-    fs.writeFileSync(updatePath2, JSON.stringify({
-      numExamples: 3,
-      vars: [
-        {values: [0, 0, 1, -1], shape: [2, 2]},
-        {values: [1, 2, 1, 2], shape: [1, 4]}
-      ]
-    }));
+    const lvl =
+        LevelUp(EncodingDown(LevelDown(dataDir), {valueEncoding: 'json'}));
+    await lvl.put('currentModelId', modelId);
+    const modelVars = await Promise.all([
+      tensorToJson(tf.tensor([0, 0, 0, 0], [2, 2])),
+      tensorToJson(tf.tensor([1, 2, 3, 4], [1, 4]))
+    ]);
+    const update1 = await Promise.all([
+      tensorToJson(tf.tensor([1, -1, 0, 0], [2, 2])),
+      tensorToJson(tf.tensor([-1, -1, -1, -1], [1, 4]))
+    ]);
+    const update2 = await Promise.all([
+      tensorToJson(tf.tensor([0, 0, 1, -1], [2, 2])),
+      tensorToJson(tf.tensor([1, 2, 1, 2], [1, 4]))
+    ]);
+    await lvl.put(modelId, {'vars': modelVars});
+    await lvl.put(modelId + '/' + updateId1, {numExamples: 2, vars: update1});
+    await lvl.put(modelId + '/' + updateId2, {numExamples: 3, vars: update2});
+    await lvl.close();
   });
 
   afterEach(() => {
@@ -114,21 +109,20 @@ describe('ModelDB', () => {
     let updated = await db.possiblyUpdate();
     expect(updated).toBe(false);
     expect(db.modelId).toBe(modelId);
-    const oldUpdateFiles = await db.listUpdateFiles();
-    expect(oldUpdateFiles.length).toBe(2);
+    const oldUpdateCount = await db.countUpdates();
+    expect(oldUpdateCount).toBe(2);
     const updateId3 = 'not-necessarily-a-uuid';
-    const updatePath3 = path.join(modelDir, updateId3 + '.json');
-    fs.writeFileSync(updatePath3, JSON.stringify({
+    await db.db.put(modelId + '/' + updateId3, {
       numExamples: 3,
       vars: [
-        {values: [0, 0, 0, 0], shape: [2, 2]},
-        {values: [0, 0, 0, 0], shape: [1, 4]}
+        tensorToJson(tf.tensor([0, 0, 0, 0], [2, 2])),
+        tensorToJson(tf.tensor([0, 0, 0, 0], [1, 4]))
       ]
-    }));
+    });
     updated = await db.possiblyUpdate();
     expect(updated).toBe(true);
     expect(db.modelId).not.toBe(modelId);
-    const newUpdateFiles = await db.listUpdateFiles();
-    expect(newUpdateFiles.length).toBe(0);
+    const newUpdateCount = await db.countUpdates();
+    expect(newUpdateCount).toBe(0);
   });
 });

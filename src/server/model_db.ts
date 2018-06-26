@@ -16,41 +16,20 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import * as fs from 'fs';
-import * as path from 'path';
-import {promisify} from 'util';
+import EncodingDown from 'encoding-down';
+import LevelDown from 'leveldown';
+import LevelUp from 'levelup';
+import {LevelUp as LevelDB} from 'levelup';
+import * as uuid from 'uuid/v4';
 
-import {jsonToTensor, TensorJson, tensorToJson} from '../serialization';
 import {FederatedModel} from '../types';
+// tslint:disable-next-line:max-line-length
+import {jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from '../serialization';
 
 const DEFAULT_MIN_UPDATES = 10;
-const mkdir = promisify(fs.mkdir);
-const exists = promisify(fs.exists);
-const readdir = promisify(fs.readdir);
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
-
-async function getLatestId(dir: string) {
-  const files = await readdir(dir);
-  let latestId: string = null;
-  files.forEach((name) => {
-    if (name.endsWith('.json')) {
-      const id = name.slice(0, -5);
-      if (latestId == null || id > latestId) {
-        latestId = id;
-      }
-    }
-  });
-  return latestId;
-}
 
 function generateNewId() {
   return new Date().getTime().toString();
-}
-
-async function readJSON(path: string) {
-  const buffer = await readFile(path);
-  return JSON.parse(buffer.toString());
 }
 
 export class ModelDB {
@@ -58,6 +37,7 @@ export class ModelDB {
   modelId: string;
   updating: boolean;
   minUpdates: number;
+  db: LevelDB;
 
   constructor(dataDir: string, minUpdates?: number) {
     this.dataDir = dataDir;
@@ -66,35 +46,57 @@ export class ModelDB {
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
   }
 
-  async setup(model?: FederatedModel) {
-    const dirExists = await exists(this.dataDir);
-    if (!dirExists) {
-      await mkdir(this.dataDir);
-    }
-
-    this.modelId = await getLatestId(this.dataDir);
-    if (this.modelId == null) {
+  async setup() {
+    this.db = await LevelUp(
+        EncodingDown(LevelDown(this.dataDir), {valueEncoding: 'json'}));
+    try {
+      this.modelId = await this.db.get('currentModelId');
+    } catch {
       const dict = await model.setup();
       await this.writeNewVars(dict.vars as tf.Tensor[]);
     }
   }
 
-  async listUpdateFiles(): Promise<string[]> {
-    const files = await readdir(path.join(this.dataDir, this.modelId));
-    return files.map((f) => {
-      return path.join(this.dataDir, this.modelId, f);
-    });
+  async putUpdate(update: UpdateJson): Promise<void> {
+    return this.db.put(update.modelId + '/' + uuid(), update);
+  }
+
+  async getUpdates(): Promise<UpdateJson[]> {
+    const min = this.modelId;
+    const max = (parseInt(min, 10) + 1).toString();
+    return new Promise((resolve, reject) => {
+             const updates: UpdateJson[] = [];
+             this.db.createValueStream({gt: min, lt: max})
+                 .on('data', (data: UpdateJson) => updates.push(data))
+                 .on('error', (error) => reject(error))
+                 .on('end', () => resolve(updates));
+           }) as Promise<UpdateJson[]>;
+  }
+
+  async countUpdates(): Promise<number> {
+    const min = this.modelId;
+    const max = (parseInt(min, 10) + 1).toString();
+    return new Promise((resolve, reject) => {
+             let numUpdates = 0;
+             this.db.createKeyStream({gt: min, lt: max})
+                 .on('data', (key) => numUpdates++)
+                 .on('error', (error) => reject(error))
+                 .on('end', () => resolve(numUpdates));
+           }) as Promise<number>;
+  }
+
+  async getModelVars(modelId: string): Promise<tf.Tensor[]> {
+    const model: ModelJson = await this.db.get(modelId);
+    return model.vars.map(jsonToTensor);
   }
 
   async currentVars(): Promise<tf.Tensor[]> {
-    const file = path.join(this.dataDir, this.modelId + '.json');
-    const json = await readJSON(file);
-    return json['vars'].map(jsonToTensor);
+    return this.getModelVars(this.modelId);
   }
 
   async possiblyUpdate(): Promise<boolean> {
-    const updateFiles = await this.listUpdateFiles();
-    if (updateFiles.length < this.minUpdates || this.updating) {
+    const numUpdates = await this.countUpdates();
+    if (numUpdates < this.minUpdates || this.updating) {
       return false;
     }
     this.updating = true;
@@ -106,21 +108,20 @@ export class ModelDB {
   async update() {
     const currentVars = await this.currentVars();
     const updatedVars = currentVars.map(v => tf.zerosLike(v));
-    const updateFiles = await this.listUpdateFiles();
-    const updatesJSON = await Promise.all(updateFiles.map(readJSON));
+    const updatesJSON = await this.getUpdates();
 
     // Compute total number of examples for normalization
     let totalNumExamples = 0;
     updatesJSON.forEach((obj) => {
-      totalNumExamples += obj['numExamples'];
+      totalNumExamples += obj.numExamples;
     });
     const n = tf.scalar(totalNumExamples);
 
     // Apply normalized updates
     updatesJSON.forEach((u) => {
-      const nk = tf.scalar(u['numExamples']);
+      const nk = tf.scalar(u.numExamples);
       const frac = nk.div(n);
-      u['vars'].forEach((v: TensorJson, i: number) => {
+      u.vars.forEach((v: TensorJson, i: number) => {
         const update = jsonToTensor(v).mul(frac);
         updatedVars[i] = updatedVars[i].add(update);
       });
@@ -132,12 +133,9 @@ export class ModelDB {
 
   async writeNewVars(newVars: tf.Tensor[]) {
     const newModelId = generateNewId();
-    const newModelDir = path.join(this.dataDir, newModelId);
-    const newModelPath = path.join(this.dataDir, newModelId + '.json');
-    const newVarsJSON = await Promise.all(newVars.map(tensorToJson));
-    const newModelJSON = JSON.stringify({'vars': newVarsJSON});
-    await writeFile(newModelPath, newModelJSON);
-    await mkdir(newModelDir);
+    const newVarsJson = await Promise.all(newVars.map(tensorToJson));
+    await this.db.put(newModelId, {'vars': newVarsJson});
+    await this.db.put('currentModelId', newModelId);
     this.modelId = newModelId;
   }
 }
