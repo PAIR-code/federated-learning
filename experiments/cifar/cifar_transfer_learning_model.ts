@@ -16,14 +16,16 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Scalar} from '@tensorflow/tfjs';
 
 export class CifarTransferLearningModel {
   async setup() {
     /* clang-format off */
     const model = tf.sequential({
       layers: [
-        tf.layers.conv2d({filters: 64, kernelSize: 3, activation: 'relu'}),
+        tf.layers.conv2d({inputShape: [32, 32, 3],
+                          filters: 64,
+                          kernelSize: 3,
+                          activation: 'relu'}),
         tf.layers.maxPooling2d({poolSize: 2}),
         tf.layers.conv2d({filters: 64, kernelSize: 3, activation: 'relu'}),
         tf.layers.maxPooling2d({poolSize: 2}),
