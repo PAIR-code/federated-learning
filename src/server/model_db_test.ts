@@ -14,18 +14,17 @@
  * limitations under the License.
  * =============================================================================
  */
+import * as tf from '@tensorflow/tfjs';
 // tslint:disable-next-line:max-line-length
 import {scalar, tensor, Tensor, test_util, variable} from '@tensorflow/tfjs-core';
-import * as tf from '@tensorflow/tfjs';
-import {test_util} from '@tensorflow/tfjs-core';
 import EncodingDown from 'encoding-down';
 import * as fs from 'fs';
 import LevelDown from 'leveldown';
 import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
 
-import {FederatedModel} from '../types';
 import {tensorToJson} from '../serialization';
+import {FederatedModel} from '../types';
 
 import {ModelDB} from './model_db';
 

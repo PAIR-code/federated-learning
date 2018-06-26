@@ -22,9 +22,9 @@ import LevelUp from 'levelup';
 import {LevelUp as LevelDB} from 'levelup';
 import * as uuid from 'uuid/v4';
 
-import {FederatedModel} from '../types';
 // tslint:disable-next-line:max-line-length
 import {jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from '../serialization';
+import {FederatedModel} from '../types';
 
 const DEFAULT_MIN_UPDATES = 10;
 
@@ -46,7 +46,7 @@ export class ModelDB {
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
   }
 
-  async setup() {
+  async setup(model: FederatedModel) {
     this.db = await LevelUp(
         EncodingDown(LevelDown(this.dataDir), {valueEncoding: 'json'}));
     try {
