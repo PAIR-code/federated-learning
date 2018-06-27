@@ -20,14 +20,16 @@ import {ModelFitConfig, Variable} from '@tensorflow/tfjs';
 import {assert} from '@tensorflow/tfjs-core/dist/util';
 import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
-import * as socketio from 'socket.io-client';
+import * as socketProxy from 'socket.io-client';
+// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
+const socketio = (<any>socketProxy).default || socketProxy;
 
 import {DataMsg, DownloadMsg, Events, UploadMsg} from './common';
 // tslint:disable-next-line:max-line-length
 import {deserializeVar, SerializedVariable, serializeVar, serializeVars} from './serialization';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
-const UPLOAD_TIMEOUT = 2 * 1000;
+const UPLOAD_TIMEOUT = 5 * 1000;
 
 /**
  * Synchronises tf.Variables between a client and a server.
@@ -147,7 +149,6 @@ export class VariableSynchroniser {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
-      rejectTimer.unref();
       this.socket.emit(Events.Upload, msg, () => {
         clearTimeout(rejectTimer);
         resolve();
@@ -176,12 +177,9 @@ export class VariableSynchroniser {
   protected setVarsFromMessage(newVars: SerializedVariable[]) {
     for (let i = 0; i < newVars.length; i++) {
       const newVar = newVars[i];
-      const varOrLVar = this.vars[i];
-      if (varOrLVar instanceof LayerVariable) {
-        varOrLVar.write(deserializeVar(newVar));
-      } else {
-        varOrLVar.assign(deserializeVar(newVar));
-      }
+      const newVal = deserializeVar(newVar);
+      const oldVar = (this.vars[i] as LayerVariable);
+      oldVar.write(newVal);
     }
   }
 
@@ -196,7 +194,6 @@ async function fromEvent<T>(
   return new Promise((resolve, reject) => {
            const rejectTimer = setTimeout(
                () => reject(`${eventName} event timed out`), timeout);
-           rejectTimer.unref();
            const listener = (evtArgs: T) => {
              emitter.removeListener(eventName, listener);
              clearTimeout(rejectTimer);
