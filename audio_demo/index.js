@@ -19,12 +19,10 @@ import * as client from '../src/client/client';
 import * as tf from '@tensorflow/tfjs';
 import Tracker from './tracker';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
+import {AudioTransferLearningModel} from '../src/index';
 
 const labelNames =
     'one,two,three,four,five,six,seven,eight,nine,zero,left,right,go,stop'.split(',');
-
-const audioTransferLearningModelURL =
-    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 
 const runOptions = {
   magnitudeThreshold: -40,
@@ -97,21 +95,18 @@ function setupUI(stream) {
     runOptions.refractoryPeriodMillis / frameDurationMillis);
   const tracker = new Tracker(waitingPeriodFrames, refractoryPeriodFrames);
   let audioTask;
-  let webmChunks;
 
-  const recorder = new MediaRecorder(stream);
-  recorder.ondataavailable = event => {
-    webmChunks.push(event.data);
-    if (recorder.state == 'inactive') {
-      const audioBlob = new Blob(webmChunks, { type: 'audio/webm' });
-      const blobUrl = URL.createObjectURL(audioBlob);
-      const audioControls = document.getElementById('audio-controls');
-      audioControls.innerHTML = '';
-      const sourceEl = document.createElement('source');
-      sourceEl.src = blobUrl;
-      sourceEl.type = 'audio/webm';
-      audioControls.appendChild(sourceEl);
-    }
+  const recorder = new MediaStreamRecorder(stream, { })
+  recorder.mimeType = 'audio/wav';
+  recorder.ondataavailable = blob => {
+    const url = URL.createObjectURL(blob);
+    console.log(url);
+    const audioControls = document.getElementById('audio-controls');
+    audioControls.innerHTML = '';
+    const sourceEl = document.createElement('source');
+    sourceEl.src = url;
+    sourceEl.type = 'audio/wav';
+    audioControls.appendChild(sourceEl);
   };
 
   function onEveryAudioFrame() {
@@ -119,84 +114,72 @@ function setupUI(stream) {
     if (freqData[0] === -Infinity && freqData[1] === -Infinity) {
       return;
     }
-
     const freqDataSlice = freqData.slice(0, runOptions.modelFFTLength);
     plotSpectrum(spectrumCanvas, freqDataSlice, runOptions);
     const bufferPos = frameCount % rotatingBufferNumFrames;
     rotatingBuffer.set(freqDataSlice, bufferPos * runOptions.modelFFTLength);
-
-    if (!recording) {
-      return;
-    }
-
-    const spectralMax = getArrayMax(freqDataSlice);
-    tracker.tick(spectralMax > runOptions.magnitudeThreshold);
-    if (tracker.shouldFire()) {
-      modelOutputDiv.innerHTML = outputTemplate;
-      modelInputDiv.innerHTML = inputTemplate;
-      recording = false;
-      recorder.stop();
-      recordButton.innerText = 'Save & Record New';
-      recordButton.removeAttribute('disabled');
-      const freqData = getFrequencyDataFromRotatingBuffer(
-        rotatingBuffer, frameCount - runOptions.numFrames);
-      const spectrogramCanvas = document.getElementById('spectrogram-canvas');
-      plotSpectrogram(
-        spectrogramCanvas, freqData,
-        runOptions.modelFFTLength, runOptions.modelFFTLength);
-      const inputTensor = getInputTensorFromFrequencyData(freqData);
-      window.inputTensors.push(inputTensor);
-      tf.tidy(() => {
-        const probs = model.predict(inputTensor).dataSync();
-        window.probs = probs;
-        Plotly.newPlot('probs', [{
-          x: labelNames,
-          y: probs,
-          type: 'bar'
-        }], {
-          autosize: false,
-          width: 600,
-          height: 200,
-          margin: { l: 30, r: 5, b: 20, t: 5, pad: 0 },
-        });
-
-        document.getElementById('predicted-label').innerText = labelNames[getArgMax(probs)];
-      });
-    }
     frameCount++;
   }
 
   window.inputTensors = [];
 
+  function stopRecording() {
+    recording = false;
+    modelOutputDiv.innerHTML = outputTemplate;
+    modelInputDiv.innerHTML = inputTemplate;
+    recorder.stop();
+    recordButton.innerText = 'Save & Record New';
+    recordButton.removeAttribute('disabled');
+    const freqData = getFrequencyDataFromRotatingBuffer(
+      rotatingBuffer, frameCount - runOptions.numFrames);
+    const spectrogramCanvas = document.getElementById('spectrogram-canvas');
+    plotSpectrogram(
+      spectrogramCanvas, freqData,
+      runOptions.modelFFTLength, runOptions.modelFFTLength);
+    const inputTensor = getInputTensorFromFrequencyData(freqData);
+    window.inputTensors.push(inputTensor);
+    tf.tidy(() => {
+      const probs = model.predict(inputTensor).dataSync();
+      window.probs = probs;
+      Plotly.newPlot('probs', [{
+        x: labelNames,
+        y: probs,
+        type: 'bar'
+      }], {
+        autosize: false,
+        width: 600,
+        height: 200,
+        margin: { l: 30, r: 5, b: 20, t: 5, pad: 0 },
+      });
+      document.getElementById('predicted-label').innerText = labelNames[getArgMax(probs)];
+    });
+  }
   const frameFreq = analyser.frequencyBinCount / audioContext.sampleRate * 1000;
   audioTask = setInterval(onEveryAudioFrame, frameFreq);
+
   recordButton.innerHTML = 'Record Sample';
   recordButton.removeAttribute('disabled');
-
   recordButton.addEventListener('click', async (event) => {
     recordButton.innerHTML = 'Saving&hellip;';
     recordButton.setAttribute('disabled', 'disabled');
     await saveLabeledExample();
     modelOutputDiv.innerHTML = waitingTemplate;
     modelInputDiv.innerHTML = waitingTemplate;
-    recording = true;
-    webmChunks = [];
-    clearInterval(audioTask);
-    audioTask = setInterval(onEveryAudioFrame, frameFreq);
-    recorder.start(10);
     recordButton.innerHTML = "Listening&hellip;";
+    recording = true;
+    recorder.start(1100);
+    setTimeout(stopRecording, 1000);
   });
 }
 
-tf.loadModel(audioTransferLearningModelURL).then((model) => {
+const fedModel = new AudioTransferLearningModel();
+fedModel.setup().then((dict) => {
+  const model = dict.model;
   const inputShape = model.inputs[0].shape;
   runOptions.numFrames = inputShape[1];
   runOptions.modelFFTLength = inputShape[2];
   runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
   window.model = model;
-  for (let i = 0; i < 9; ++i) {
-    model.layers[i].trainable = false;  // freeze conv layers
-  }
   model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
   const clientAPI = client.VariableSynchroniser.fromLayers(model.layers);
   clientAPI.acceptUpdate = (msg) => {
@@ -211,7 +194,7 @@ tf.loadModel(audioTransferLearningModelURL).then((model) => {
     navigator.mediaDevices.getUserMedia({audio: true, video: false})
       .then(stream => setupUI(stream));
   });
-})
+});
 
 async function saveLabeledExample() {
   const x = window.inputTensors[window.inputTensors.length-1];
@@ -244,16 +227,10 @@ async function saveLabeledExample() {
     const y = toOneHot(yTrue);
     const ys = tf.expandDims(y);
     try {
-      console.log('upload data');
-      await window.clientAPI.uploadData(x, y);
-
-      console.log('train model');
-      await model.fit(x, ys, fitConfig);
-
-      console.log('upload vars');
       clientAPI.numExamples = 1;
+      await window.clientAPI.uploadData(x, y);
+      await model.fit(x, ys, fitConfig);
       await clientAPI.uploadVars();
-
       td4.innerText = '✔️';
     } catch (error) {
       console.log(error);
