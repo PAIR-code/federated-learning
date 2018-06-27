@@ -16,8 +16,22 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Scalar, Tensor} from '@tensorflow/tfjs';
-import {FederatedModel, ModelDict} from '../src/index';
+import {Model, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
+
+export type LossFun = (inputs: Tensor, labels: Tensor) => Scalar;
+export type PredFun = (inputs: Tensor) => Tensor|Tensor[];
+export type VarList = Array<Variable|LayerVariable>;
+export type ModelDict = {
+  vars: VarList,
+  loss: LossFun,
+  predict: PredFun,
+  model?: Model
+};
+
+export interface FederatedModel {
+  setup(): Promise<ModelDict>;
+}
 
 const audioTransferLearningModelURL =
     // tslint:disable-next-line:max-line-length
