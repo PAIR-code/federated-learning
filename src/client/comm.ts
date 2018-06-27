@@ -210,3 +210,8 @@ async function fromEvent<T>(
            emitter.on(eventName, listener);
          }) as Promise<T>;
 }
+
+// tslint:disable-next-line:no-any
+export function isTensor(t: any) {
+  return (t instanceof tf.Tensor);
+}
