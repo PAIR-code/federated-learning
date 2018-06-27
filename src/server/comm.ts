@@ -17,8 +17,6 @@
 
 import {ModelFitConfig} from '@tensorflow/tfjs';
 import {Server, Socket} from 'socket.io';
-import {promisify} from 'util';
-import {v4 as uuid} from 'uuid';
 
 import {DownloadMsg, Events, UploadMsg} from '../common';
 import {serializedToJson, serializeVar} from '../serialization';
