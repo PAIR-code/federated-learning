@@ -17,27 +17,25 @@
     </div>
     <div class='left-col'>
       <fieldset>
-        <legend>Audio Input</legend>
+        <legend>Hi!</legend>
+        <span id='intro-text'></span>
+        <h1 id='suggested-label'></h1>
+        <button id='record-button' disabled>Connecting to server&hellip;</button>
+      </fieldset>
+      <fieldset>
+        <legend>Audio</legend>
         <div class='chart'>
           <label>Spectrum</label>
           <canvas id="spectrum-canvas" height="90" width="540"></canvas>
         </div>
       </fieldset>
-      <button id='record-button' disabled>Connecting to server&hellip;</button>
-      <br><br>
       <fieldset>
-        <legend>Model Input</legend>
-        <div id='model-input'>
-          Waiting&hellip;
+        <legend>Model</legend>
+        <div id='model'>
+          Waiting for input&hellip;
         </div>
+        <small class='version'>Version: <em id='model-version'></em></small>
       </fieldset>
-      <fieldset>
-        <legend>Model Output</legend>
-        <div id='model-output'>
-          Waiting&hellip;
-        </div>
-      </fieldset>
-      <small>Model version: <em id='model-version'></em></small>
     </div>
     <script src="https://cdn.webrtc-experiment.com/MediaStreamRecorder.js"> </script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>

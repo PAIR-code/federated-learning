@@ -39,37 +39,40 @@ const runOptions = {
 };
 
 const spectrumCanvas = document.getElementById('spectrum-canvas');
-const modelOutputDiv = document.getElementById('model-output');
-const modelInputDiv = document.getElementById('model-input');
+const modelDiv = document.getElementById('model');
 const recordButton = document.getElementById('record-button');
 const modelVersion = document.getElementById('model-version');
+const suggestedLabel = document.getElementById('suggested-label');
+const introText = document.getElementById('intro-text');
 let recording = false;
 
-const waitingTemplate = `Waiting&hellip;`;
-
-const inputTemplate = `
+const firstIntro = "Would you be willing to help me? I'd love it if you could show me how to pronounce the word:"
+const laterIntro = "If you're up for another, could you show me how to pronounce:"
+const thanksVariants = [
+  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
+  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
+  "Not bad!",
+  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
+  "You're getting good at this!",
+  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
+  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
+  "No one expects the Spanish Inquisition!"
+];
+const waitingTemplate = `Waiting for input&hellip;`;
+const modelTemplate = `
   <div class='chart'>
     <label>Spectrogram</label>
     <canvas id="spectrogram-canvas" height="180" width="270"></canvas>
+  </div>
+  <div class='chart'>
+    <label>Prediction</label>
+    <div id='probs'></div>
   </div>
   <div class='chart'>
     <label>Recording</label>
     <audio controls id='audio-controls'></audio>
   </div>
 `;
-
-let outputTemplate = `
-  <label>Prediction: <em id='predicted-label'>&hellip;</em></label>
-  <div id='probs'></div>
-  <br>
-  <label>What <em>should</em> we have chosen?</label>
-  <ul id='label-radios'>
-`;
-for (let i = 0; i < labelNames.length; i++) {
-  outputTemplate += `<li><label>${labelNames[i]}<input type='radio' name='true-label' value='${i}'></label></li>`;
-}
-outputTemplate += `<li><label>Nothing (ignore this one)<input type='radio' name='true-label' value=''></label></li>`;
-outputTemplate += "</ul>";
 
 function setupUI(stream) {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -94,7 +97,11 @@ function setupUI(stream) {
   const refractoryPeriodFrames = Math.round(
     runOptions.refractoryPeriodMillis / frameDurationMillis);
   const tracker = new Tracker(waitingPeriodFrames, refractoryPeriodFrames);
-  let audioTask;
+  const randomLabels = [0,1,2,3,4,5,6,7,8,9,10,11,12,13];
+  shuffle(randomLabels);
+  let labelIdx = 0;
+  let thanksIdx = 0;
+  suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
 
   const recorder = new MediaStreamRecorder(stream, { })
   recorder.mimeType = 'audio/wav';
@@ -125,10 +132,9 @@ function setupUI(stream) {
 
   function stopRecording() {
     recording = false;
-    modelOutputDiv.innerHTML = outputTemplate;
-    modelInputDiv.innerHTML = inputTemplate;
+    modelDiv.innerHTML = modelTemplate;
     recorder.stop();
-    recordButton.innerText = 'Save & Record New';
+    recordButton.innerText = 'Record';
     recordButton.removeAttribute('disabled');
     const freqData = getFrequencyDataFromRotatingBuffer(
       rotatingBuffer, frameCount - runOptions.numFrames);
@@ -147,24 +153,27 @@ function setupUI(stream) {
         type: 'bar'
       }], {
         autosize: false,
-        width: 600,
-        height: 200,
-        margin: { l: 30, r: 5, b: 20, t: 5, pad: 0 },
+        width: 480,
+        height: 180,
+        margin: { l: 30, r: 5, b: 30, t: 5, pad: 0 },
       });
-      document.getElementById('predicted-label').innerText = labelNames[getArgMax(probs)];
     });
+    saveLabeledExample(inputTensor, randomLabels[labelIdx]);
+    labelIdx = (labelIdx + 1) % labelNames.length;
+    suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
+    introText.innerText = thanksVariants[thanksIdx] + ' ' + laterIntro;
+    thanksIdx = (thanksIdx + 1) % thanksVariants.length;
   }
   const frameFreq = analyser.frequencyBinCount / audioContext.sampleRate * 1000;
-  audioTask = setInterval(onEveryAudioFrame, frameFreq);
+  setInterval(onEveryAudioFrame, frameFreq);
 
-  recordButton.innerHTML = 'Record Sample';
+  introText.innerText = firstIntro;
+  recordButton.innerHTML = 'Record';
   recordButton.removeAttribute('disabled');
   recordButton.addEventListener('click', async (event) => {
     recordButton.innerHTML = 'Saving&hellip;';
     recordButton.setAttribute('disabled', 'disabled');
-    await saveLabeledExample();
-    modelOutputDiv.innerHTML = waitingTemplate;
-    modelInputDiv.innerHTML = waitingTemplate;
+    modelDiv.innerHTML = waitingTemplate;
     recordButton.innerHTML = "Listening&hellip;";
     recording = true;
     recorder.start(1100);
@@ -196,54 +205,47 @@ fedModel.setup().then((dict) => {
   });
 });
 
-async function saveLabeledExample() {
-  const x = window.inputTensors[window.inputTensors.length-1];
-  const enteredLabel = document.querySelector('input[name="true-label"]:checked');
-  if (enteredLabel && enteredLabel.value != '') {
-    const yTrue = parseInt(enteredLabel.value);
-    const yPred = getArgMax(window.probs);
-    const spectrogramCanvas = document.getElementById('spectrogram-canvas');
-    spectrogramCanvas.parentNode.removeChild(spectrogramCanvas);
-    spectrogramCanvas.setAttribute('id', '');
-    spectrogramCanvas.setAttribute('style', 'width: 54px; height: 32px;');
-    const tr = document.createElement('tr');
-    const td1 = document.createElement('td');
-    const td2 = document.createElement('td');
-    const td3 = document.createElement('td');
-    const td4 = document.createElement('td');
-    td1.appendChild(spectrogramCanvas);
-    td2.innerText = labelNames[yTrue];
-    td3.innerText = labelNames[yPred];
-    if (yTrue != yPred) {
-      td3.className = 'incorrect-prediction';
-    }
-    td4.innerHTML = '&hellip;';
-    tr.appendChild(td1);
-    tr.appendChild(td2);
-    tr.appendChild(td3);
-    tr.appendChild(td4);
-    document.getElementById('labeled-examples').appendChild(tr);
-    window.probs = undefined;
-    const y = toOneHot(yTrue);
-    const ys = tf.expandDims(y);
-    try {
-      clientAPI.numExamples = 1;
-      await window.clientAPI.uploadData(x, y);
-      await model.fit(x, ys, fitConfig);
-      await clientAPI.uploadVars();
-      td4.innerText = '✔️';
-    } catch (error) {
-      console.log(error);
-      td4.innerText = '✗';
-    } finally {
-      clientAPI.revertToOriginalVars();
-      clientAPI.numExamples = 0;
-      ys.dispose();
-      x.dispose();
-      y.dispose();
-    }
-  } else if (x) {
+async function saveLabeledExample(x, yTrue) {
+  const yPred = getArgMax(window.probs);
+  const spectrogramCanvas = document.getElementById('spectrogram-canvas');
+  spectrogramCanvas.parentNode.removeChild(spectrogramCanvas);
+  spectrogramCanvas.setAttribute('id', '');
+  spectrogramCanvas.setAttribute('style', 'width: 54px; height: 32px;');
+  const tr = document.createElement('tr');
+  const td1 = document.createElement('td');
+  const td2 = document.createElement('td');
+  const td3 = document.createElement('td');
+  const td4 = document.createElement('td');
+  td1.appendChild(spectrogramCanvas);
+  td2.innerText = labelNames[yTrue];
+  td3.innerText = labelNames[yPred];
+  if (yTrue != yPred) {
+    td3.className = 'incorrect-prediction';
+  }
+  td4.innerHTML = '&hellip;';
+  tr.appendChild(td1);
+  tr.appendChild(td2);
+  tr.appendChild(td3);
+  tr.appendChild(td4);
+  document.getElementById('labeled-examples').appendChild(tr);
+  window.probs = undefined;
+  const y = toOneHot(yTrue);
+  const ys = tf.expandDims(y);
+  try {
+    clientAPI.numExamples = 1;
+    await window.clientAPI.uploadData(x, y);
+    await model.fit(x, ys, fitConfig);
+    await clientAPI.uploadVars();
+    td4.innerText = '✔️';
+  } catch (error) {
+    console.log(error);
+    td4.innerText = '✗';
+  } finally {
+    clientAPI.revertToOriginalVars();
+    clientAPI.numExamples = 0;
+    ys.dispose();
     x.dispose();
+    y.dispose();
   }
 }
 
@@ -316,4 +318,12 @@ function getInputTensorFromFrequencyData(freqData) {
     return normalize(tensorBuffer.toTensor().reshape([
     1, runOptions.numFrames, runOptions.modelFFTLength, 1]));
   });
+}
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
