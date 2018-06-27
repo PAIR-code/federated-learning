@@ -16,3 +16,5 @@
  */
 
 /** Client code. */
+
+export * from './comm';
