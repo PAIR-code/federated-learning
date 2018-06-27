@@ -322,19 +322,21 @@ function getFrequencyDataFromRotatingBuffer(rotatingBuffer, frameCount) {
 }
 
 function normalize(x) {
-  return tf.tidy(() => {
-    const mean = tf.mean(x);
-    const std = tf.sqrt(tf.mean(tf.square(tf.add(x, tf.neg(mean)))));
-    return tf.div(tf.add(x, tf.neg(mean)), std);
-  });
+  console.log('is x a tensor? ' + client.isTensor(x));
+  console.log('is x a tensor? ' + (x instanceof tf.Tensor));
+  const mean = tf.mean(x);
+  const std = tf.sqrt(tf.mean(tf.square(tf.add(x, tf.neg(mean)))));
+  return tf.div(tf.add(x, tf.neg(mean)), std);
 }
 
 function getInputTensorFromFrequencyData(freqData) {
-  const size = freqData.length;
-  const tensorBuffer = tf.buffer([size]);
-  for (let i = 0; i < freqData.length; ++i) {
-    tensorBuffer.set(freqData[i], i);
-  }
-  return normalize(tensorBuffer.toTensor().reshape([
+  return tf.tidy(() => {
+    const size = freqData.length;
+    const tensorBuffer = tf.buffer([size]);
+    for (let i = 0; i < freqData.length; ++i) {
+      tensorBuffer.set(freqData[i], i);
+    }
+    return normalize(tensorBuffer.toTensor().reshape([
     1, runOptions.numFrames, runOptions.modelFFTLength, 1]));
+  });
 }
