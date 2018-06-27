@@ -18,7 +18,7 @@
 import {ModelFitConfig} from '@tensorflow/tfjs';
 import {Server, Socket} from 'socket.io';
 
-import {DownloadMsg, Events, UploadMsg} from '../common';
+import {DataMsg, DownloadMsg, Events, UploadMsg} from '../common';
 import {serializedToJson, serializeVar} from '../serialization';
 
 import {ModelDB} from './model_db';
@@ -63,6 +63,13 @@ export class SocketAPI {
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();
       socket.emit(Events.Download, initVars);
+
+      socket.on(Events.Data, async (msg: DataMsg, ack) => {
+        ack(true);
+        const x = await serializedToJson(msg.x);
+        const y = await serializedToJson(msg.y);
+        await this.modelDB.putData({x, y});
+      });
 
       // When a client sends us updated weights
       socket.on(Events.Upload, async (msg: UploadMsg, ack) => {

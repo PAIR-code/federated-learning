@@ -21,11 +21,7 @@ export async function serializeVars(
     vars: Array<Variable|LayerVariable|Tensor>) {
   const varsP: Array<Promise<SerializedVariable>> = [];
   vars.forEach((value, key) => {
-    if (value instanceof LayerVariable) {
-      varsP.push(serializeVar(tf.variable(value.read())));
-    } else {
-      varsP.push(serializeVar(value));
-    }
+    varsP.push(serializeVar(tf.variable((value as LayerVariable).read())));
   });
   return Promise.all(varsP);
 }
