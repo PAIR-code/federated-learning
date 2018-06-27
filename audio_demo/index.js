@@ -15,9 +15,8 @@
  * =============================================================================
  */
 
-import 'babel-polyfill';
+import * as client from '../src/client/client';
 import * as tf from '@tensorflow/tfjs';
-import * as client from './comm';
 import Tracker from './tracker';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 
@@ -28,7 +27,7 @@ const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 
 const runOptions = {
-  magnitudeThreshold: -35,
+  magnitudeThreshold: -40,
   magnitudeThresholdMin: -60,
   magnitudeThresholdMax: 0,
   sampleRate: 44100,
@@ -245,10 +244,10 @@ async function saveLabeledExample() {
     const y = toOneHot(yTrue);
     const ys = tf.expandDims(y);
     try {
-      console.log('uploadData');
+      console.log('upload data');
       await window.clientAPI.uploadData(x, y);
 
-      console.log('model.fit');
+      console.log('train model');
       await model.fit(x, ys, fitConfig);
 
       console.log('upload vars');
