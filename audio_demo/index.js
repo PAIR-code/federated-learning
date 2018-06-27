@@ -244,20 +244,28 @@ async function saveLabeledExample() {
     window.probs = undefined;
     const y = toOneHot(yTrue);
     const ys = tf.expandDims(y);
-    console.log('uploadData');
-    await window.clientAPI.uploadData(x, y);
-    console.log('model.fit');
-    await model.fit(x, ys, fitConfig);
-    clientAPI.numExamples = 1;
-    console.log('upload vars');
-    await clientAPI.uploadVars();
-    console.log('revert to original');
-    clientAPI.revertToOriginalVars();
-    clientAPI.numExamples = 0;
-    td4.innerText = '✔️';
-    ys.dispose();
-    x.dispose();
-    y.dispose();
+    try {
+      console.log('uploadData');
+      await window.clientAPI.uploadData(x, y);
+
+      console.log('model.fit');
+      await model.fit(x, ys, fitConfig);
+
+      console.log('upload vars');
+      clientAPI.numExamples = 1;
+      await clientAPI.uploadVars();
+
+      td4.innerText = '✔️';
+    } catch (error) {
+      console.log(error);
+      td4.innerText = '✗';
+    } finally {
+      clientAPI.revertToOriginalVars();
+      clientAPI.numExamples = 0;
+      ys.dispose();
+      x.dispose();
+      y.dispose();
+    }
   } else if (x) {
     x.dispose();
   }
