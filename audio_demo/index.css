@@ -1,0 +1,76 @@
+body {
+  font-family: monospace;
+}
+button {
+  cursor: pointer;
+}
+#record-button {
+  font-family: monospace;
+  margin-top: 5px;
+  background-color: lightgreen;
+}
+.chart {
+  display: inline-block;
+  position: relative;
+  padding-top: 1.2em;
+  vertical-align: top;
+}
+.chart label {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.chart canvas {
+  border: 1px solid #ccc;
+}
+.left-col {
+  width: 800px;
+  float: left;
+}
+.right-col {
+  display: inline-block;
+  width: 400px;
+}
+#probs {
+  margin-top: 1em;
+}
+#label-radios {
+  list-style: none;
+  padding-left: 32px;
+}
+#label-radios li {
+  display: inline;
+}
+#label-radios label {
+  cursor: pointer;
+  position: relative;
+  font-family: "Open Sans", verdana, arial, sans-serif;
+  padding: 0 7px;
+  padding-bottom: 16px;
+  border: 1px solid #ccc;
+  font-size: 12px;
+  fill: rgb(68, 68, 68);
+}
+#label-radios label:hover {
+  background: #e8e8e8;
+}
+#label-radios input {
+  position: absolute;
+  margin: 0;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+#example-table {
+  width: 100%;
+}
+#example-table tbody tr {
+  border-top: 1px solid;
+}
+#example-table tbody td {
+  text-align: center;
+}
+#example-table .incorrect-prediction {
+  color: darkred;
+  font-weight: bold;
+}
