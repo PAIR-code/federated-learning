@@ -74,3 +74,14 @@ button {
   color: darkred;
   font-weight: bold;
 }
+audio {
+  width: 270px;
+}
+fieldset {
+  position: relative;
+}
+.version {
+  position: absolute;
+  right: 1em;
+  bottom: 1em;
+}
