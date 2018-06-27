@@ -10,13 +10,13 @@
   "license": "Apache-2.0",
   "scripts": {
     "start": "node dist/src/server/server.js",
-    "dev": "ts-node-dev src/server/audio_demo_server.ts",
+    "dev": "ts-node src/server/audio_demo_server.ts",
     "build": "tsc && cp demo/index.html dist/demo/",
     "test": "ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "0.11.4",
+    "@tensorflow/tfjs": "^0.11.7",
     "@tensorflow/tfjs-node": "^0.1.7",
     "@tensorflow/tfjs-node-gpu": "^0.1.7",
     "@types/express": "^4.16.0",
@@ -28,8 +28,6 @@
     "encoding-down": "^5.0.3",
     "es6-promise": "^4.2.4",
     "express": "^4.16.3",
-    "level": "^4.0.0",
-    "level-typings": "git+https://github.com/Level/typings.git",
     "leveldown": "^4.0.1",
     "levelup": "^3.0.1",
     "node-fetch": "^2.1.2",
