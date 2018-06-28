@@ -57,7 +57,6 @@ export class SocketAPI {
         }
       });
 
-
       this.numClients++;
 
       // Send current variables to newly connected client

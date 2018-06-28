@@ -18,15 +18,16 @@
 /** Server code */
 import '@tensorflow/tfjs-node';
 
-import '../src/server/fetch_polyfill';
+import '../../src/server/fetch_polyfill';
 
 import * as express from 'express';
 import * as http from 'http';
 import * as path from 'path';
 import * as socketIO from 'socket.io';
 
-import {SocketAPI} from '../src/server/comm';
-import {ModelDB} from '../src/server/model_db';
+import {SocketAPI} from '../../src/server/comm';
+import {ModelDB} from '../../src/server/model_db';
+import {CifarTransferLearningModel} from './cifar_transfer_learning_model';
 
 const app = express();
 const server = http.createServer(app);
@@ -41,7 +42,7 @@ const socketAPI = new SocketAPI(modelDB, FIT_CONFIG, io, true);
 // Plan:
 
 async function main() {
-  await modelDB.setup();
+  await modelDB.setup(new CifarTransferLearningModel());
   await socketAPI.setup();
   await server.listen(3000);
 
