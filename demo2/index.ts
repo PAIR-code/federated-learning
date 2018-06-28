@@ -15,6 +15,5 @@
  * =============================================================================
  */
 
-/** Client code. */
-// TODO: export client code.
-export * from './comm';
+import * as client from '../src/client/client';
+console.log(client);
