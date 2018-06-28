@@ -17,6 +17,7 @@
 
 import * as client from '../src/client/client';
 import * as tf from '@tensorflow/tfjs';
+import MediaStreamRecorder from 'msr';
 import Tracker from './tracker';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 import {AudioTransferLearningModel} from '../src/index';
