@@ -71,7 +71,8 @@ export type UpdateJson = {
 
 export type DataJson = {
   x: TensorJson,
-  y: TensorJson
+  y: TensorJson,
+  clientId?: string
 };
 
 export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
