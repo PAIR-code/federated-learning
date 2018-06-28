@@ -85,3 +85,7 @@ fieldset {
   right: 1em;
   bottom: 1em;
 }
+th {
+  padding: 0 1em;
+  text-align: left;
+}

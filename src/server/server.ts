@@ -46,6 +46,11 @@ export async function setup(model: FederatedModel, dataDir: string) {
 
   app.use(fileUpload());
 
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+  });
+
   // tslint:disable-next-line:no-any
   app.post('/data', async (req: any, res: any) => {
     if (!req.files) {

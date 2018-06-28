@@ -39,7 +39,13 @@ const audioTransferLearningModelURL =
 
 export class AudioTransferLearningModel implements FederatedModel {
   async setup(): Promise<ModelDict> {
+    // NOTE: have to temporarily pretend that this is a browser
+    const prevIsBrowser = tf.ENV.getFeatures().IS_BROWSER;
+    // tslint:disable-next-line:no-any
+    (tf.ENV as any).features.IS_BROWSER = true;
     const model = await tf.loadModel(audioTransferLearningModelURL);
+    // tslint:disable-next-line:no-any
+    (tf.ENV as any).features.IS_BROWSER = prevIsBrowser;
 
     for (let i = 0; i < 9; ++i) {
       model.layers[i].trainable = false;  // freeze conv layers
