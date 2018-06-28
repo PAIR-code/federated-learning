@@ -73,6 +73,7 @@ const modelTemplate = `
     <audio controls id='audio-controls'></audio>
   </div>
 `;
+const serverURL = location.href.replace('1234', '3000');
 
 function setupUI(stream) {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -114,6 +115,17 @@ function setupUI(stream) {
     sourceEl.src = url;
     sourceEl.type = 'audio/wav';
     audioControls.appendChild(sourceEl);
+    const file = new File([blob], `${labelNames[lastLabel]}.wav`, { type: 'audio/wav'});
+    const formData = new FormData();
+    formData.append('file', file);
+    const req = new XMLHttpRequest();
+    req.onreadystatechange = () => {
+      if (req.readyState === 4 && req.status === 200) {
+        console.log('file uploaded successfully');
+      }
+    }
+    req.open('POST', serverURL + '/data');
+    req.send(formData);
   };
 
   function onEveryAudioFrame() {
@@ -131,6 +143,7 @@ function setupUI(stream) {
   window.inputTensors = [];
 
   function stopRecording() {
+    window.lastLabel = randomLabels[labelIdx];
     recording = false;
     modelDiv.innerHTML = modelTemplate;
     recorder.stop();
@@ -196,7 +209,7 @@ fedModel.setup().then((dict) => {
     return true;
   }
   window.clientAPI = clientAPI;
-  clientAPI.initialise(location.href.replace('1234', '3000')).then((fitConfig) => {
+  clientAPI.initialise(serverURL).then((fitConfig) => {
     modelVersion.innerText = clientAPI.modelId;
     window.fitConfig = fitConfig;
     recordButton.innerHTML = 'Waiting for microphone&hellip;';

@@ -67,12 +67,16 @@ export class SocketAPI {
         ack(true);
         const x = await serializedToJson(msg.x);
         const y = await serializedToJson(msg.y);
-        await this.modelDB.putData({x, y});
+        const clientId = socket.client.id;
+        await this.modelDB.putData({x, y, clientId});
       });
 
       // When a client sends us updated weights
       socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
-        // Save them to a file
+        // Immediately acknowledge the request
+        ack(true);
+
+        // Save weights
         const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
         const update = {
           clientId: socket.client.id,
@@ -81,9 +85,6 @@ export class SocketAPI {
           vars: updatedVars
         };
         await this.modelDB.putUpdate(update);
-
-        // Let them know we're done saving
-        ack(true);
 
         // Potentially update the model (asynchronously)
         if (msg.modelId === this.modelDB.modelId) {

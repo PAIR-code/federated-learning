@@ -20,11 +20,21 @@
 import './fetch_polyfill';
 
 import * as express from 'express';
+import * as fileUpload from 'express-fileupload';
+import * as fs from 'fs';
 import * as http from 'http';
+import * as path from 'path';
 import * as socketIO from 'socket.io';
+import {promisify} from 'util';
+import * as uuid from 'uuid/v4';
+
 import {FederatedModel} from '../types';
+
 import {SocketAPI} from './comm';
 import {ModelDB} from './model_db';
+
+const mkdir = promisify(fs.mkdir);
+const exists = promisify(fs.exists);
 
 export async function setup(model: FederatedModel, dataDir: string) {
   const app = express();
@@ -33,6 +43,24 @@ export async function setup(model: FederatedModel, dataDir: string) {
   const modelDB = new ModelDB(dataDir);
   const FIT_CONFIG = {batchSize: 10};
   const socketAPI = new SocketAPI(modelDB, FIT_CONFIG, io);
+
+  app.use(fileUpload());
+
+  // tslint:disable-next-line:no-any
+  app.post('/data', async (req: any, res: any) => {
+    if (!req.files) {
+      return res.status(400).send('Must upload a file');
+    }
+    const dataPath = path.join(dataDir, 'files');
+    const dirExists = await exists(dataPath);
+    if (!dirExists) {
+      await mkdir(dataPath);
+    }
+    const file = req.files.file;
+    const filename = path.join(dataPath, uuid() + '_' + file.name);
+    await file.mv(filename);
+    res.send('File uploaded successfully');
+  });
 
   return modelDB.setup(model).then(() => {
     socketAPI.setup().then(() => {
