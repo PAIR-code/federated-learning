@@ -85,7 +85,8 @@ async function main(
   log('initial loss', preEvalRes[0]);
 
   let i = 0;
-  let wait = 100 + 50 * Math.random();
+  let wait = 50 + 100 * Math.random();
+  let backoff = 0;
   // so all the clients don't try and sync at once
   let j = i + Math.floor(Math.random() * syncEvery);
   const optimizer = tf.train.sgd(0.001);
@@ -98,22 +99,24 @@ async function main(
     if (j % syncEvery) {
       continue;
     }
-    await new Promise((res, rej) => setTimeout(res(), wait));
+    await new Promise((res, rej) => setTimeout(() => res(), wait));
 
     try {
-      await sync.uploadVars();
-
-      wait = 100 + 50 * Math.random();
+      if (sync.numExamples > 0) {
+        await sync.uploadVars();
+      }
+      wait = 50 + 10 * Math.pow(2, backoff);
       log('up sync', i, 'batch loss',
-          loss(img, tf.oneHot(label, 10).toFloat()).mean().dataSync()[0]);
+          tf.tidy(() => loss(img, tf.oneHot(label, 10).toFloat()).mean())
+              .dataSync()[0]);
     } catch (exn) {
-      wait = wait * 2.0;  // exp backoff
-      j--;                // try again next iter
+      backoff++;
+      j--;  // try again next iter
       log('timeout', exn);
     }
   }
   // process any pending updates
-  await new Promise((res, rej) => setTimeout(res(), 50));
+  await new Promise((res, rej) => setTimeout(() => res(), 50));
   log('done, evaluating final loss');
   done = true;
   const evalRes = evaluate();

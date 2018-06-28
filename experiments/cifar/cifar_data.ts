@@ -74,7 +74,7 @@ export async function loadData(
     labels[i] = resultBuf[i * EXAMPLE_SIZE];
   }
 
-  const img = new Uint8Array(numExamples * 3072);
+  const img = new Uint8Array(numExamples * IMG_SIZE);
 
   for (let i = 0; i < numExamples; i++) {
     const readAt = i * EXAMPLE_SIZE + 1;
