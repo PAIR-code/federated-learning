@@ -46,7 +46,7 @@ export class ModelDB {
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
   }
 
-  async setup(model: FederatedModel) {
+  async setup(model?: FederatedModel) {
     this.db = await LevelUp(
         EncodingDown(LevelDown(this.dataDir), {valueEncoding: 'json'}));
     try {
