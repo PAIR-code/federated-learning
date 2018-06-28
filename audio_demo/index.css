@@ -68,14 +68,18 @@ button {
   border-top: 1px solid;
 }
 #example-table tbody td {
-  text-align: center;
+  padding-right: 1em;
+}
+#example-table th {
+  text-align: left;
+  padding-right: 1em;
 }
 #example-table .incorrect-prediction {
   color: darkred;
   font-weight: bold;
 }
 audio {
-  width: 270px;
+  width: 250px;
 }
 fieldset {
   position: relative;
@@ -84,8 +88,4 @@ fieldset {
   position: absolute;
   right: 1em;
   bottom: 1em;
-}
-th {
-  padding: 0 1em;
-  text-align: left;
 }
