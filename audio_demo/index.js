@@ -21,15 +21,6 @@ import Tracker from './tracker';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 import {AudioTransferLearningModel} from '../src/index';
 
-window.tf = tf;
-try {
-  tf.setBackend('webgl');
-} catch (err) {
-  console.log(err);
-  console.log('unable to use webgl, falling back to CPU');
-  tf.setBackend('cpu');
-}
-
 const labelNames =
     'one,two,three,four,five,six,seven,eight,nine,zero,left,right,go,stop'.split(',');
 
@@ -54,10 +45,10 @@ const modelVersion = document.getElementById('model-version');
 const suggestedLabel = document.getElementById('suggested-label');
 const introText = document.getElementById('intro-text');
 const labeledExamples = document.getElementById('labeled-examples');
-let recording = false;
-
-const firstIntro = "Would you be willing to help me? I'd love it if you could show me how to pronounce the word:"
-const laterIntro = "If you're up for another, could you show me how to pronounce:"
+const firstIntro = "Would you be willing to help me?"
+  + " I'd love it if you could show me how to pronounce the word:";
+const laterIntro = "If you're up for another, " +
+  "could you show me how to pronounce:";
 const thanksVariants = [
   "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
   "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
@@ -80,13 +71,43 @@ const modelTemplate = `
   </div>
 `;
 const serverURL = location.href.replace('1234', '3000');
+const fedModel = new AudioTransferLearningModel();
+
+fedModel.setup().then((dict) => {
+  const model = dict.model;
+  const inputShape = model.inputs[0].shape;
+  runOptions.numFrames = inputShape[1];
+  runOptions.modelFFTLength = inputShape[2];
+  runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
+  window.model = model;
+  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+  const clientAPI = client.VariableSynchroniser.fromLayers(model.layers);
+  clientAPI.acceptUpdate = (msg) => {
+    console.log(
+      `new model! updating from ${modelVersion.innerText} to ${msg.modelId}`);
+    modelVersion.innerText = msg.modelId;
+    return true;
+  }
+  window.clientAPI = clientAPI;
+  clientAPI.initialise(serverURL).then((fitConfig) => {
+    modelVersion.innerText = clientAPI.modelId;
+    window.fitConfig = fitConfig;
+    recordButton.innerHTML = 'Waiting for microphone&hellip;';
+    navigator.mediaDevices.getUserMedia({audio: true, video: false})
+      .then(stream => setupUI(stream));
+  });
+});
 
 function setupUI(stream) {
+  // Ask user to provide audio for all labels, but in a random order
+  const randomLabels = [0,1,2,3,4,5,6,7,8,9,10,11,12,13];
+  shuffle(randomLabels);
+
+  // Set up audio objects that listen to our stream
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(stream);
   const analyser = audioContext.createAnalyser();
-
   analyser.fftSize = runOptions.frameSize * 2;
   analyser.smoothingTimeConstant = 0.0;
   source.connect(analyser);
@@ -96,7 +117,6 @@ function setupUI(stream) {
   const rotatingBufferSize =
     runOptions.modelFFTLength * rotatingBufferNumFrames;
   const rotatingBuffer = new Float32Array(rotatingBufferSize);
-  let frameCount = 0;
   const frameDurationMillis =
     runOptions.frameSize / runOptions.sampleRate * 1e3;
   const waitingPeriodFrames = Math.round(
@@ -104,15 +124,18 @@ function setupUI(stream) {
   const refractoryPeriodFrames = Math.round(
     runOptions.refractoryPeriodMillis / frameDurationMillis);
   const tracker = new Tracker(waitingPeriodFrames, refractoryPeriodFrames);
-  const randomLabels = [0,1,2,3,4,5,6,7,8,9,10,11,12,13];
-  shuffle(randomLabels);
+
+  // Keep track of counters that change each audio frame or recording iteration
+  let frameCount = 0;
   let labelIdx = 0;
   let thanksIdx = 0;
   suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
 
-  const recorder = new MediaStreamRecorder(stream, { })
+  // Create a recorder to save the raw .wav file
+  const recorder = new MediaStreamRecorder(stream);
   recorder.mimeType = 'audio/wav';
   recorder.ondataavailable = blob => {
+    // create audio element with recording
     const url = URL.createObjectURL(blob);
     const audioControls = document.createElement('audio');
     const audioSource = document.createElement('source');
@@ -121,20 +144,21 @@ function setupUI(stream) {
     audioSource.type = 'audio/wav';
     audioControls.appendChild(audioSource);
     tr.children[0].appendChild(audioControls);
-    const file = new File([blob], `${labelNames[yTrue]}.wav`, { type: 'audio/wav'});
+
+    // send .wav file to server
+    const file = new File([blob], `${labelNames[yTrue]}.wav`, {
+      type: 'audio/wav'
+    });
+    const req = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
-    const req = new XMLHttpRequest();
-    req.onreadystatechange = () => {
-      if (req.readyState === 4 && req.status === 200) {
-        console.log('file uploaded successfully');
-      }
-    }
     req.open('POST', serverURL + 'data');
     req.send(formData);
   };
 
-  function onEveryAudioFrame() {
+  // On each audio frame, update our rotating buffer with the latest FFT data
+  // from our analyser. For fun, also update the spectrum plot
+  function handleAudioFrame() {
     analyser.getFloatFrequencyData(freqData);
     if (freqData[0] === -Infinity && freqData[1] === -Infinity) {
       return;
@@ -145,49 +169,74 @@ function setupUI(stream) {
     rotatingBuffer.set(freqDataSlice, bufferPos * runOptions.modelFFTLength);
     frameCount++;
   }
+  setInterval(handleAudioFrame,
+    analyser.frequencyBinCount / audioContext.sampleRate * 1000);
 
-  function stopRecording() {
-    // Setup results div
+  // Create our record button
+  introText.innerText = firstIntro;
+  recordButton.innerHTML = 'Record';
+  recordButton.removeAttribute('disabled');
+
+  // When we click it, record for 1 second
+  recordButton.addEventListener('click', async (event) => {
+    recordButton.innerHTML = 'Saving&hellip;';
+    recordButton.setAttribute('disabled', 'disabled');
+    modelDiv.innerHTML = waitingTemplate;
+    recordButton.innerHTML = "Listening&hellip;";
+    recorder.start(1100);
+    setTimeout(finishRecording, 1000);
+  });
+
+  // When we're done recording,
+  function finishRecording() {
+    // Setup results html
     modelDiv.innerHTML = modelTemplate;
-    const yTrue = randomLabels[labelIdx];
-    window.yTrue = yTrue;
-
-    // Create new labeled example row
     window.tr = document.createElement('tr');
     for (let i = 0; i < 5; i++)
       tr.appendChild(document.createElement('td'));
     labeledExamples.appendChild(tr);
+    tr.children[4].innerHTML = '&hellip;';
 
-    // Stop recording
+    // Compute true prediction
+    const yTrue = randomLabels[labelIdx];
+    window.yTrue = yTrue;
+    tr.children[2].innerText = labelNames[yTrue];
+
+    // Stop separate .wav recording
     recorder.stop();
 
-    // Compute our input
+    // Compute input tensor
     const freqData = getFrequencyDataFromRotatingBuffer(
       rotatingBuffer, frameCount - runOptions.numFrames);
     const x = getInputTensorFromFrequencyData(freqData);
 
-    // Compute our label
-    const y = toOneHot(yTrue);
-    const ys = tf.expandDims(y);
-
-    // Compute our prediction
-    let probs;
-    tf.tidy(() => {
-      probs = model.predict(x).dataSync();
-    });
-    const yPred = getArgMax(probs);
-
     // Plot spectrograms
     const mainSpectrogram = document.getElementById('spectrogram-canvas');
     const miniSpectrogram = document.createElement('canvas');
-    miniSpectrogram.setAttribute('width', '100');
-    miniSpectrogram.setAttribute('height', '67');
+    miniSpectrogram.setAttribute('width', '81');
+    miniSpectrogram.setAttribute('height', '54');
     plotSpectrogram(
       mainSpectrogram, freqData,
       runOptions.modelFFTLength, runOptions.modelFFTLength);
     plotSpectrogram(
       miniSpectrogram, freqData,
       runOptions.modelFFTLength, runOptions.modelFFTLength);
+    tr.children[1].appendChild(miniSpectrogram);
+
+    // Compute label tensor
+    const y = toOneHot(yTrue);
+    const ys = tf.expandDims(y);
+
+    // Compute predictions
+    let probs;
+    tf.tidy(() => {
+      probs = model.predict(x).dataSync();
+    });
+    const yPred = getArgMax(probs);
+    tr.children[3].innerText = labelNames[yPred];
+    if (yTrue != yPred) {
+      tr.children[3].className = 'incorrect-prediction';
+    }
 
     // Plot probabilities
     Plotly.newPlot('probs', [{
@@ -201,15 +250,7 @@ function setupUI(stream) {
       margin: { l: 30, r: 5, b: 30, t: 5, pad: 0 },
     });
 
-    tr.children[1].appendChild(miniSpectrogram);
-    tr.children[2].innerText = labelNames[yTrue];
-    tr.children[3].innerText = labelNames[yPred];
-    if (yTrue != yPred) {
-      tr.children[3].className = 'incorrect-prediction';
-    }
-    tr.children[4].innerHTML = '&hellip;';
-
-    // Upload data
+    // Prepare our next loop...
     const cleanup = (err) => {
       if (err) console.log(err);
       tr.children[4].innerText = '✗';
@@ -218,10 +259,16 @@ function setupUI(stream) {
       ys.dispose();
       x.dispose();
       y.dispose();
-    }
+      labelIdx = (labelIdx + 1) % labelNames.length;
+      suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
+      introText.innerText = thanksVariants[thanksIdx] + ' ' + laterIntro;
+      thanksIdx = (thanksIdx + 1) % thanksVariants.length;
+      recordButton.innerText = 'Record';
+      recordButton.removeAttribute('disabled');
+    };
 
-    console.log(x.shape);
-    console.log(ys.shape);
+    // ...after we upload data and train
+    recordButton.innerHTML = 'Uploading&hellip;'
     clientAPI.uploadData(x, y).then(() => {
       console.log('uploaded data');
       model.fit(x, ys).then(() => {
@@ -234,56 +281,8 @@ function setupUI(stream) {
         }, cleanup);
       }, cleanup);
     }, cleanup);
-
-
-    // Update text
-    labelIdx = (labelIdx + 1) % labelNames.length;
-    suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
-    introText.innerText = thanksVariants[thanksIdx] + ' ' + laterIntro;
-    thanksIdx = (thanksIdx + 1) % thanksVariants.length;
-    recordButton.innerText = 'Record';
-    recordButton.removeAttribute('disabled');
   }
-
-  const frameFreq = analyser.frequencyBinCount / audioContext.sampleRate * 1000;
-  setInterval(onEveryAudioFrame, frameFreq);
-  introText.innerText = firstIntro;
-  recordButton.innerHTML = 'Record';
-  recordButton.removeAttribute('disabled');
-  recordButton.addEventListener('click', async (event) => {
-    recordButton.innerHTML = 'Saving&hellip;';
-    recordButton.setAttribute('disabled', 'disabled');
-    modelDiv.innerHTML = waitingTemplate;
-    recordButton.innerHTML = "Listening&hellip;";
-    recording = true;
-    recorder.start(1100);
-    setTimeout(stopRecording, 1000);
-  });
 }
-
-const fedModel = new AudioTransferLearningModel();
-fedModel.setup().then((dict) => {
-  const model = dict.model;
-  const inputShape = model.inputs[0].shape;
-  runOptions.numFrames = inputShape[1];
-  runOptions.modelFFTLength = inputShape[2];
-  runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
-  window.model = model;
-  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
-  const clientAPI = client.VariableSynchroniser.fromLayers(model.layers);
-  clientAPI.acceptUpdate = (msg) => {
-    modelVersion.innerText = msg.modelId;
-    return true;
-  }
-  window.clientAPI = clientAPI;
-  clientAPI.initialise(serverURL).then((fitConfig) => {
-    modelVersion.innerText = clientAPI.modelId;
-    window.fitConfig = fitConfig;
-    recordButton.innerHTML = 'Waiting for microphone&hellip;';
-    navigator.mediaDevices.getUserMedia({audio: true, video: false})
-      .then(stream => setupUI(stream));
-  });
-});
 
 function getArgMax(xs) {
   let max = -Infinity;
