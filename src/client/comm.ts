@@ -182,11 +182,13 @@ export class VariableSynchroniser {
       const newVar = newVars[i];
       // tslint:disable-next-line:no-any
       const varOrLVar = (this.vars[i] as any);
+      const newVal = deserializeVar(newVar);
       if (varOrLVar.write != null) {
-        varOrLVar.write(deserializeVar(newVar));
+        varOrLVar.write(newVal);
       } else {
-        varOrLVar.assign(deserializeVar(newVar));
+        varOrLVar.assign(newVal);
       }
+      newVal.dispose();
     }
   }
 

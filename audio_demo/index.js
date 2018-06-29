@@ -22,6 +22,8 @@ import Tracker from './tracker';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 import {AudioTransferLearningModel} from '../src/index';
 
+window.tf = tf;
+
 const labelNames =
     'one,two,three,four,five,six,seven,eight,nine,zero,left,right,go,stop'.split(',');
 
@@ -256,14 +258,11 @@ function setupUI(stream) {
         console.log('error uploading data or fitting model:');
         console.log(err);
       }
+      // dispose of tensors
+      tf.dispose([x,y,ys]);
       // restore variables we had before training
       clientAPI.revertToOriginalVars();
       clientAPI.numExamples = 0;
-      // dispose of tensors
-      ys.dispose();
-      x.dispose();
-      y.dispose();
-      console.log(tf.memory());
       // decide what label to request next
       labelIdx += 1;
       if (labelIdx >= labelNames.length) {
@@ -277,6 +276,7 @@ function setupUI(stream) {
       // re-allow recording
       recordButton.innerText = 'Record';
       recordButton.removeAttribute('disabled');
+      console.log('done cleaning up');
     };
 
     // ...after we upload data and train
@@ -286,7 +286,7 @@ function setupUI(stream) {
       console.log('fitting model...');
       const modelVersionBeforeFitting = clientAPI.modelId;
       recordButton.innerHTML = 'Fitting Model&hellip;'
-      model.fit(x, ys).then(() => {
+      model.fit(x, ys, clientAPI.fitConfig).then(() => {
         if (clientAPI.modelId === modelVersionBeforeFitting) {
           console.log('uploading weights...');
           clientAPI.numExamples = 1;
