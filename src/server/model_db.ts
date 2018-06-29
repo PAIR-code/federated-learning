@@ -120,7 +120,6 @@ export class ModelDB {
   }
 
   async update() {
-    console.log('updating!!!');
     const currentVars = await this.currentVars();
     const updatedVars = currentVars.map(v => tf.zerosLike(v));
     const updatesJSON = await this.getUpdates();
@@ -144,7 +143,6 @@ export class ModelDB {
 
     // Save results and update key
     await this.writeNewVars(updatedVars);
-    console.log('updated');
   }
 
   async writeNewVars(newVars: tf.Tensor[]) {
