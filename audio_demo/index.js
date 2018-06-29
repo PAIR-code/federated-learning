@@ -179,7 +179,7 @@ function setupUI(stream) {
   recordButton.removeAttribute('disabled');
 
   // When we click it, record for 1 second
-  recordButton.addEventListener('click', async (event) => {
+  recordButton.addEventListener('click', () => {
     recordButton.innerHTML = 'Saving&hellip;';
     recordButton.setAttribute('disabled', 'disabled');
     modelDiv.innerHTML = waitingTemplate;
