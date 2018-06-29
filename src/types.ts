@@ -34,18 +34,15 @@ export interface FederatedModel {
 }
 
 const audioTransferLearningModelURL =
-    // tslint:disable-next-line:max-line-length
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 
 export class AudioTransferLearningModel implements FederatedModel {
   async setup(): Promise<ModelDict> {
     // NOTE: have to temporarily pretend that this is a browser
-    const prevIsBrowser = tf.ENV.getFeatures().IS_BROWSER;
-    // tslint:disable-next-line:no-any
-    (tf.ENV as any).features.IS_BROWSER = true;
+    const isBrowser = tf.ENV.get('IS_BROWSER');
+    tf.ENV.set('IS_BROWSER', true);
     const model = await tf.loadModel(audioTransferLearningModelURL);
-    // tslint:disable-next-line:no-any
-    (tf.ENV as any).features.IS_BROWSER = prevIsBrowser;
+    tf.ENV.set('IS_BROWSER', isBrowser);
 
     for (let i = 0; i < 9; ++i) {
       model.layers[i].trainable = false;  // freeze conv layers
