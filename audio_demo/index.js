@@ -77,7 +77,7 @@ const modelTemplate = `
 const serverURL = 'http://localhost:3000';
 const fedModel = new AudioTransferLearningModel();
 
-fedModel.setup().then((dict) => {
+fedModel.setup().then(async (dict) => {
   const model = dict.model;
   const inputShape = model.inputs[0].shape;
   runOptions.numFrames = inputShape[1];
@@ -90,13 +90,12 @@ fedModel.setup().then((dict) => {
     modelVersion.innerText = msg.modelId;
     return true;
   };
-  clientAPI.initialise(serverURL).then((fitConfig) => {
-    modelVersion.innerText = clientAPI.modelId;
-    window.fitConfig = fitConfig;
-    recordButton.innerHTML = 'Waiting for microphone&hellip;';
-    navigator.mediaDevices.getUserMedia({audio: true, video: false})
-        .then(stream => setupUI(stream, model, clientAPI));
-  });
+  await clientAPI.initialise(serverURL);
+  modelVersion.innerText = clientAPI.modelId;
+  recordButton.innerHTML = 'Waiting for microphone&hellip;';
+  const stream =
+      await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+  setupUI(stream, model, clientAPI);
 });
 
 function setupUI(stream, model, clientAPI) {
