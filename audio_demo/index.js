@@ -15,16 +15,17 @@
  * =============================================================================
  */
 
-import * as client from '../src/client/client';
 import * as tf from '@tensorflow/tfjs';
 import MediaStreamRecorder from 'msr';
-import {plotSpectrogram, plotSpectrum} from './spectral_plots';
+
+import * as client from '../src/client/client';
 import {AudioTransferLearningModel} from '../src/index';
 
+import {plotSpectrogram, plotSpectrum} from './spectral_plots';
+
 const labelNames = [
-  'one', 'two', 'three', 'four', 'five',
-  'six', 'seven', 'eight', 'nine', 'zero',
-  'left', 'right', 'go', 'stop'
+  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'zero', 'left', 'right', 'go', 'stop'
 ];
 
 const runOptions = {
@@ -48,20 +49,20 @@ const modelVersion = document.getElementById('model-version');
 const suggestedLabel = document.getElementById('suggested-label');
 const introText = document.getElementById('intro-text');
 const labeledExamples = document.getElementById('labeled-examples');
-const firstIntro = "Would you be willing to help me?"
-  + " I'd love it if you could show me how to pronounce the word:";
-const laterIntro = "If you're up for another, " +
-  "could you show me how to pronounce:";
-const thanksVariants = [
-  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
-  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
-  "Not bad!",
-  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
-  "You're getting good at this!",
-  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
-  "Thanks!", "Gracias!", "Much obliged!", "Bravo!",
-  "No one expects the Spanish Inquisition!"
-];
+const firstIntro = 'Would you be willing to help me?' +
+    ' I\'d love it if you could show me how to pronounce the word:';
+const laterIntro = 'If you\'re up for another, ' +
+    'could you show me how to pronounce:';
+const basicThanks = ['Thanks!', 'Gracias!', 'Much obliged!', 'Bravo!'];
+let thanksVariants = [];
+thanksVariants = thanksVariants.concat(basicThanks);
+thanksVariants = thanksVariants.concat(basicThanks);
+thanksVariants.push('Not bad!');
+thanksVariants = thanksVariants.concat(basicThanks);
+thanksVariants.push('You\'re getting good at this!');
+thanksVariants = thanksVariants.concat(basicThanks);
+thanksVariants = thanksVariants.concat(basicThanks);
+thanksVariants.push('That was a lot, maybe you should take a break!');
 const waitingTemplate = `Waiting for input&hellip;`;
 const modelTemplate = `
   <div class='chart'>
@@ -85,22 +86,22 @@ fedModel.setup().then((dict) => {
   const clientAPI = client.VariableSynchroniser.fromLayers(model.layers);
   clientAPI.acceptUpdate = (msg) => {
     console.log(
-      `new model! updating from ${modelVersion.innerText} to ${msg.modelId}`);
+        `new model! updating from ${modelVersion.innerText} to ${msg.modelId}`);
     modelVersion.innerText = msg.modelId;
     return true;
-  }
+  };
   clientAPI.initialise(serverURL).then((fitConfig) => {
     modelVersion.innerText = clientAPI.modelId;
     window.fitConfig = fitConfig;
     recordButton.innerHTML = 'Waiting for microphone&hellip;';
     navigator.mediaDevices.getUserMedia({audio: true, video: false})
-      .then(stream => setupUI(stream, model, clientAPI));
+        .then(stream => setupUI(stream, model, clientAPI));
   });
 });
 
 function setupUI(stream, model, clientAPI) {
   // Ask user to provide audio for all labels, but in a random order
-  const randomLabels = [0,1,2,3,4,5,6,7,8,9,10,11,12,13];
+  const randomLabels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
   tf.util.shuffle(randomLabels);
 
   // Set up audio objects that listen to our stream
@@ -113,9 +114,9 @@ function setupUI(stream, model, clientAPI) {
   source.connect(analyser);
   const freqData = new Float32Array(analyser.frequencyBinCount);
   const rotatingBufferNumFrames =
-    runOptions.numFrames * runOptions.rotatingBufferSizeMultiplier;
+      runOptions.numFrames * runOptions.rotatingBufferSizeMultiplier;
   const rotatingBufferSize =
-    runOptions.modelFFTLength * rotatingBufferNumFrames;
+      runOptions.modelFFTLength * rotatingBufferNumFrames;
   const rotatingBuffer = new Float32Array(rotatingBufferSize);
   let resultRow;
   let yTrue;
@@ -141,9 +142,8 @@ function setupUI(stream, model, clientAPI) {
     resultRow.children[0].appendChild(audioControls);
 
     // send .wav file to server
-    const file = new File([blob], `${labelNames[yTrue]}.wav`, {
-      type: 'audio/wav'
-    });
+    const file =
+        new File([blob], `${labelNames[yTrue]}.wav`, {type: 'audio/wav'});
     const req = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
@@ -164,8 +164,9 @@ function setupUI(stream, model, clientAPI) {
     rotatingBuffer.set(freqDataSlice, bufferPos * runOptions.modelFFTLength);
     frameCount++;
   }
-  setInterval(handleAudioFrame,
-    analyser.frequencyBinCount / audioContext.sampleRate * 1000);
+  setInterval(
+      handleAudioFrame,
+      analyser.frequencyBinCount / audioContext.sampleRate * 1000);
 
   // Create our record button
   introText.innerText = firstIntro;
@@ -177,7 +178,7 @@ function setupUI(stream, model, clientAPI) {
     recordButton.innerHTML = 'Saving&hellip;';
     recordButton.setAttribute('disabled', 'disabled');
     modelDiv.innerHTML = waitingTemplate;
-    recordButton.innerHTML = "Listening&hellip;";
+    recordButton.innerHTML = 'Listening&hellip;';
     recorder.start(1100);
     setTimeout(finishRecording, 1000);
   });
@@ -200,7 +201,7 @@ function setupUI(stream, model, clientAPI) {
 
     // Compute input tensor
     const freqData = getFrequencyDataFromRotatingBuffer(
-      rotatingBuffer, frameCount - runOptions.numFrames);
+        rotatingBuffer, frameCount - runOptions.numFrames);
     const x = getInputTensorFromFrequencyData(freqData);
 
     // Plot spectrograms
@@ -209,11 +210,11 @@ function setupUI(stream, model, clientAPI) {
     miniSpectrogram.setAttribute('width', '81');
     miniSpectrogram.setAttribute('height', '54');
     plotSpectrogram(
-      mainSpectrogram, freqData,
-      runOptions.modelFFTLength, runOptions.modelFFTLength);
+        mainSpectrogram, freqData, runOptions.modelFFTLength,
+        runOptions.modelFFTLength);
     plotSpectrogram(
-      miniSpectrogram, freqData,
-      runOptions.modelFFTLength, runOptions.modelFFTLength);
+        miniSpectrogram, freqData, runOptions.modelFFTLength,
+        runOptions.modelFFTLength);
     resultRow.children[1].appendChild(miniSpectrogram);
 
     // Compute label tensor
@@ -235,15 +236,11 @@ function setupUI(stream, model, clientAPI) {
     }
 
     // Plot probabilities
-    Plotly.newPlot('probs', [{
-      x: labelNames,
-      y: probs,
-      type: 'bar'
-    }], {
+    Plotly.newPlot('probs', [{x: labelNames, y: probs, type: 'bar'}], {
       autosize: false,
       width: 480,
       height: 180,
-      margin: { l: 30, r: 5, b: 30, t: 5, pad: 0 },
+      margin: {l: 30, r: 5, b: 30, t: 5, pad: 0},
     });
 
     // Prepare our next loop...
@@ -253,7 +250,7 @@ function setupUI(stream, model, clientAPI) {
         console.log(err);
       }
       // dispose of tensors
-      tf.dispose([x,y]);
+      tf.dispose([x, y]);
       // restore variables we had before training
       clientAPI.revertToOriginalVars();
       clientAPI.numExamples = 0;
@@ -261,7 +258,7 @@ function setupUI(stream, model, clientAPI) {
       labelIdx += 1;
       if (labelIdx >= labelNames.length) {
         labelIdx = 0;
-        tf.util.shuffle(randomLabels); // reshuffle each iteration
+        tf.util.shuffle(randomLabels);  // reshuffle each iteration
       }
       suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
       // thank the user
@@ -301,16 +298,16 @@ function getFrequencyDataFromRotatingBuffer(rotatingBuffer, frameCount) {
 
   const rotatingBufferSize = rotatingBuffer.length;
   const rotatingBufferNumFrames =
-    rotatingBufferSize / runOptions.modelFFTLength;
+      rotatingBufferSize / runOptions.modelFFTLength;
   while (frameCount < 0) {
     frameCount += rotatingBufferNumFrames;
   }
   const indexBegin =
-    (frameCount % rotatingBufferNumFrames) * runOptions.modelFFTLength;
+      (frameCount % rotatingBufferNumFrames) * runOptions.modelFFTLength;
   const indexEnd = indexBegin + size;
 
   for (let i = indexBegin; i < indexEnd; ++i) {
-    freqData[ i - indexBegin]  = rotatingBuffer[i % rotatingBufferSize];
+    freqData[i - indexBegin] = rotatingBuffer[i % rotatingBufferSize];
   }
   return freqData;
 }
@@ -330,7 +327,7 @@ function getInputTensorFromFrequencyData(freqData) {
     for (let i = 0; i < freqData.length; ++i) {
       tensorBuffer.set(freqData[i], i);
     }
-    return normalize(tensorBuffer.toTensor().reshape([
-        1, runOptions.numFrames, runOptions.modelFFTLength, 1]));
+    return normalize(tensorBuffer.toTensor().reshape(
+        [1, runOptions.numFrames, runOptions.modelFFTLength, 1]));
   });
 }
