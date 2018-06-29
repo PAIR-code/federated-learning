@@ -18,14 +18,14 @@
 import * as client from '../src/client/client';
 import * as tf from '@tensorflow/tfjs';
 import MediaStreamRecorder from 'msr';
-import Tracker from './tracker';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 import {AudioTransferLearningModel} from '../src/index';
 
-window.tf = tf;
-
-const labelNames =
-    'one,two,three,four,five,six,seven,eight,nine,zero,left,right,go,stop'.split(',');
+const labelNames = [
+  'one', 'two', 'three', 'four', 'five',
+  'six', 'seven', 'eight', 'nine', 'zero',
+  'left', 'right', 'go', 'stop'
+];
 
 const runOptions = {
   magnitudeThreshold: -40,
@@ -73,7 +73,7 @@ const modelTemplate = `
     <div id='probs'></div>
   </div>
 `;
-const serverURL = location.href.replace('1234', '3000');
+const serverURL = 'http://localhost:3000';
 const fedModel = new AudioTransferLearningModel();
 
 fedModel.setup().then((dict) => {
@@ -82,8 +82,6 @@ fedModel.setup().then((dict) => {
   runOptions.numFrames = inputShape[1];
   runOptions.modelFFTLength = inputShape[2];
   runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
-  window.model = model;
-  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
   const clientAPI = client.VariableSynchroniser.fromLayers(model.layers);
   clientAPI.acceptUpdate = (msg) => {
     console.log(
@@ -91,20 +89,19 @@ fedModel.setup().then((dict) => {
     modelVersion.innerText = msg.modelId;
     return true;
   }
-  window.clientAPI = clientAPI;
   clientAPI.initialise(serverURL).then((fitConfig) => {
     modelVersion.innerText = clientAPI.modelId;
     window.fitConfig = fitConfig;
     recordButton.innerHTML = 'Waiting for microphone&hellip;';
     navigator.mediaDevices.getUserMedia({audio: true, video: false})
-      .then(stream => setupUI(stream));
+      .then(stream => setupUI(stream, model, clientAPI));
   });
 });
 
-function setupUI(stream) {
+function setupUI(stream, model, clientAPI) {
   // Ask user to provide audio for all labels, but in a random order
   const randomLabels = [0,1,2,3,4,5,6,7,8,9,10,11,12,13];
-  shuffle(randomLabels);
+  tf.util.shuffle(randomLabels);
 
   // Set up audio objects that listen to our stream
   const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -120,13 +117,8 @@ function setupUI(stream) {
   const rotatingBufferSize =
     runOptions.modelFFTLength * rotatingBufferNumFrames;
   const rotatingBuffer = new Float32Array(rotatingBufferSize);
-  const frameDurationMillis =
-    runOptions.frameSize / runOptions.sampleRate * 1e3;
-  const waitingPeriodFrames = Math.round(
-    runOptions.waitingPeriodMillis / frameDurationMillis);
-  const refractoryPeriodFrames = Math.round(
-    runOptions.refractoryPeriodMillis / frameDurationMillis);
-  const tracker = new Tracker(waitingPeriodFrames, refractoryPeriodFrames);
+  let resultRow;
+  let yTrue;
 
   // Keep track of counters that change each audio frame or recording iteration
   let frameCount = 0;
@@ -146,7 +138,7 @@ function setupUI(stream) {
     audioSource.src = url;
     audioSource.type = 'audio/wav';
     audioControls.appendChild(audioSource);
-    tr.children[0].appendChild(audioControls);
+    resultRow.children[0].appendChild(audioControls);
 
     // send .wav file to server
     const file = new File([blob], `${labelNames[yTrue]}.wav`, {
@@ -155,7 +147,7 @@ function setupUI(stream) {
     const req = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
-    req.open('POST', serverURL + 'data');
+    req.open('POST', serverURL + '/data');
     req.send(formData);
   };
 
@@ -194,15 +186,14 @@ function setupUI(stream) {
   function finishRecording() {
     // Setup results html
     modelDiv.innerHTML = modelTemplate;
-    window.tr = document.createElement('tr');
+    resultRow = document.createElement('tr');
     for (let i = 0; i < 4; i++)
-      tr.appendChild(document.createElement('td'));
-    labeledExamples.appendChild(tr);
+      resultRow.appendChild(document.createElement('td'));
+    labeledExamples.appendChild(resultRow);
 
     // Compute true prediction
-    const yTrue = randomLabels[labelIdx];
-    window.yTrue = yTrue;
-    tr.children[2].innerText = labelNames[yTrue];
+    yTrue = randomLabels[labelIdx];
+    resultRow.children[2].innerText = labelNames[yTrue];
 
     // Stop separate .wav recording
     recorder.stop();
@@ -223,21 +214,24 @@ function setupUI(stream) {
     plotSpectrogram(
       miniSpectrogram, freqData,
       runOptions.modelFFTLength, runOptions.modelFFTLength);
-    tr.children[1].appendChild(miniSpectrogram);
+    resultRow.children[1].appendChild(miniSpectrogram);
 
     // Compute label tensor
-    const y = toOneHot(yTrue);
-    const ys = tf.expandDims(y);
+    const onehotY = new Array(labelNames.length).fill(0);
+    onehotY[yTrue] = 1;
+    const y = tf.tensor2d([onehotY]);
 
     // Compute predictions
+    let yPred;
     let probs;
     tf.tidy(() => {
-      probs = model.predict(x).dataSync();
+      const p = model.predict(x);
+      yPred = tf.argMax(p, 1).dataSync()[0];
+      probs = p.dataSync();
     });
-    const yPred = getArgMax(probs);
-    tr.children[3].innerText = labelNames[yPred];
+    resultRow.children[3].innerText = labelNames[yPred];
     if (yTrue != yPred) {
-      tr.children[3].className = 'incorrect-prediction';
+      resultRow.children[3].className = 'incorrect-prediction';
     }
 
     // Plot probabilities
@@ -259,7 +253,7 @@ function setupUI(stream) {
         console.log(err);
       }
       // dispose of tensors
-      tf.dispose([x,y,ys]);
+      tf.dispose([x,y]);
       // restore variables we had before training
       clientAPI.revertToOriginalVars();
       clientAPI.numExamples = 0;
@@ -267,7 +261,7 @@ function setupUI(stream) {
       labelIdx += 1;
       if (labelIdx >= labelNames.length) {
         labelIdx = 0;
-        shuffle(randomLabels); // reshuffle each iteration
+        tf.util.shuffle(randomLabels); // reshuffle each iteration
       }
       suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
       // thank the user
@@ -286,7 +280,7 @@ function setupUI(stream) {
       console.log('fitting model...');
       const modelVersionBeforeFitting = clientAPI.modelId;
       recordButton.innerHTML = 'Fitting Model&hellip;'
-      model.fit(x, ys, clientAPI.fitConfig).then(() => {
+      model.fit(x, y, clientAPI.fitConfig).then(() => {
         if (clientAPI.modelId === modelVersionBeforeFitting) {
           console.log('uploading weights...');
           clientAPI.numExamples = 1;
@@ -299,27 +293,6 @@ function setupUI(stream) {
       }, cleanup);
     }, cleanup);
   }
-}
-
-function getArgMax(xs) {
-  let max = -Infinity;
-  let idx = 0;
-  for (let i = 0; i < xs.length; ++i) {
-    if (xs[i] > max) {
-      max = xs[i];
-      idx = i;
-    }
-  }
-  return idx;
-}
-
-function toOneHot(j) {
-  const yArr = [];
-  for (let i = 0; i < labelNames.length; i++) {
-    yArr.push(0);
-  }
-  yArr[j] = 1;
-  return tf.tensor1d(yArr);
 }
 
 function getFrequencyDataFromRotatingBuffer(rotatingBuffer, frameCount) {
@@ -343,9 +316,11 @@ function getFrequencyDataFromRotatingBuffer(rotatingBuffer, frameCount) {
 }
 
 function normalize(x) {
-  const mean = tf.mean(x);
-  const std = tf.sqrt(tf.mean(tf.square(tf.add(x, tf.neg(mean)))));
-  return tf.div(tf.add(x, tf.neg(mean)), std);
+  return tf.tidy(() => {
+    const mean = tf.mean(x);
+    const std = tf.sqrt(tf.mean(tf.square(tf.add(x, tf.neg(mean)))));
+    return tf.div(tf.add(x, tf.neg(mean)), std);
+  });
 }
 
 function getInputTensorFromFrequencyData(freqData) {
@@ -356,14 +331,6 @@ function getInputTensorFromFrequencyData(freqData) {
       tensorBuffer.set(freqData[i], i);
     }
     return normalize(tensorBuffer.toTensor().reshape([
-    1, runOptions.numFrames, runOptions.modelFFTLength, 1]));
+        1, runOptions.numFrames, runOptions.modelFFTLength, 1]));
   });
-}
-
-function shuffle(a) {
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }

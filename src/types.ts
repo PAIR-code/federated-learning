@@ -51,6 +51,8 @@ export class AudioTransferLearningModel implements FederatedModel {
       model.layers[i].trainable = false;  // freeze conv layers
     }
 
+    model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+
     const loss = (inputs: Tensor, labels: Tensor) => {
       const logits = model.predict(inputs) as Tensor;
       const losses = tf.losses.softmaxCrossEntropy(logits, labels);
