@@ -256,30 +256,46 @@ function setupUI(stream) {
         console.log('error uploading data or fitting model:');
         console.log(err);
       }
+      // restore variables we had before training
       clientAPI.revertToOriginalVars();
       clientAPI.numExamples = 0;
+      // dispose of tensors
       ys.dispose();
       x.dispose();
       y.dispose();
-      labelIdx = (labelIdx + 1) % labelNames.length;
+      console.log(tf.memory());
+      // decide what label to request next
+      labelIdx += 1;
+      if (labelIdx >= labelNames.length) {
+        labelIdx = 0;
+        shuffle(randomLabels); // reshuffle each iteration
+      }
       suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
+      // thank the user
       introText.innerText = thanksVariants[thanksIdx] + ' ' + laterIntro;
       thanksIdx = (thanksIdx + 1) % thanksVariants.length;
+      // re-allow recording
       recordButton.innerText = 'Record';
       recordButton.removeAttribute('disabled');
     };
 
     // ...after we upload data and train
-    recordButton.innerHTML = 'Uploading&hellip;'
+    console.log('uploading data...');
+    recordButton.innerHTML = 'Uploading Data&hellip;'
     clientAPI.uploadData(x, y).then(() => {
-      console.log('uploaded data');
+      console.log('fitting model...');
+      const modelVersionBeforeFitting = clientAPI.modelId;
+      recordButton.innerHTML = 'Fitting Model&hellip;'
       model.fit(x, ys).then(() => {
-        console.log('fit model');
-        clientAPI.numExamples = 1;
-        clientAPI.uploadVars().then(() => {
-          console.log('uploaded vars');
+        if (clientAPI.modelId === modelVersionBeforeFitting) {
+          console.log('uploading weights...');
+          clientAPI.numExamples = 1;
+          recordButton.innerHTML = 'Uploading Weights&hellip;'
+          clientAPI.uploadVars().then(cleanup, cleanup);
+        } else {
+          console.log('aborting weight upload due to version change!');
           cleanup();
-        }, cleanup);
+        }
       }, cleanup);
     }, cleanup);
   }
@@ -346,8 +362,8 @@ function getInputTensorFromFrequencyData(freqData) {
 
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
