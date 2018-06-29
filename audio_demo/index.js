@@ -193,10 +193,9 @@ function setupUI(stream) {
     // Setup results html
     modelDiv.innerHTML = modelTemplate;
     window.tr = document.createElement('tr');
-    for (let i = 0; i < 5; i++)
+    for (let i = 0; i < 4; i++)
       tr.appendChild(document.createElement('td'));
     labeledExamples.appendChild(tr);
-    tr.children[4].innerHTML = '&hellip;';
 
     // Compute true prediction
     const yTrue = randomLabels[labelIdx];
@@ -253,8 +252,10 @@ function setupUI(stream) {
 
     // Prepare our next loop...
     const cleanup = (err) => {
-      if (err) console.log(err);
-      tr.children[4].innerText = '✗';
+      if (err) {
+        console.log('error uploading data or fitting model:');
+        console.log(err);
+      }
       clientAPI.revertToOriginalVars();
       clientAPI.numExamples = 0;
       ys.dispose();
@@ -278,7 +279,6 @@ function setupUI(stream) {
         clientAPI.uploadVars().then(() => {
           console.log('uploaded vars');
           cleanup();
-          tr.children[4].innerText = '✔️';
         }, cleanup);
       }, cleanup);
     }, cleanup);
