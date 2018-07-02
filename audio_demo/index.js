@@ -84,12 +84,13 @@ loadAudioTransferLearningModel().then(async (model) => {
   runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
 
   const clientAPI = new ClientAPI(new FederatedTfModel(model));
-  await clientAPI.connectTo(serverURL);
-  clientAPI.onUpdate((msg) => {
+  clientAPI.onDownload((msg) => {
+    const newVersion = msg.modelVersion;
     console.log(
-        `new model! updating from ${modelVersion.innerText} to ${msg.modelId}`);
-    modelVersion.innerText = msg.modelId;
+        `new model! updating from ${modelVersion.innerText} to ${newVersion}`);
+    modelVersion.innerText = newVersion;
   });
+  await clientAPI.connect(serverURL);
 
   recordButton.innerHTML = 'Waiting for microphone&hellip;';
   const stream =

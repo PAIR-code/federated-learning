@@ -27,9 +27,7 @@ export class ServerAPI {
   io: Server;
   numClients = 0;
 
-  constructor(
-      modelDB: ModelDB, io: Server,
-      private exitOnClientExit = false) {
+  constructor(modelDB: ModelDB, io: Server, private exitOnClientExit = false) {
     this.modelDB = modelDB;
     this.io = io;
   }
@@ -37,10 +35,7 @@ export class ServerAPI {
   async downloadMsg(): Promise<DownloadMsg> {
     const varsJson = await this.modelDB.currentVars();
     const varsSeri = await Promise.all(varsJson.map(serializeVar));
-    return {
-      modelId: this.modelDB.modelId,
-      vars: varsSeri
-    };
+    return {modelVersion: this.modelDB.modelVersion, vars: varsSeri};
   }
 
   async setup() {
@@ -76,14 +71,14 @@ export class ServerAPI {
         const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
         const update = {
           clientId: socket.client.id,
-          modelId: msg.modelId,
+          modelVersion: msg.modelVersion,
           numExamples: msg.numExamples,
           vars: updatedVars
         };
         await this.modelDB.putUpdate(update);
 
         // Potentially update the model (asynchronously)
-        if (msg.modelId === this.modelDB.modelId) {
+        if (msg.modelVersion === this.modelDB.modelVersion) {
           const updated = await this.modelDB.possiblyUpdate();
           if (updated) {
             // Send new variables to all clients if we updated

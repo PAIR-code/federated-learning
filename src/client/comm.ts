@@ -28,81 +28,78 @@ import {FederatedModel} from '../types';
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
 
+type DownloadCallback = (msg: DownloadMsg) => void;
+
 /**
- * Synchronises tf.Variables between a client and a server.
- * Example usage with bare tf.Variables:
- * ```js
- * const { loss, vars } = setupModel()
- * const sync = new VariableSynchroniser(vars)
- * const clientHyperparams = await sync.initialise('http://server.com')
- * // train the model or otherwise update vars
- * const metaInfo = { nSteps: 1 } // optional
- * await sync.uploadVars(metaInfo)
- * ```
+ * Federated Learning Client API library.
+ *
  * Example usage with a tf.Model:
  * ```js
- * const model = tf.loadModel('a-model.json');
- * const sync = VariableSynchroniser.fromLayers(model.getLayer('classifier'))
- * const clientFitConfig = await sync.initialise('http://server.com')
- * const h = await model.fit(data.X, data.y, clientFitConfig)
- * await sync.uploadVars(metaInfo)
+ * const tensorflowModel = await tf.loadModel('a-model.json');
+ * const federatedModel = new FederatedTfModel(tensorflowModel);
+ * const clientAPI = new ClientAPI(federatedModel);
+ * await clientAPI.connect('http://server.com');
+ * await clientAPI.fitAndUpload(data.X, data.y);
  * ```
  * The server->client synchronisation happens transparently whenever the server
  * broadcasts weights.
  * The client->server sync must be triggered manually with uploadVars
  */
-
-type UpdateCallback = (msg: DownloadMsg) => void;
-
 export class ClientAPI {
-  public model: FederatedModel;
   private msg: DownloadMsg;
+  private model: FederatedModel;
   private socket: SocketIOClient.Socket;
-  private updateCallbacks: UpdateCallback[];
+  private downloadCallbacks: DownloadCallback[];
+
   /**
-   * Construct a synchroniser from a list of tf.Variables of tf.LayerVariables.
-   * @param {Array<Variable|LayerVariable>} vars - Variables to track and sync
+   * Construct a client API for federated learning that will push and pull
+   * `model` updates from the server.
+   * @param {model<FederatedModel>} model - model to use with federated learning
    */
   constructor(model: FederatedModel) {
     this.model = model;
-    this.updateCallbacks = [];
-  }
-
-  public modelVersion() {
-    return this.msg.modelId
-  }
-
-  public onUpdate(callback: UpdateCallback) {
-    this.updateCallbacks.push(callback);
-  }
-
-  private async connect(url: string): Promise<DownloadMsg> {
-    this.socket = socketio(url);
-    return fromEvent<DownloadMsg>(
-        this.socket, Events.Download, CONNECTION_TIMEOUT);
+    this.downloadCallbacks = [];
   }
 
   /**
-   * Connect to a server, synchronise the variables to their
-   * initial values and return the hyperparameters for this client
-   * @param url: The URL of the server
+   * @return The version of the model we're currently training
+   */
+  public modelVersion(): string {
+    return this.msg.modelVersion;
+  }
+
+  /**
+   * Register a new callback to be invoked whenever the client downloads new
+   * weights from the server.
+   */
+  public onDownload(callback: DownloadCallback): void {
+    this.downloadCallbacks.push(callback);
+  }
+
+  /**
+   * Connect to a server, synchronise the variables to their initial values
+   * @param serverURL: The URL of the server
    * @return A promise that resolves when the connection has been established
    * and variables set to their inital values.
    */
-  public async connectTo(serverURL: string): Promise<void> {
-    this.msg = await this.connect(serverURL);
-    this.setVars(this.msg.vars);
-    for (let i = 0; i < this.updateCallbacks.length; i++) {
-      this.updateCallbacks[i](this.msg);
-    }
+  public async connect(serverURL: string): Promise<void> {
+    const msg = await this.connectTo(serverURL);
+    this.msg = msg;
+    this.setVars(msg.vars);
+    this.downloadCallbacks.forEach((cb) => cb(msg));
 
     this.socket.on(Events.Download, (msg: DownloadMsg) => {
       this.msg = msg;
       this.setVars(msg.vars);
-      for (let i = 0; i < this.updateCallbacks.length; i++) {
-        this.updateCallbacks[i](this.msg);
-      }
+      this.downloadCallbacks.forEach((cb) => cb(msg));
     });
+  }
+
+  /**
+   * Disconnect from the server.
+   */
+  public dispose(): void {
+    this.socket.disconnect();
   }
 
   /**
@@ -139,7 +136,7 @@ export class ClientAPI {
    */
   public async federatedUpdate(xs: tf.Tensor, ys: tf.Tensor): Promise<void> {
     // save original model ID (in case it changes during training/serialization)
-    const modelId = this.msg.modelId;
+    const modelVersion = this.msg.modelVersion;
     // fit the model to the new data
     await this.model.fit(xs, ys);
     // serialize the new weights -- in the future we could add noise here
@@ -147,7 +144,8 @@ export class ClientAPI {
     // revert our model back to its original weights
     this.setVars(this.msg.vars);
     // upload the updates to the server
-    await this.uploadVars({modelId, numExamples: xs.shape[0], vars: newVars});
+    await this.uploadVars(
+        {modelVersion, numExamples: xs.shape[0], vars: newVars});
   }
 
   /**
@@ -172,8 +170,10 @@ export class ClientAPI {
     });
   }
 
-  public dispose() {
-    this.socket.disconnect();
+  private async connectTo(serverURL: string): Promise<DownloadMsg> {
+    this.socket = socketio(serverURL);
+    return fromEvent<DownloadMsg>(
+        this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 }
 

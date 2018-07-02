@@ -27,7 +27,7 @@ import {FederatedModel, VarList} from '../types';
 
 import {ModelDB} from './model_db';
 
-const modelId = '1528400733553';
+const modelVersion = '1528400733553';
 const updateId1 = '4c382c89-30cc-4f81-9197-c26e345cfb5b';
 const updateId2 = 'cdd749c0-8908-48d7-ba87-4844c831945c';
 
@@ -49,7 +49,7 @@ describe('ModelDB', () => {
     dataDir = fs.mkdtempSync('/tmp/modeldb_test');
     const lvl =
         LevelUp(EncodingDown(LevelDown(dataDir), {valueEncoding: 'json'}));
-    await lvl.put('currentModelId', modelId);
+    await lvl.put('currentModelVersion', modelVersion);
     const modelVars = await Promise.all([
       tensorToJson(tf.tensor([0, 0, 0, 0], [2, 2])),
       tensorToJson(tf.tensor([1, 2, 3, 4], [1, 4]))
@@ -62,9 +62,11 @@ describe('ModelDB', () => {
       tensorToJson(tf.tensor([0, 0, 1, -1], [2, 2])),
       tensorToJson(tf.tensor([1, 2, 1, 2], [1, 4]))
     ]);
-    await lvl.put(modelId, {'vars': modelVars});
-    await lvl.put(modelId + '/' + updateId1, {numExamples: 2, vars: update1});
-    await lvl.put(modelId + '/' + updateId2, {numExamples: 3, vars: update2});
+    await lvl.put(modelVersion, {'vars': modelVars});
+    await lvl.put(
+        modelVersion + '/' + updateId1, {numExamples: 2, vars: update1});
+    await lvl.put(
+        modelVersion + '/' + updateId2, {numExamples: 3, vars: update2});
     await lvl.close();
   });
 
@@ -75,7 +77,7 @@ describe('ModelDB', () => {
   it('defaults to treating the latest model as current', async () => {
     const db = new ModelDB(dataDir);
     await db.setup(new MockModel());
-    expect(db.modelId).toBe(modelId);
+    expect(db.modelVersion).toBe(modelVersion);
   });
 
   it('loads variables from JSON', async () => {
@@ -94,7 +96,7 @@ describe('ModelDB', () => {
     const db = new ModelDB(dataDir);
     await db.setup(new MockModel());
     await db.update();
-    expect(db.modelId).not.toBe(modelId);
+    expect(db.modelVersion).not.toBe(modelVersion);
     const newVars = await db.currentVars();
     test_util.expectArraysClose(newVars[0], [0.4, -0.4, 0.6, -0.6]);
     test_util.expectArraysClose(newVars[1], [0.2, 0.8, 0.2, 0.8]);
@@ -105,11 +107,11 @@ describe('ModelDB', () => {
     await db.setup(new MockModel());
     let updated = await db.possiblyUpdate();
     expect(updated).toBe(false);
-    expect(db.modelId).toBe(modelId);
+    expect(db.modelVersion).toBe(modelVersion);
     const oldUpdateCount = await db.countUpdates();
     expect(oldUpdateCount).toBe(2);
     const updateId3 = 'not-necessarily-a-uuid';
-    await db.db.put(modelId + '/' + updateId3, {
+    await db.db.put(modelVersion + '/' + updateId3, {
       numExamples: 3,
       vars: [
         tensorToJson(tf.tensor([0, 0, 0, 0], [2, 2])),
@@ -118,7 +120,7 @@ describe('ModelDB', () => {
     });
     updated = await db.possiblyUpdate();
     expect(updated).toBe(true);
-    expect(db.modelId).not.toBe(modelId);
+    expect(db.modelVersion).not.toBe(modelVersion);
     const newUpdateCount = await db.countUpdates();
     expect(newUpdateCount).toBe(0);
   });
