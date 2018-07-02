@@ -16,46 +16,53 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Model, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {Model, ModelFitConfig, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
-export type LossFun = (inputs: Tensor, labels: Tensor) => Scalar;
-export type PredFun = (inputs: Tensor) => Tensor|Tensor[];
 export type VarList = Array<Variable|LayerVariable>;
-export type ModelDict = {
-  vars: VarList,
-  loss: LossFun,
-  predict: PredFun,
-  model?: Model
-};
 
 export interface FederatedModel {
-  setup(): Promise<ModelDict>;
+  setup(): Promise<void>;
+  fit(x: Tensor, y: Tensor, fitConfig: ModelFitConfig): Promise<void>;
+  getVars(): VarList;
+  setVars(vals: Tensor[]): void;
+}
+
+export class FederatedTfModel implements FederatedModel {
+  public model: Model;
+
+  async setup(): Promise<void> {}
+
+  async fit(x: Tensor, y: Tensor, fitConfig: ModelFitConfig): Promise<void> {
+    await this.model.fit(x, y, fitConfig);
+  }
+
+  getVars(): VarList {
+    return this.model.trainableWeights;
+  }
+
+  setVars(vals: Tensor[]) {
+    for (let i = 0; i < vals.length; i++) {
+      this.model.trainableWeights[i].write(vals[i]);
+    }
+  }
 }
 
 const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 
-export class AudioTransferLearningModel implements FederatedModel {
-  async setup(): Promise<ModelDict> {
+export class AudioTransferLearningModel extends FederatedTfModel {
+  async setup(): Promise<void> {
     // NOTE: have to temporarily pretend that this is a browser
     const isBrowser = tf.ENV.get('IS_BROWSER');
     tf.ENV.set('IS_BROWSER', true);
-    const model = await tf.loadModel(audioTransferLearningModelURL);
+    this.model = await tf.loadModel(audioTransferLearningModelURL);
     tf.ENV.set('IS_BROWSER', isBrowser);
 
     for (let i = 0; i < 9; ++i) {
-      model.layers[i].trainable = false;  // freeze conv layers
+      this.model.layers[i].trainable = false;  // freeze conv layers
     }
 
-    model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
-
-    const loss = (inputs: Tensor, labels: Tensor) => {
-      const logits = model.predict(inputs) as Tensor;
-      const losses = tf.losses.softmaxCrossEntropy(logits, labels);
-      return losses.mean() as Scalar;
-    };
-
-    return {predict: model.predict, vars: model.trainableWeights, loss, model};
+    this.model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
   }
 }

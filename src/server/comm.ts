@@ -23,7 +23,7 @@ import {serializedToJson, serializeVar} from '../serialization';
 
 import {ModelDB} from './model_db';
 
-export class SocketAPI {
+export class ServerAPI {
   modelDB: ModelDB;
   fitConfig: ModelFitConfig;
   io: Server;

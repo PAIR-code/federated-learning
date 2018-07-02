@@ -30,7 +30,7 @@ import * as uuid from 'uuid/v4';
 
 import {FederatedModel} from '../types';
 
-import {SocketAPI} from './comm';
+import {ServerAPI} from './comm';
 import {ModelDB} from './model_db';
 
 const mkdir = promisify(fs.mkdir);
@@ -42,7 +42,7 @@ export async function setup(model: FederatedModel, dataDir: string) {
   const io = socketIO(server);
   const modelDB = new ModelDB(dataDir);
   const FIT_CONFIG = {batchSize: 10};
-  const socketAPI = new SocketAPI(modelDB, FIT_CONFIG, io);
+  const api = new ServerAPI(modelDB, FIT_CONFIG, io);
 
   app.use(fileUpload());
 
@@ -68,7 +68,7 @@ export async function setup(model: FederatedModel, dataDir: string) {
   });
 
   return modelDB.setup(model).then(() => {
-    socketAPI.setup().then(() => {
+    api.setup().then(() => {
       server.listen(3000, () => {
         console.log('listening on 3000');
       });
