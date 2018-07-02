@@ -86,12 +86,12 @@ export class ClientAPI {
     const msg = await this.connectTo(serverURL);
     this.msg = msg;
     this.setVars(msg.vars);
-    this.downloadCallbacks.forEach((cb) => cb(msg));
+    this.downloadCallbacks.forEach(cb => cb(msg));
 
     this.socket.on(Events.Download, (msg: DownloadMsg) => {
       this.msg = msg;
       this.setVars(msg.vars);
-      this.downloadCallbacks.forEach((cb) => cb(msg));
+      this.downloadCallbacks.forEach(cb => cb(msg));
     });
   }
 
@@ -166,7 +166,7 @@ export class ClientAPI {
 
   protected setVars(newVars: SerializedVariable[]) {
     tf.tidy(() => {
-      this.model.setVars(newVars.map(deserializeVar));
+      this.model.setVars(newVars.map(v => deserializeVar(v)));
     });
   }
 
