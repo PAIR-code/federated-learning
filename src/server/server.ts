@@ -41,8 +41,7 @@ export async function setup(model: FederatedModel, dataDir: string) {
   const server = http.createServer(app);
   const io = socketIO(server);
   const modelDB = new ModelDB(dataDir);
-  const FIT_CONFIG = {batchSize: 10};
-  const api = new ServerAPI(modelDB, FIT_CONFIG, io);
+  const api = new ServerAPI(modelDB, io);
 
   app.use(fileUpload());
 

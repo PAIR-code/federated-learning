@@ -17,7 +17,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {ModelFitConfig, Tensor, test_util, Variable} from '@tensorflow/tfjs';
+import {Tensor, test_util, Variable} from '@tensorflow/tfjs';
 import EncodingDown from 'encoding-down';
 import * as fs from 'fs';
 import * as http from 'http';
@@ -33,31 +33,18 @@ import {ModelDB} from './server/model_db';
 import {FederatedModel, VarList} from './types';
 
 const modelId = '1528400733553';
-const batchSize = 42;
-const FIT_CONFIG = {batchSize};
-const PORT = 3000;
+const PORT = 3001;
 const socketURL = `http://0.0.0.0:${PORT}`;
 const initWeights =
     [tf.tensor([1, 1, 1, 1], [2, 2]), tf.tensor([1, 2, 3, 4], [1, 4])];
 const updateThreshold = 2;
-
-function waitUntil(done: () => boolean, then: () => void, timeout?: number) {
-  const moveOn = () => {
-    clearInterval(moveOnIfDone);
-    clearTimeout(moveOnAnyway);
-    then();
-  };
-  const moveOnIfDone = setInterval(() => done() && moveOn(), 1);
-  const moveOnAnyway = setTimeout(moveOn, timeout || 100);
-}
 
 class MockModel implements FederatedModel {
   vars: Variable[];
   constructor(vars: Variable[]) {
     this.vars = vars;
   }
-  async setup() {}
-  async fit(x: Tensor, y: Tensor, fitConfig: ModelFitConfig) {}
+  async fit(x: Tensor, y: Tensor) {}
   setVars(vars: Tensor[]) {
     for (let i = 0; i < this.vars.length; i++) {
       this.vars[i].assign(vars[i]);
@@ -91,7 +78,7 @@ describe('Socket API', () => {
 
     // Set up the server exposing our upload/download API
     httpServer = http.createServer();
-    serverAPI = new ServerAPI(modelDB, FIT_CONFIG, serverSocket(httpServer));
+    serverAPI = new ServerAPI(modelDB, serverSocket(httpServer));
     await serverAPI.setup();
     await httpServer.listen(PORT);
 
@@ -99,7 +86,7 @@ describe('Socket API', () => {
     clientVars = initWeights.map(t => tf.variable(tf.zerosLike(t)));
     const model = new MockModel(clientVars);
     clientAPI = new ClientAPI(model);
-    await clientAPI.setup(socketURL);
+    await clientAPI.connectTo(socketURL);
   });
 
   afterEach(async () => {
@@ -107,12 +94,8 @@ describe('Socket API', () => {
     await httpServer.close();
   });
 
-  it('transmits fit config on startup', () => {
-    expect(clientAPI.msg.fitConfig.batchSize).toBe(batchSize);
-  });
-
   it('transmits model version on startup', () => {
-    expect(clientAPI.msg.modelId).toBe(modelId);
+    expect(clientAPI.modelVersion()).toBe(modelId);
   });
 
   it('transmits model parameters on startup', () => {
@@ -134,6 +117,16 @@ describe('Socket API', () => {
   });
 
   it('triggers a download after enough uploads', async (done) => {
+    clientAPI.onUpdate((msg) => {
+      expect(msg.modelId).not.toBe(modelId);
+      expect(msg.modelId).toBe(modelDB.modelId);
+      test_util.expectArraysClose(
+          clientVars[0], tf.tensor([1.25, 1.25, 1.25, 1.25], [2, 2]));
+      test_util.expectArraysClose(
+          clientVars[1], tf.tensor([3.25, 2.75, 2.25, 1.75], [1, 4]));
+      done();
+    });
+
     const dummyX1 = tf.tensor2d([[0]]);            // 1 example
     const dummyX3 = tf.tensor2d([[0], [0], [0]]);  // 3 examples
     const dummyY = tf.tensor1d([0]);
@@ -143,14 +136,5 @@ describe('Socket API', () => {
     clientVars[0].assign(tf.tensor([1, 1, 1, 1], [2, 2]));
     clientVars[1].assign(tf.tensor([4, 3, 2, 1], [1, 4]));
     await clientAPI.federatedUpdate(dummyX3, dummyY);
-
-    waitUntil(() => clientAPI.msg.modelId !== modelId, () => {
-      test_util.expectArraysClose(
-          clientVars[0], tf.tensor([1.25, 1.25, 1.25, 1.25], [2, 2]));
-      test_util.expectArraysClose(
-          clientVars[1], tf.tensor([3.25, 2.75, 2.25, 1.75], [1, 4]));
-      expect(clientAPI.msg.modelId).toBe(modelDB.modelId);
-      done();
-    });
   });
 });
