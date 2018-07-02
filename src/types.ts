@@ -16,25 +16,26 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Model, ModelFitConfig, Tensor, Variable} from '@tensorflow/tfjs';
+import {Model, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
 export type VarList = Array<Variable|LayerVariable>;
 
 export interface FederatedModel {
-  setup(): Promise<void>;
-  fit(x: Tensor, y: Tensor, fitConfig: ModelFitConfig): Promise<void>;
+  fit(x: Tensor, y: Tensor): Promise<void>;
   getVars(): VarList;
   setVars(vals: Tensor[]): void;
 }
 
 export class FederatedTfModel implements FederatedModel {
-  public model: Model;
+  private model: Model;
 
-  async setup(): Promise<void> {}
+  constructor(model: Model) {
+    this.model = model;
+  }
 
-  async fit(x: Tensor, y: Tensor, fitConfig: ModelFitConfig): Promise<void> {
-    await this.model.fit(x, y, fitConfig);
+  async fit(x: Tensor, y: Tensor): Promise<void> {
+    await this.model.fit(x, y);
   }
 
   getVars(): VarList {
@@ -51,18 +52,18 @@ export class FederatedTfModel implements FederatedModel {
 const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 
-export class AudioTransferLearningModel extends FederatedTfModel {
-  async setup(): Promise<void> {
-    // NOTE: have to temporarily pretend that this is a browser
-    const isBrowser = tf.ENV.get('IS_BROWSER');
-    tf.ENV.set('IS_BROWSER', true);
-    this.model = await tf.loadModel(audioTransferLearningModelURL);
-    tf.ENV.set('IS_BROWSER', isBrowser);
+export async function loadAudioTransferLearningModel(): Promise<Model> {
+  // NOTE: have to temporarily pretend that this is a browser
+  const isBrowser = tf.ENV.get('IS_BROWSER');
+  tf.ENV.set('IS_BROWSER', true);
+  const model = await tf.loadModel(audioTransferLearningModelURL);
+  tf.ENV.set('IS_BROWSER', isBrowser);
 
-    for (let i = 0; i < 9; ++i) {
-      this.model.layers[i].trainable = false;  // freeze conv layers
-    }
-
-    this.model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+  for (let i = 0; i < 9; ++i) {
+    model.layers[i].trainable = false;  // freeze conv layers
   }
+
+  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+
+  return model;
 }

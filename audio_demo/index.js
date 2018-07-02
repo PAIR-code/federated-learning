@@ -19,7 +19,7 @@ import * as tf from '@tensorflow/tfjs';
 import MediaStreamRecorder from 'msr';
 
 import {ClientAPI} from '../src/client/client';
-import {AudioTransferLearningModel} from '../src/index';
+import {loadAudioTransferLearningModel, FederatedTfModel} from '../src/index';
 
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 
@@ -74,25 +74,27 @@ const modelTemplate = `
     <div id='probs'></div>
   </div>
 `;
-const serverURL = 'http://localhost:3000';
-const fedModel = new AudioTransferLearningModel();
 
-fedModel.setup().then(async () => {
-  const model = fedModel.model;
+const serverURL = 'http://localhost:3000';
+
+loadAudioTransferLearningModel().then(async (model) => {
   const inputShape = model.inputs[0].shape;
   runOptions.numFrames = inputShape[1];
   runOptions.modelFFTLength = inputShape[2];
   runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
-  const clientAPI = new ClientAPI(fedModel);
+
+  const clientAPI = new ClientAPI(new FederatedTfModel(model));
+  await clientAPI.connectTo(serverURL);
   clientAPI.onUpdate((msg) => {
     console.log(
         `new model! updating from ${modelVersion.innerText} to ${msg.modelId}`);
     modelVersion.innerText = msg.modelId;
   });
-  await clientAPI.setup(serverURL);
+
   recordButton.innerHTML = 'Waiting for microphone&hellip;';
   const stream =
       await navigator.mediaDevices.getUserMedia({audio: true, video: false});
+
   setupUI(stream, model, clientAPI);
 });
 

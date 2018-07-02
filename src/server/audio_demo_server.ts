@@ -16,9 +16,12 @@
  */
 
 import * as path from 'path';
-import {AudioTransferLearningModel} from '../index';
+import {FederatedTfModel, loadAudioTransferLearningModel} from '../index';
 import {setup} from './server';
 
 const dataDir = path.resolve(__dirname + '/../../data');
-const model = new AudioTransferLearningModel();
-setup(model, dataDir);
+
+loadAudioTransferLearningModel().then((tfModel) => {
+  const fedModel = new FederatedTfModel(tfModel);
+  setup(fedModel, dataDir);
+});

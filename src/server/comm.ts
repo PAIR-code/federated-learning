@@ -15,7 +15,6 @@
  * =============================================================================
  */
 
-import {ModelFitConfig} from '@tensorflow/tfjs';
 import {Server, Socket} from 'socket.io';
 
 import {DataMsg, DownloadMsg, Events, UploadMsg} from '../common';
@@ -25,15 +24,13 @@ import {ModelDB} from './model_db';
 
 export class ServerAPI {
   modelDB: ModelDB;
-  fitConfig: ModelFitConfig;
   io: Server;
   numClients = 0;
 
   constructor(
-      modelDB: ModelDB, fitConfig: ModelFitConfig, io: Server,
+      modelDB: ModelDB, io: Server,
       private exitOnClientExit = false) {
     this.modelDB = modelDB;
-    this.fitConfig = fitConfig;
     this.io = io;
   }
 
@@ -41,7 +38,6 @@ export class ServerAPI {
     const varsJson = await this.modelDB.currentVars();
     const varsSeri = await Promise.all(varsJson.map(serializeVar));
     return {
-      fitConfig: this.fitConfig,
       modelId: this.modelDB.modelId,
       vars: varsSeri
     };

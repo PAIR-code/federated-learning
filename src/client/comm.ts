@@ -56,7 +56,7 @@ type UpdateCallback = (msg: DownloadMsg) => void;
 
 export class ClientAPI {
   public model: FederatedModel;
-  public msg: DownloadMsg;
+  private msg: DownloadMsg;
   private socket: SocketIOClient.Socket;
   private updateCallbacks: UpdateCallback[];
   /**
@@ -66,6 +66,10 @@ export class ClientAPI {
   constructor(model: FederatedModel) {
     this.model = model;
     this.updateCallbacks = [];
+  }
+
+  public modelVersion() {
+    return this.msg.modelId
   }
 
   public onUpdate(callback: UpdateCallback) {
@@ -85,16 +89,16 @@ export class ClientAPI {
    * @return A promise that resolves when the connection has been established
    * and variables set to their inital values.
    */
-  public async setup(url: string): Promise<void> {
-    this.msg = await this.connect(url);
-    this.setVarsFromMessage(this.msg.vars);
+  public async connectTo(serverURL: string): Promise<void> {
+    this.msg = await this.connect(serverURL);
+    this.setVars(this.msg.vars);
     for (let i = 0; i < this.updateCallbacks.length; i++) {
       this.updateCallbacks[i](this.msg);
     }
 
     this.socket.on(Events.Download, (msg: DownloadMsg) => {
       this.msg = msg;
-      this.setVarsFromMessage(msg.vars);
+      this.setVars(msg.vars);
       for (let i = 0; i < this.updateCallbacks.length; i++) {
         this.updateCallbacks[i](this.msg);
       }
@@ -137,11 +141,11 @@ export class ClientAPI {
     // save original model ID (in case it changes during training/serialization)
     const modelId = this.msg.modelId;
     // fit the model to the new data
-    await this.model.fit(xs, ys, this.msg.fitConfig);
+    await this.model.fit(xs, ys);
     // serialize the new weights -- in the future we could add noise here
     const newVars = await serializeVars(this.model.getVars());
     // revert our model back to its original weights
-    this.setVarsFromMessage(this.msg.vars);
+    this.setVars(this.msg.vars);
     // upload the updates to the server
     await this.uploadVars({modelId, numExamples: xs.shape[0], vars: newVars});
   }
@@ -162,7 +166,7 @@ export class ClientAPI {
     return prom;
   }
 
-  protected setVarsFromMessage(newVars: SerializedVariable[]) {
+  protected setVars(newVars: SerializedVariable[]) {
     tf.tidy(() => {
       this.model.setVars(newVars.map(deserializeVar));
     });
