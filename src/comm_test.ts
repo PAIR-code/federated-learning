@@ -32,7 +32,7 @@ import {ServerAPI} from './server/comm';
 import {ModelDB} from './server/model_db';
 import {FederatedModel, VarList} from './types';
 
-const modelId = '1528400733553';
+const modelVersion = '1528400733553';
 const PORT = 3001;
 const socketURL = `http://0.0.0.0:${PORT}`;
 const initWeights =
@@ -69,8 +69,8 @@ describe('Socket API', () => {
     const lvl =
         LevelUp(EncodingDown(LevelDown(dataDir), {valueEncoding: 'json'}));
     const modelVars = await Promise.all(initWeights.map(tensorToJson));
-    await lvl.put('currentModelId', modelId);
-    await lvl.put(modelId, {'vars': modelVars});
+    await lvl.put('currentModelVersion', modelVersion);
+    await lvl.put(modelVersion, {'vars': modelVars});
     await lvl.close();
 
     modelDB = new ModelDB(dataDir, updateThreshold);
@@ -86,7 +86,7 @@ describe('Socket API', () => {
     clientVars = initWeights.map(t => tf.variable(tf.zerosLike(t)));
     const model = new MockModel(clientVars);
     clientAPI = new ClientAPI(model);
-    await clientAPI.connectTo(socketURL);
+    await clientAPI.connect(socketURL);
   });
 
   afterEach(async () => {
@@ -95,7 +95,7 @@ describe('Socket API', () => {
   });
 
   it('transmits model version on startup', () => {
-    expect(clientAPI.modelVersion()).toBe(modelId);
+    expect(clientAPI.modelVersion()).toBe(modelVersion);
   });
 
   it('transmits model parameters on startup', () => {
@@ -117,9 +117,9 @@ describe('Socket API', () => {
   });
 
   it('triggers a download after enough uploads', async (done) => {
-    clientAPI.onUpdate((msg) => {
-      expect(msg.modelId).not.toBe(modelId);
-      expect(msg.modelId).toBe(modelDB.modelId);
+    clientAPI.onDownload((msg) => {
+      expect(msg.modelVersion).not.toBe(modelVersion);
+      expect(msg.modelVersion).toBe(modelDB.modelVersion);
       test_util.expectArraysClose(
           clientVars[0], tf.tensor([1.25, 1.25, 1.25, 1.25], [2, 2]));
       test_util.expectArraysClose(
