@@ -21,10 +21,12 @@ export async function serializeVars(
     vars: Array<Variable|LayerVariable|Tensor>) {
   const varsP: Array<Promise<SerializedVariable>> = [];
   vars.forEach((value, key) => {
-    if (value instanceof LayerVariable) {
-      varsP.push(serializeVar(tf.variable(value.read())));
+    // tslint:disable-next-line:no-any
+    const lv = (value as any);
+    if (lv.write != null) {
+      varsP.push(serializeVar(lv.read()));
     } else {
-      varsP.push(serializeVar(value));
+      varsP.push(serializeVar(lv));
     }
   });
   return Promise.all(varsP);
@@ -67,10 +69,18 @@ export type UpdateJson = {
   clientId?: string
 };
 
+export type DataJson = {
+  x: TensorJson,
+  y: TensorJson,
+  clientId?: string
+};
+
 export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
   let data;
-  if (t instanceof LayerVariable) {
-    data = await t.read().data();
+  // tslint:disable-next-line:no-any
+  const lv = (t as any);
+  if (lv.write != null) {
+    data = await lv.read().data();
   } else {
     data = await t.data();
   }

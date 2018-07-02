@@ -23,10 +23,10 @@ import {LevelUp as LevelDB} from 'levelup';
 import * as uuid from 'uuid/v4';
 
 // tslint:disable-next-line:max-line-length
-import {jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from '../serialization';
+import {DataJson, jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from '../serialization';
 import {FederatedModel} from '../types';
 
-const DEFAULT_MIN_UPDATES = 10;
+const DEFAULT_MIN_UPDATES = 5;
 
 function generateNewId() {
   return new Date().getTime().toString();
@@ -55,6 +55,20 @@ export class ModelDB {
       const dict = await model.setup();
       await this.writeNewVars(dict.vars as tf.Tensor[]);
     }
+  }
+
+  async putData(data: DataJson): Promise<void> {
+    return this.db.put('data/' + generateNewId() + '_' + uuid(), data);
+  }
+
+  async getData(): Promise<DataJson[]> {
+    return new Promise((resolve, reject) => {
+             const data: DataJson[] = [];
+             this.db.createValueStream({gt: 'data/', lt: 'data/z'})
+                 .on('data', (datum: DataJson) => data.push(datum))
+                 .on('error', (error) => reject(error))
+                 .on('end', () => resolve(data));
+           }) as Promise<DataJson[]>;
   }
 
   async putUpdate(update: UpdateJson): Promise<void> {

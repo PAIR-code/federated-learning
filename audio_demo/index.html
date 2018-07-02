@@ -1,0 +1,56 @@
+<!--
+Copyright 2018 Google LLC. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================
+-->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Federated Listening</title>
+    <link rel="stylesheet" type="text/css" href="index.css">
+  </head>
+  <body>
+    <div class='right-col'>
+      <fieldset>
+        <legend>Labeled Examples</legend>
+        <table id='example-table'>
+          <thead><tr><th>audio</th><th>image</th><th>label</th><th>prediction</th></tr></thead>
+          <tbody id='labeled-examples'></tbody>
+        </table>
+      </fieldset>
+    </div>
+    <div class='left-col'>
+      <fieldset>
+        <legend>Hi!</legend>
+        <span id='intro-text'></span>
+        <h1 id='suggested-label'></h1>
+        <button id='record-button' disabled>Connecting to server&hellip;</button>
+      </fieldset>
+      <fieldset>
+        <legend>Audio</legend>
+        <div class='chart'>
+          <label>Spectrum</label>
+          <canvas id="spectrum-canvas" height="90" width="770"></canvas>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Model (version <span id='model-version'>pending&hellip;</span>)</legend>
+        <div id='model'>
+          Waiting for input&hellip;
+        </div>
+      </fieldset>
+    </div>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="index.js"></script>
+  </body>
+</html>

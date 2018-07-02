@@ -15,29 +15,10 @@
  * =============================================================================
  */
 
-/** Shared between client and server */
-import {ModelFitConfig} from '@tensorflow/tfjs';
-import {SerializedVariable} from './serialization';
+import * as path from 'path';
+import {AudioTransferLearningModel} from '../index';
+import {setup} from './server';
 
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars',
-  Data = 'uploadData'
-}
-
-export type UploadMsg = {
-  modelId: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DataMsg = {
-  x: SerializedVariable,
-  y: SerializedVariable
-};
-
-export type DownloadMsg = {
-  modelId: string,
-  vars: SerializedVariable[]
-  fitConfig: ModelFitConfig,
-};
+const dataDir = path.resolve(__dirname + '/../../data');
+const model = new AudioTransferLearningModel();
+setup(model, dataDir);

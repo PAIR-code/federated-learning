@@ -15,6 +15,7 @@
  * =============================================================================
  */
 
+import * as tf from '@tensorflow/tfjs';
 import {Model, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
@@ -30,4 +31,31 @@ export type ModelDict = {
 
 export interface FederatedModel {
   setup(): Promise<ModelDict>;
+}
+
+const audioTransferLearningModelURL =
+    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+
+export class AudioTransferLearningModel implements FederatedModel {
+  async setup(): Promise<ModelDict> {
+    // NOTE: have to temporarily pretend that this is a browser
+    const isBrowser = tf.ENV.get('IS_BROWSER');
+    tf.ENV.set('IS_BROWSER', true);
+    const model = await tf.loadModel(audioTransferLearningModelURL);
+    tf.ENV.set('IS_BROWSER', isBrowser);
+
+    for (let i = 0; i < 9; ++i) {
+      model.layers[i].trainable = false;  // freeze conv layers
+    }
+
+    model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+
+    const loss = (inputs: Tensor, labels: Tensor) => {
+      const logits = model.predict(inputs) as Tensor;
+      const losses = tf.losses.softmaxCrossEntropy(logits, labels);
+      return losses.mean() as Scalar;
+    };
+
+    return {predict: model.predict, vars: model.trainableWeights, loss, model};
+  }
 }

@@ -20,37 +20,58 @@
 import './fetch_polyfill';
 
 import * as express from 'express';
-import {Request, Response} from 'express';
+import * as fileUpload from 'express-fileupload';
+import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
 import * as socketIO from 'socket.io';
+import {promisify} from 'util';
+import * as uuid from 'uuid/v4';
 
 import {FederatedModel} from '../types';
 
 import {SocketAPI} from './comm';
 import {ModelDB} from './model_db';
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIO(server);
-const indexPath = path.resolve(__dirname + '/../../demo/index.html');
-const dataDir = path.resolve(__dirname + '/../../data');
-const modelDB = new ModelDB(dataDir);
-const FIT_CONFIG = {
-  batchSize: 10
-};
-const socketAPI = new SocketAPI(modelDB, FIT_CONFIG, io);
+const mkdir = promisify(fs.mkdir);
+const exists = promisify(fs.exists);
 
-app.get('/', (req: Request, res: Response) => {
-  res.sendFile(indexPath);
-});
+export async function setup(model: FederatedModel, dataDir: string) {
+  const app = express();
+  const server = http.createServer(app);
+  const io = socketIO(server);
+  const modelDB = new ModelDB(dataDir);
+  const FIT_CONFIG = {batchSize: 10};
+  const socketAPI = new SocketAPI(modelDB, FIT_CONFIG, io);
 
-export async function setup(model: FederatedModel) {
+  app.use(fileUpload());
+
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+  });
+
+  // tslint:disable-next-line:no-any
+  app.post('/data', async (req: any, res: any) => {
+    if (!req.files) {
+      return res.status(400).send('Must upload a file');
+    }
+    const dataPath = path.join(dataDir, 'files');
+    const dirExists = await exists(dataPath);
+    if (!dirExists) {
+      await mkdir(dataPath);
+    }
+    const file = req.files.file;
+    const filename = path.join(dataPath, uuid() + '_' + file.name);
+    await file.mv(filename);
+    res.send('File uploaded successfully');
+  });
+
   return modelDB.setup(model).then(() => {
     socketAPI.setup().then(() => {
       server.listen(3000, () => {
         console.log('listening on 3000');
       });
     });
-  })
+  });
 }
