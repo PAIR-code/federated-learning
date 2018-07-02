@@ -18,7 +18,7 @@
 import * as tf from '@tensorflow/tfjs';
 import MediaStreamRecorder from 'msr';
 
-import * as client from '../src/client/client';
+import {ClientAPI} from '../src/client/client';
 import {AudioTransferLearningModel} from '../src/index';
 
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
@@ -77,21 +77,19 @@ const modelTemplate = `
 const serverURL = 'http://localhost:3000';
 const fedModel = new AudioTransferLearningModel();
 
-fedModel.setup().then(async (dict) => {
-  const model = dict.model;
+fedModel.setup().then(async () => {
+  const model = fedModel.model;
   const inputShape = model.inputs[0].shape;
   runOptions.numFrames = inputShape[1];
   runOptions.modelFFTLength = inputShape[2];
   runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
-  const clientAPI = client.VariableSynchroniser.fromLayers(model.layers);
-  clientAPI.acceptUpdate = (msg) => {
+  const clientAPI = new ClientAPI(fedModel);
+  clientAPI.onUpdate((msg) => {
     console.log(
         `new model! updating from ${modelVersion.innerText} to ${msg.modelId}`);
     modelVersion.innerText = msg.modelId;
-    return true;
-  };
-  await clientAPI.initialise(serverURL);
-  modelVersion.innerText = clientAPI.modelId;
+  });
+  await clientAPI.setup(serverURL);
   recordButton.innerHTML = 'Waiting for microphone&hellip;';
   const stream =
       await navigator.mediaDevices.getUserMedia({audio: true, video: false});
@@ -250,9 +248,6 @@ function setupUI(stream, model, clientAPI) {
       }
       // dispose of tensors
       tf.dispose([x, y]);
-      // restore variables we had before training
-      clientAPI.revertToOriginalVars();
-      clientAPI.numExamples = 0;
       // decide what label to request next
       labelIdx += 1;
       if (labelIdx >= labelNames.length) {
@@ -274,19 +269,8 @@ function setupUI(stream, model, clientAPI) {
     recordButton.innerHTML = 'Uploading Data&hellip;'
     clientAPI.uploadData(x, y).then(() => {
       console.log('fitting model...');
-      const modelVersionBeforeFitting = clientAPI.modelId;
       recordButton.innerHTML = 'Fitting Model&hellip;'
-      model.fit(x, y, clientAPI.fitConfig).then(() => {
-        if (clientAPI.modelId === modelVersionBeforeFitting) {
-          console.log('uploading weights...');
-          clientAPI.numExamples = 1;
-          recordButton.innerHTML = 'Uploading Weights&hellip;'
-          clientAPI.uploadVars().then(cleanup, cleanup);
-        } else {
-          console.log('aborting weight upload due to version change!');
-          cleanup();
-        }
-      }, cleanup);
+      clientAPI.federatedUpdate(x, y).then(cleanup, cleanup);
     }, cleanup);
   }
 }

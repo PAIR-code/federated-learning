@@ -52,8 +52,8 @@ export class ModelDB {
     try {
       this.modelId = await this.db.get('currentModelId');
     } catch {
-      const dict = await model.setup();
-      await this.writeNewVars(dict.vars as tf.Tensor[]);
+      await model.setup();
+      await this.writeNewVars(model.getVars() as tf.Tensor[]);
     }
   }
 

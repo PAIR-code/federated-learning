@@ -15,8 +15,8 @@
  * =============================================================================
  */
 import * as tf from '@tensorflow/tfjs';
-// tslint:disable-next-line:max-line-length
-import {scalar, tensor, Tensor, test_util, variable} from '@tensorflow/tfjs-core';
+import {ModelFitConfig} from '@tensorflow/tfjs';
+import {tensor, Tensor, test_util, variable} from '@tensorflow/tfjs-core';
 import EncodingDown from 'encoding-down';
 import * as fs from 'fs';
 import LevelDown from 'leveldown';
@@ -24,7 +24,7 @@ import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
 
 import {tensorToJson} from '../serialization';
-import {FederatedModel} from '../types';
+import {FederatedModel, VarList} from '../types';
 
 import {ModelDB} from './model_db';
 
@@ -33,14 +33,13 @@ const updateId1 = '4c382c89-30cc-4f81-9197-c26e345cfb5b';
 const updateId2 = 'cdd749c0-8908-48d7-ba87-4844c831945c';
 
 class MockModel implements FederatedModel {
-  async setup() {
+  async setup() {}
+  async fit(x: Tensor, y: Tensor, fitConfig: ModelFitConfig) {}
+  setVars(vars: Tensor[]) {}
+  getVars(): VarList {
     const var1 = variable(tensor([0, 0, 0, 0], [2, 2]));
     const var2 = variable(tensor([-1, -1, -1, -1], [1, 4]));
-    return {
-      loss: (i: Tensor, l: Tensor) => scalar(1.0),
-      vars: [var1, var2],
-      predict: (_: Tensor) => _
-    };
+    return [var1, var2];
   }
 }
 
