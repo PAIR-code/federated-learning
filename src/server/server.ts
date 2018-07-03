@@ -19,17 +19,25 @@
 
 import './fetch_polyfill';
 
-import * as express from 'express';
-import * as fileUpload from 'express-fileupload';
+import * as expressProxy from 'express';
+import * as fileUploadProxy from 'express-fileupload';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
-import * as socketIO from 'socket.io';
+import * as socketProxy from 'socket.io';
 import {promisify} from 'util';
-import * as uuid from 'uuid/v4';
+import * as uuidProxy from 'uuid/v4';
 
-import {FederatedModel} from '../types';
+// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
+const uuid = (<any>uuidProxy).default || uuidProxy;
+// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
+const express = (<any>expressProxy).default || expressProxy;
+// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
+const fileUpload = (<any>fileUploadProxy).default || fileUploadProxy;
+// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
+const socketIO = (<any>socketProxy).default || socketProxy;
 
+import {FederatedModel} from './common';
 import {ServerAPI} from './api';
 import {ModelDB} from './model_db';
 
@@ -45,7 +53,7 @@ export async function setup(model: FederatedModel, dataDir: string) {
 
   app.use(fileUpload());
 
-  app.use((req, res, next) => {
+  app.use((req: any, res: any, next: any) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     next();
   });

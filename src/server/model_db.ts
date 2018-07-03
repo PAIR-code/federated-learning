@@ -20,11 +20,12 @@ import EncodingDown from 'encoding-down';
 import LevelDown from 'leveldown';
 import LevelUp from 'levelup';
 import {LevelUp as LevelDB} from 'levelup';
-import * as uuid from 'uuid/v4';
+import * as uuidProxy from 'uuid/v4';
+// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
+const uuid = (<any>uuidProxy).default || uuidProxy;
 
 // tslint:disable-next-line:max-line-length
-import {DataJson, jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from '../serialization';
-import {FederatedModel} from '../types';
+import {DataJson, FederatedModel, jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from './common';
 
 const DEFAULT_MIN_UPDATES = 5;
 

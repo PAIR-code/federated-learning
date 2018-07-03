@@ -19,18 +19,15 @@
 import * as tf from '@tensorflow/tfjs';
 import {Tensor, test_util, Variable} from '@tensorflow/tfjs';
 import EncodingDown from 'encoding-down';
+import {ClientAPI} from 'federated-learning-client';
+import {FederatedModel, tensorToJson, VarList} from 'federated-learning-client';
+import {ModelDB, ServerAPI} from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import LevelDown from 'leveldown';
 import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
 import * as serverSocket from 'socket.io';
-
-import {ClientAPI} from './client/client';
-import {tensorToJson} from './serialization';
-import {ServerAPI} from './server/api';
-import {ModelDB} from './server/model_db';
-import {FederatedModel, VarList} from './types';
 
 const modelVersion = '1528400733553';
 const PORT = 3001;
@@ -55,7 +52,7 @@ class MockModel implements FederatedModel {
   }
 }
 
-describe('Socket API', () => {
+describe('Server-to-client API', () => {
   let dataDir: string;
   let modelDB: ModelDB;
   let serverAPI: ServerAPI;

@@ -16,11 +16,9 @@
  */
 
 import {Server, Socket} from 'socket.io';
-
-import {DataMsg, DownloadMsg, Events, UploadMsg} from '../common';
-import {serializedToJson, serializeVar} from '../serialization';
-
 import {ModelDB} from './model_db';
+// tslint:disable-next-line:max-line-length
+import {serializedToJson, serializeVar, DataMsg, DownloadMsg, Events, UploadMsg} from './common';
 
 export class ServerAPI {
   modelDB: ModelDB;

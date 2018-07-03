@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "src/client"
+		},
+		{
+			"path": "src/server"
+		},
+		{
+			"path": "test"
+		},
+		{
+			"path": "audio_demo"
+		}
+	],
+	"settings": {}
+}

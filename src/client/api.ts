@@ -19,16 +19,13 @@ import * as tf from '@tensorflow/tfjs';
 import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
-
-import {DataMsg, DownloadMsg, Events, UploadMsg} from '../common';
 // tslint:disable-next-line:max-line-length
-import {deserializeVar, SerializedVariable, serializeVar, serializeVars} from '../serialization';
-import {FederatedModel} from '../types';
+import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, SerializedVariable, serializeVar, serializeVars} from './common';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
 
-type DownloadCallback = (msg: DownloadMsg) => void;
+export type DownloadCallback = (msg: DownloadMsg) => void;
 
 /**
  * Federated Learning Client API library.
