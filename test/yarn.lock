@@ -742,14 +742,14 @@ fast-future@~1.0.2:
   resolved "https://registry.yarnpkg.com/fast-future/-/fast-future-1.0.2.tgz#8435a9aaa02d79248d17d704e76259301d99280a"
 
 "federated-learning-client@file:.yalc/federated-learning-client":
-  version "0.0.1-45790929"
+  version "0.0.1-c7819a5a"
   dependencies:
     "@tensorflow/tfjs" "0.11.7"
     "@types/socket.io-client" "^1.4.32"
     socket.io-client "^2.1.1"
 
 "federated-learning-server@file:.yalc/federated-learning-server":
-  version "0.0.1-a6cde430"
+  version "0.0.1-63fa1e05"
   dependencies:
     "@tensorflow/tfjs" "0.11.7"
     "@tensorflow/tfjs-node" "^0.1.7"

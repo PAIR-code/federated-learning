@@ -19,26 +19,17 @@
 
 import './fetch_polyfill';
 
-import * as expressProxy from 'express';
-import * as fileUploadProxy from 'express-fileupload';
+import * as express from 'express';
+import * as fileUpload from 'express-fileupload';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
-import * as socketProxy from 'socket.io';
+import * as socketIO from 'socket.io';
 import {promisify} from 'util';
-import * as uuidProxy from 'uuid/v4';
+import * as uuid from 'uuid/v4';
 
-// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
-const uuid = (<any>uuidProxy).default || uuidProxy;
-// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
-const express = (<any>expressProxy).default || expressProxy;
-// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
-const fileUpload = (<any>fileUploadProxy).default || fileUploadProxy;
-// tslint:disable-next-line:no-angle-bracket-type-assertion no-any
-const socketIO = (<any>socketProxy).default || socketProxy;
-
-import {FederatedModel} from './common';
 import {ServerAPI} from './api';
+import {FederatedModel} from './common';
 import {ModelDB} from './model_db';
 
 const mkdir = promisify(fs.mkdir);

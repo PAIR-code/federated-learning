@@ -10,35 +10,32 @@
   "license": "Apache-2.0",
   "scripts": {
     "build": "tsc",
-    "test": "ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json",
+    "test": "./scripts/build-deps-and-run-tests.sh",
     "lint": "tslint -p . -t verbose"
   },
-  "dependencies": {
+  "devDependencies": {
     "@tensorflow/tfjs": "0.11.7",
+    "@types/jasmine": "^2.8.8",
+    "@types/rimraf": "^2.0.2",
+    "@types/seedrandom": "~2.4.27",
     "@types/socket.io": "^1.4.34",
     "@types/uuid": "^3.4.3",
     "bswap": "^1.2.0",
+    "clang-format": "~1.2.2",
     "encoding-down": "^5.0.3",
     "es6-promise": "^4.2.4",
     "federated-learning-client": "file:.yalc/federated-learning-client",
     "federated-learning-server": "file:.yalc/federated-learning-server",
-    "leveldown": "^4.0.1",
-    "levelup": "^3.0.1",
-    "node-fetch": "^2.1.2",
-    "socket.io": "^2.1.1",
-    "uuid": "^3.2.1",
-    "yalc": "^1.0.0-pre.22"
-  },
-  "devDependencies": {
-    "@types/jasmine": "^2.8.8",
-    "@types/rimraf": "^2.0.2",
-    "@types/seedrandom": "~2.4.27",
-    "clang-format": "~1.2.2",
     "jasmine": "^3.1.0",
     "jasmine-core": "~3.1.0",
+    "leveldown": "^4.0.1",
+    "levelup": "^3.0.1",
     "rimraf": "^2.6.2",
+    "socket.io": "^2.1.1",
     "ts-node": "^6.1.0",
     "tslint": "~5.8.0",
-    "typescript": "2.7.2"
+    "typescript": "2.7.2",
+    "uuid": "^3.2.1",
+    "yalc": "^1.0.0-pre.22"
   }
 }
