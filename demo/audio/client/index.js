@@ -17,10 +17,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import MediaStreamRecorder from 'msr';
-
-import {ClientAPI} from '../src/client/client';
-import {loadAudioTransferLearningModel, FederatedTfModel} from '../src/index';
-
+import {ClientAPI, FederatedTfModel, loadAudioTransferLearningModel} from 'federated-learning-client';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 
 const labelNames = [

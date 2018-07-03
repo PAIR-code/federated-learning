@@ -10,7 +10,13 @@
       "path": "test"
     },
     {
-      "path": "audio_demo"
+      "path": "."
+    },
+    {
+      "path": "demo/audio/server"
+    },
+    {
+      "path": "demo/audio/client"
     }
   ],
   "settings": {

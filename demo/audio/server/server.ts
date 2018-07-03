@@ -15,11 +15,11 @@
  * =============================================================================
  */
 
+// tslint:disable-next-line:max-line-length
+import {FederatedTfModel, loadAudioTransferLearningModel, setup} from 'federated-learning-server';
 import * as path from 'path';
-import {FederatedTfModel, loadAudioTransferLearningModel} from './common';
-import {setup} from './server';
 
-const dataDir = path.resolve(__dirname + '/../../data');
+const dataDir = path.resolve(__dirname + '/data');
 
 loadAudioTransferLearningModel().then((tfModel) => {
   const fedModel = new FederatedTfModel(tfModel);
