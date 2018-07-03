@@ -17,4 +17,4 @@
 
 /** Client code. */
 
-export * from './comm';
+export * from './api';

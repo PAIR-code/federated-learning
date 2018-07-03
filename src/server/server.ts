@@ -30,7 +30,7 @@ import * as uuid from 'uuid/v4';
 
 import {FederatedModel} from '../types';
 
-import {ServerAPI} from './comm';
+import {ServerAPI} from './api';
 import {ModelDB} from './model_db';
 
 const mkdir = promisify(fs.mkdir);
