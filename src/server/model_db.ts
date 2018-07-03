@@ -23,8 +23,7 @@ import {LevelUp as LevelDB} from 'levelup';
 import * as uuid from 'uuid/v4';
 
 // tslint:disable-next-line:max-line-length
-import {DataJson, jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from '../serialization';
-import {FederatedModel} from '../types';
+import {DataJson, FederatedModel, jsonToTensor, ModelJson, TensorJson, tensorToJson, UpdateJson} from './common';
 
 const DEFAULT_MIN_UPDATES = 5;
 

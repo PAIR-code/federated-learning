@@ -16,7 +16,7 @@
  */
 
 import * as path from 'path';
-import {FederatedTfModel, loadAudioTransferLearningModel} from '../index';
+import {FederatedTfModel, loadAudioTransferLearningModel} from './common';
 import {setup} from './server';
 
 const dataDir = path.resolve(__dirname + '/../../data');
