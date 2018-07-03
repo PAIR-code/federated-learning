@@ -52,7 +52,7 @@ export class ClientAPI {
   /**
    * Construct a client API for federated learning that will push and pull
    * `model` updates from the server.
-   * @param {model<FederatedModel>} model - model to use with federated learning
+   * @param model - model to use with federated learning
    */
   constructor(model: FederatedModel|Model) {
     this.model = federated(model);
