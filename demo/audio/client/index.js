@@ -80,7 +80,7 @@ loadAudioTransferLearningModel().then(async (model) => {
   runOptions.modelFFTLength = inputShape[2];
   runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
 
-  const clientAPI = new ClientAPI(new FederatedTfModel(model));
+  const clientAPI = new ClientAPI(model);
   clientAPI.onDownload((msg) => {
     const newVersion = msg.modelVersion;
     console.log(

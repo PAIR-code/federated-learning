@@ -19,57 +19,18 @@
 
 import './fetch_polyfill';
 
-import * as express from 'express';
-import * as fileUpload from 'express-fileupload';
-import * as fs from 'fs';
-import * as http from 'http';
-import * as path from 'path';
-import * as socketIO from 'socket.io';
-import {promisify} from 'util';
-import * as uuid from 'uuid/v4';
+import {Model} from '@tensorflow/tfjs';
+import {Server} from 'socket.io';
 
 import {ServerAPI} from './api';
-import {FederatedModel} from './common';
+import {federated, FederatedModel} from './common';
 import {ModelDB} from './model_db';
 
-const mkdir = promisify(fs.mkdir);
-const exists = promisify(fs.exists);
-
-export async function setup(model: FederatedModel, dataDir: string) {
-  const app = express();
-  const server = http.createServer(app);
-  const io = socketIO(server);
+export async function setup(
+    io: Server, model: FederatedModel|Model, dataDir: string) {
   const modelDB = new ModelDB(dataDir);
+  await modelDB.setup(federated(model));
+
   const api = new ServerAPI(modelDB, io);
-
-  app.use(fileUpload());
-
-  app.use((req: any, res: any, next: any) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    next();
-  });
-
-  // tslint:disable-next-line:no-any
-  app.post('/data', async (req: any, res: any) => {
-    if (!req.files) {
-      return res.status(400).send('Must upload a file');
-    }
-    const dataPath = path.join(dataDir, 'files');
-    const dirExists = await exists(dataPath);
-    if (!dirExists) {
-      await mkdir(dataPath);
-    }
-    const file = req.files.file;
-    const filename = path.join(dataPath, uuid() + '_' + file.name);
-    await file.mv(filename);
-    res.send('File uploaded successfully');
-  });
-
-  return modelDB.setup(model).then(() => {
-    api.setup().then(() => {
-      server.listen(3000, () => {
-        console.log('listening on 3000');
-      });
-    });
-  });
+  await api.setup();
 }

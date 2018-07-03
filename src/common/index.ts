@@ -176,6 +176,14 @@ export class FederatedTfModel implements FederatedModel {
   }
 }
 
+export function federated(model: FederatedModel|Model): FederatedModel {
+  if (model instanceof Model) {
+    return new FederatedTfModel(model);
+  } else {
+    return model;
+  }
+}
+
 const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 

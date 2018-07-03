@@ -20,7 +20,8 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, SerializedVariable, serializeVar, serializeVars} from './common';
+import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, SerializedVariable, serializeVar, serializeVars, federated} from './common';
+import {Model} from '@tensorflow/tfjs';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
@@ -53,8 +54,8 @@ export class ClientAPI {
    * `model` updates from the server.
    * @param {model<FederatedModel>} model - model to use with federated learning
    */
-  constructor(model: FederatedModel) {
-    this.model = model;
+  constructor(model: FederatedModel|Model) {
+    this.model = federated(model);
     this.downloadCallbacks = [];
   }
 

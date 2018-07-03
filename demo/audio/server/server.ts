@@ -16,12 +16,56 @@
  */
 
 // tslint:disable-next-line:max-line-length
-import {FederatedTfModel, loadAudioTransferLearningModel, setup} from 'federated-learning-server';
+import * as express from 'express';
+import * as fileUpload from 'express-fileupload';
+import {loadAudioTransferLearningModel, setup} from 'federated-learning-server';
+import * as fs from 'fs';
+import * as http from 'http';
 import * as path from 'path';
+import * as io from 'socket.io';
+import {promisify} from 'util';
+import * as uuid from 'uuid/v4';
 
+const mkdir = promisify(fs.mkdir);
+const exists = promisify(fs.exists);
 const dataDir = path.resolve(__dirname + '/data');
+const app = express();
+const httpServer = http.createServer(app);
+const sockServer = io(httpServer);
 
-loadAudioTransferLearningModel().then((tfModel) => {
-  const fedModel = new FederatedTfModel(tfModel);
-  setup(fedModel, dataDir);
+app.use(fileUpload());
+
+app.use((req: any, res: any, next: any) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+});
+
+// tslint:disable-next-line:no-any
+app.post('/data', async (req: any, res: any) => {
+  if (!req.files) {
+    return res.status(400).send('Must upload a file');
+  }
+
+  const file = req.files.file;
+  const fileParts = file.name.split('.');
+  const labelName = fileParts[0];
+  const extension = fileParts[1];
+  const fileDir = path.join(dataDir, 'files');
+  const labelDir = path.join(fileDir, labelName);
+
+  if (!(await exists(fileDir))) await mkdir(fileDir);
+  if (!(await exists(labelDir))) await mkdir(labelDir);
+
+  const filename = path.join(labelDir, `${uuid()}.${extension}`);
+  await file.mv(filename);
+
+  res.send('File uploaded successfully');
+});
+
+loadAudioTransferLearningModel().then((model) => {
+  setup(sockServer, model, dataDir);
+});
+
+httpServer.listen(3000, () => {
+  console.log('listening on 3000');
 });
