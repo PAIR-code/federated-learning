@@ -16,46 +16,92 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Model, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {Model, ModelFitConfig, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
-export type LossFun = (inputs: Tensor, labels: Tensor) => Scalar;
-export type PredFun = (inputs: Tensor) => Tensor|Tensor[];
 export type VarList = Array<Variable|LayerVariable>;
-export type ModelDict = {
-  vars: VarList,
-  loss: LossFun,
-  predict: PredFun,
-  model?: Model
-};
 
+/**
+ * Basic interface that users need to implement to perform federated learning.
+ *
+ * Any model that implements `fit`, `getVars` and `setVars` can be passed into
+ * a `ClientAPI` and `ServerAPI` to do federated learning.
+ */
 export interface FederatedModel {
-  setup(): Promise<ModelDict>;
+  /**
+   * Trains the model to better predict the given targets.
+   *
+   * @param x `tf.Tensor` of training input data.
+   * @param y `tf.Tensor` of training target data.
+   *
+   * @return A `Promise` resolved when training is done.
+   */
+  fit(x: Tensor, y: Tensor): Promise<void>;
+
+  /**
+   * Gets the model's variables.
+   *
+   * @return A list of `tf.Variable`s or LayerVariables representing the model's
+   * trainable weights.
+   */
+  getVars(): VarList;
+
+  /**
+   * Sets the model's variables to given values.
+   *
+   * @param vals An array of `tf.Tensor`s representing updated model weights
+   */
+  setVars(vals: Tensor[]): void;
+}
+
+/**
+ * Implementation of `FederatedModel` designed to wrap a `tf.Model`.
+ */
+export class FederatedTfModel implements FederatedModel {
+  private model: Model;
+  private config: ModelFitConfig;
+
+  /**
+   * Construct a new `FederatedModel` wrapping a `tf.Model`.
+   *
+   * @param model An instance of `tf.Model` that has already been `compile`d.
+   * @param config Optional `tf.ModelFitConfig` for training.
+   */
+  constructor(model: Model, config?: ModelFitConfig) {
+    this.model = model;
+    this.config = config || {epochs: 10, batchSize: 32};
+  }
+
+  async fit(x: Tensor, y: Tensor): Promise<void> {
+    await this.model.fit(x, y, this.config);
+  }
+
+  getVars(): VarList {
+    return this.model.trainableWeights;
+  }
+
+  setVars(vals: Tensor[]) {
+    for (let i = 0; i < vals.length; i++) {
+      this.model.trainableWeights[i].write(vals[i]);
+    }
+  }
 }
 
 const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 
-export class AudioTransferLearningModel implements FederatedModel {
-  async setup(): Promise<ModelDict> {
-    // NOTE: have to temporarily pretend that this is a browser
-    const isBrowser = tf.ENV.get('IS_BROWSER');
-    tf.ENV.set('IS_BROWSER', true);
-    const model = await tf.loadModel(audioTransferLearningModelURL);
-    tf.ENV.set('IS_BROWSER', isBrowser);
+export async function loadAudioTransferLearningModel(): Promise<Model> {
+  // NOTE: have to temporarily pretend that this is a browser
+  const isBrowser = tf.ENV.get('IS_BROWSER');
+  tf.ENV.set('IS_BROWSER', true);
+  const model = await tf.loadModel(audioTransferLearningModelURL);
+  tf.ENV.set('IS_BROWSER', isBrowser);
 
-    for (let i = 0; i < 9; ++i) {
-      model.layers[i].trainable = false;  // freeze conv layers
-    }
-
-    model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
-
-    const loss = (inputs: Tensor, labels: Tensor) => {
-      const logits = model.predict(inputs) as Tensor;
-      const losses = tf.losses.softmaxCrossEntropy(logits, labels);
-      return losses.mean() as Scalar;
-    };
-
-    return {predict: model.predict, vars: model.trainableWeights, loss, model};
+  for (let i = 0; i < 9; ++i) {
+    model.layers[i].trainable = false;  // freeze conv layers
   }
+
+  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+
+  return model;
 }

@@ -28,37 +28,36 @@ import {FederatedModel} from '../types';
 
 const DEFAULT_MIN_UPDATES = 5;
 
-function generateNewId() {
+function currentTimestamp() {
   return new Date().getTime().toString();
 }
 
 export class ModelDB {
   dataDir: string;
-  modelId: string;
+  modelVersion: string;
   updating: boolean;
   minUpdates: number;
   db: LevelDB;
 
   constructor(dataDir: string, minUpdates?: number) {
     this.dataDir = dataDir;
-    this.modelId = null;
     this.updating = false;
     this.minUpdates = minUpdates || DEFAULT_MIN_UPDATES;
+    this.modelVersion = null;
   }
 
   async setup(model?: FederatedModel) {
     this.db = await LevelUp(
         EncodingDown(LevelDown(this.dataDir), {valueEncoding: 'json'}));
     try {
-      this.modelId = await this.db.get('currentModelId');
+      this.modelVersion = await this.db.get('currentModelVersion');
     } catch {
-      const dict = await model.setup();
-      await this.writeNewVars(dict.vars as tf.Tensor[]);
+      await this.writeNewVars(model.getVars() as tf.Tensor[]);
     }
   }
 
   async putData(data: DataJson): Promise<void> {
-    return this.db.put('data/' + generateNewId() + '_' + uuid(), data);
+    return this.db.put('data/' + currentTimestamp() + '_' + uuid(), data);
   }
 
   async getData(): Promise<DataJson[]> {
@@ -72,11 +71,11 @@ export class ModelDB {
   }
 
   async putUpdate(update: UpdateJson): Promise<void> {
-    return this.db.put(update.modelId + '/' + uuid(), update);
+    return this.db.put(update.modelVersion + '/' + uuid(), update);
   }
 
   async getUpdates(): Promise<UpdateJson[]> {
-    const min = this.modelId;
+    const min = this.modelVersion;
     const max = (parseInt(min, 10) + 1).toString();
     return new Promise((resolve, reject) => {
              const updates: UpdateJson[] = [];
@@ -88,7 +87,7 @@ export class ModelDB {
   }
 
   async countUpdates(): Promise<number> {
-    const min = this.modelId;
+    const min = this.modelVersion;
     const max = (parseInt(min, 10) + 1).toString();
     return new Promise((resolve, reject) => {
              let numUpdates = 0;
@@ -99,13 +98,13 @@ export class ModelDB {
            }) as Promise<number>;
   }
 
-  async getModelVars(modelId: string): Promise<tf.Tensor[]> {
-    const model: ModelJson = await this.db.get(modelId);
+  async getModelVars(modelVersion: string): Promise<tf.Tensor[]> {
+    const model: ModelJson = await this.db.get(modelVersion);
     return model.vars.map(jsonToTensor);
   }
 
   async currentVars(): Promise<tf.Tensor[]> {
-    return this.getModelVars(this.modelId);
+    return this.getModelVars(this.modelVersion);
   }
 
   async possiblyUpdate(): Promise<boolean> {
@@ -146,10 +145,10 @@ export class ModelDB {
   }
 
   async writeNewVars(newVars: tf.Tensor[]) {
-    const newModelId = generateNewId();
+    const newModelVersion = currentTimestamp();
     const newVarsJson = await Promise.all(newVars.map(tensorToJson));
-    await this.db.put(newModelId, {'vars': newVarsJson});
-    await this.db.put('currentModelId', newModelId);
-    this.modelId = newModelId;
+    await this.db.put(newModelVersion, {'vars': newVarsJson});
+    await this.db.put('currentModelVersion', newModelVersion);
+    this.modelVersion = newModelVersion;
   }
 }

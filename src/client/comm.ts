@@ -16,10 +16,6 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {ModelFitConfig, Variable} from '@tensorflow/tfjs';
-import {assert} from '@tensorflow/tfjs-core/dist/util';
-import {Layer} from '@tensorflow/tfjs-layers/dist/engine/topology';
-import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
@@ -27,101 +23,88 @@ const socketio = (<any>socketProxy).default || socketProxy;
 import {DataMsg, DownloadMsg, Events, UploadMsg} from '../common';
 // tslint:disable-next-line:max-line-length
 import {deserializeVar, SerializedVariable, serializeVar, serializeVars} from '../serialization';
+import {FederatedModel} from '../types';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
 
+type DownloadCallback = (msg: DownloadMsg) => void;
+
 /**
- * Synchronises tf.Variables between a client and a server.
- * Example usage with bare tf.Variables:
- * ```js
- * const { loss, vars } = setupModel()
- * const sync = new VariableSynchroniser(vars)
- * const clientHyperparams = await sync.initialise('http://server.com')
- * // train the model or otherwise update vars
- * const metaInfo = { nSteps: 1 } // optional
- * await sync.uploadVars(metaInfo)
- * ```
+ * Federated Learning Client API library.
+ *
  * Example usage with a tf.Model:
  * ```js
- * const model = tf.loadModel('a-model.json');
- * const sync = VariableSynchroniser.fromLayers(model.getLayer('classifier'))
- * const clientFitConfig = await sync.initialise('http://server.com')
- * const h = await model.fit(data.X, data.y, clientFitConfig)
- * await sync.uploadVars(metaInfo)
+ * const tensorflowModel = await tf.loadModel('a-model.json');
+ * const federatedModel = new FederatedTfModel(tensorflowModel);
+ * const clientAPI = new ClientAPI(federatedModel);
+ * await clientAPI.connect('http://server.com');
+ * await clientAPI.fitAndUpload(data.X, data.y);
  * ```
  * The server->client synchronisation happens transparently whenever the server
  * broadcasts weights.
  * The client->server sync must be triggered manually with uploadVars
  */
-export class VariableSynchroniser {
-  public modelId: string;
-  public numExamples: number;
-  public fitConfig: ModelFitConfig;
-  public acceptUpdate: (msg: DownloadMsg) => boolean;
-  private socket: SocketIOClient.Socket;
-  private vars: Array<Variable|LayerVariable>;
+export class ClientAPI {
   private msg: DownloadMsg;
+  private model: FederatedModel;
+  private socket: SocketIOClient.Socket;
+  private downloadCallbacks: DownloadCallback[];
+
   /**
-   * Construct a synchroniser from a list of tf.Variables of tf.LayerVariables.
-   * @param {Array<Variable|LayerVariable>} vars - Variables to track and sync
+   * Construct a client API for federated learning that will push and pull
+   * `model` updates from the server.
+   * @param {model<FederatedModel>} model - model to use with federated learning
    */
-  constructor(
-      vars: Array<Variable|LayerVariable>,
-      updateCallback?: (msg: DownloadMsg) => boolean) {
-    this.vars = vars;
-    if (updateCallback) {
-      this.acceptUpdate = updateCallback;
-    } else {
-      this.acceptUpdate = () => true;
-    }
+  constructor(model: FederatedModel) {
+    this.model = model;
+    this.downloadCallbacks = [];
   }
 
   /**
-   * Construct a VariableSynchroniser from an array of layers.
-   * This will synchronise the weights of the layers.
-   * @param layers: An array of layers to extract variables from
+   * @return The version of the model we're currently training
    */
-  public static fromLayers(layers: Layer[]) {
-    const layerWeights = layers.map(l => l.trainableWeights);
-    return new VariableSynchroniser(tf.util.flatten(layerWeights, []));
-  }
-
-  private async connect(url: string): Promise<DownloadMsg> {
-    this.socket = socketio(url);
-    return fromEvent<DownloadMsg>(
-        this.socket, Events.Download, CONNECTION_TIMEOUT);
+  public modelVersion(): string {
+    return this.msg.modelVersion;
   }
 
   /**
-   * Connect to a server, synchronise the variables to their
-   * initial values and return the hyperparameters for this client
-   * @param url: The URL of the server
+   * Register a new callback to be invoked whenever the client downloads new
+   * weights from the server.
+   */
+  public onDownload(callback: DownloadCallback): void {
+    this.downloadCallbacks.push(callback);
+  }
+
+  /**
+   * Connect to a server, synchronise the variables to their initial values
+   * @param serverURL: The URL of the server
    * @return A promise that resolves when the connection has been established
    * and variables set to their inital values.
    */
-  public async initialise(url: string): Promise<ModelFitConfig> {
-    const connMsg = await this.connect(url);
-    this.setVarsFromMessage(connMsg.vars);
-    this.modelId = connMsg.modelId;
-    this.fitConfig = connMsg.fitConfig;
-    this.numExamples = 0;
-    this.msg = connMsg;
+  public async connect(serverURL: string): Promise<void> {
+    const msg = await this.connectTo(serverURL);
+    this.msg = msg;
+    this.setVars(msg.vars);
+    this.downloadCallbacks.forEach(cb => cb(msg));
 
     this.socket.on(Events.Download, (msg: DownloadMsg) => {
-      if (this.acceptUpdate(msg)) {
-        this.msg = msg;
-        this.setVarsFromMessage(msg.vars);
-        this.modelId = msg.modelId;
-        this.fitConfig = {...msg.fitConfig};
-        this.numExamples = 0;
-      }
+      this.msg = msg;
+      this.setVars(msg.vars);
+      this.downloadCallbacks.forEach(cb => cb(msg));
     });
-
-    return {...this.fitConfig};
   }
 
   /**
+   * Disconnect from the server.
+   */
+  public dispose(): void {
+    this.socket.disconnect();
+  }
+
+  /**
+   * TODO: remove this method, move functionality to specific demos
+   *
    * Upload x and y tensors to the server (for debugging/training)
    * @return A promise that resolves when the server has recieved the data
    */
@@ -140,11 +123,36 @@ export class VariableSynchroniser {
   }
 
   /**
+   * Train the model on the given examples, upload new weights to the server,
+   * then revert back to the original weights (so subsequent updates are
+   * relative to the same model).
+   *
+   * TODO: consider having this method save copies of `xs` and `ys` when there
+   * are too few examples, and only doing training/uploading after reaching a
+   * configurable threshold (disposing of the copies afterwards).
+   *
+   * @param xs Training inputs
+   * @param ys Training labels
+   */
+  public async federatedUpdate(xs: tf.Tensor, ys: tf.Tensor): Promise<void> {
+    // save original model ID (in case it changes during training/serialization)
+    const modelVersion = this.msg.modelVersion;
+    // fit the model to the new data
+    await this.model.fit(xs, ys);
+    // serialize the new weights -- in the future we could add noise here
+    const newVars = await serializeVars(this.model.getVars());
+    // revert our model back to its original weights
+    this.setVars(this.msg.vars);
+    // upload the updates to the server
+    await this.uploadVars(
+        {modelVersion, numExamples: xs.shape[0], vars: newVars});
+  }
+
+  /**
    * Upload the current values of the tracked variables to the server
    * @return A promise that resolves when the server has recieved the variables
    */
-  public async uploadVars(): Promise<{}> {
-    const msg: UploadMsg = await this.serializeCurrentVars();
+  private async uploadVars(msg: UploadMsg): Promise<{}> {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
@@ -156,44 +164,16 @@ export class VariableSynchroniser {
     return prom;
   }
 
-  /**
-   * Restore variables to their original values (e.g. before training),
-   * which is necessary if a single client sends multiple updates for different
-   * (sets of) examples.
-   */
-  public revertToOriginalVars() {
-    this.setVarsFromMessage(this.msg.vars);
+  protected setVars(newVars: SerializedVariable[]) {
+    tf.tidy(() => {
+      this.model.setVars(newVars.map(v => deserializeVar(v)));
+    });
   }
 
-  protected async serializeCurrentVars(): Promise<UploadMsg> {
-    assert(this.numExamples > 0, 'should only serialize if we\'ve seen data');
-
-    const vars = await serializeVars(this.vars);
-
-    return {
-      numExamples: this.numExamples, /* TODO: ensure this gets updated */
-      modelId: this.modelId,
-      vars
-    };
-  }
-
-  protected setVarsFromMessage(newVars: SerializedVariable[]) {
-    for (let i = 0; i < newVars.length; i++) {
-      const newVar = newVars[i];
-      // tslint:disable-next-line:no-any
-      const varOrLVar = (this.vars[i] as any);
-      const newVal = deserializeVar(newVar);
-      if (varOrLVar.write != null) {
-        varOrLVar.write(newVal);
-      } else {
-        varOrLVar.assign(newVal);
-      }
-      newVal.dispose();
-    }
-  }
-
-  public dispose() {
-    this.socket.disconnect();
+  private async connectTo(serverURL: string): Promise<DownloadMsg> {
+    this.socket = socketio(serverURL);
+    return fromEvent<DownloadMsg>(
+        this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 }
 

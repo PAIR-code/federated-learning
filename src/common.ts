@@ -16,7 +16,6 @@
  */
 
 /** Shared between client and server */
-import {ModelFitConfig} from '@tensorflow/tfjs';
 import {SerializedVariable} from './serialization';
 
 export enum Events {
@@ -26,7 +25,7 @@ export enum Events {
 }
 
 export type UploadMsg = {
-  modelId: string,
+  modelVersion: string,
   vars: SerializedVariable[],
   numExamples: number
 };
@@ -37,7 +36,6 @@ export type DataMsg = {
 };
 
 export type DownloadMsg = {
-  modelId: string,
+  modelVersion: string,
   vars: SerializedVariable[]
-  fitConfig: ModelFitConfig,
 };

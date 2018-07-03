@@ -15,7 +15,6 @@
  * =============================================================================
  */
 
-import {ModelFitConfig} from '@tensorflow/tfjs';
 import {Server, Socket} from 'socket.io';
 
 import {DataMsg, DownloadMsg, Events, UploadMsg} from '../common';
@@ -23,28 +22,20 @@ import {serializedToJson, serializeVar} from '../serialization';
 
 import {ModelDB} from './model_db';
 
-export class SocketAPI {
+export class ServerAPI {
   modelDB: ModelDB;
-  fitConfig: ModelFitConfig;
   io: Server;
   numClients = 0;
 
-  constructor(
-      modelDB: ModelDB, fitConfig: ModelFitConfig, io: Server,
-      private exitOnClientExit = false) {
+  constructor(modelDB: ModelDB, io: Server, private exitOnClientExit = false) {
     this.modelDB = modelDB;
-    this.fitConfig = fitConfig;
     this.io = io;
   }
 
   async downloadMsg(): Promise<DownloadMsg> {
     const varsJson = await this.modelDB.currentVars();
     const varsSeri = await Promise.all(varsJson.map(serializeVar));
-    return {
-      fitConfig: this.fitConfig,
-      modelId: this.modelDB.modelId,
-      vars: varsSeri
-    };
+    return {modelVersion: this.modelDB.modelVersion, vars: varsSeri};
   }
 
   async setup() {
@@ -80,14 +71,14 @@ export class SocketAPI {
         const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
         const update = {
           clientId: socket.client.id,
-          modelId: msg.modelId,
+          modelVersion: msg.modelVersion,
           numExamples: msg.numExamples,
           vars: updatedVars
         };
         await this.modelDB.putUpdate(update);
 
         // Potentially update the model (asynchronously)
-        if (msg.modelId === this.modelDB.modelId) {
+        if (msg.modelVersion === this.modelDB.modelVersion) {
           const updated = await this.modelDB.possiblyUpdate();
           if (updated) {
             // Send new variables to all clients if we updated

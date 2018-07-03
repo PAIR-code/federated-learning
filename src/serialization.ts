@@ -65,7 +65,7 @@ export type ModelJson = {
 export type UpdateJson = {
   numExamples: number,
   vars: TensorJson[],
-  modelId?: string,
+  modelVersion?: string,
   clientId?: string
 };
 
