@@ -26,9 +26,9 @@ import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
 import * as serverSocket from 'socket.io';
 
-import {ClientAPI} from './client/comm';
+import {ClientAPI} from './client/client';
 import {tensorToJson} from './serialization';
-import {ServerAPI} from './server/comm';
+import {ServerAPI} from './server/api';
 import {ModelDB} from './server/model_db';
 import {FederatedModel, VarList} from './types';
 
