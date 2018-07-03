@@ -28,9 +28,8 @@ import * as socketIO from 'socket.io';
 import {promisify} from 'util';
 import * as uuid from 'uuid/v4';
 
-import {FederatedModel} from '../types';
-
 import {ServerAPI} from './api';
+import {FederatedModel} from './common';
 import {ModelDB} from './model_db';
 
 const mkdir = promisify(fs.mkdir);
@@ -45,7 +44,7 @@ export async function setup(model: FederatedModel, dataDir: string) {
 
   app.use(fileUpload());
 
-  app.use((req, res, next) => {
+  app.use((req: any, res: any, next: any) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     next();
   });

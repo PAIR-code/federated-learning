@@ -1,0 +1,39 @@
+{
+  "folders": [
+    {
+      "path": "src/client"
+    },
+    {
+      "path": "src/server"
+    },
+    {
+      "path": "test"
+    },
+    {
+      "path": "audio_demo"
+    }
+  ],
+  "settings": {
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/coverage": true,
+      "**/dist": true,
+      "**/yarn.lock": true
+    },
+    "tslint.enable": true,
+    "tslint.run": "onType",
+    "tslint.configFile": "tslint.json",
+    "files.trimTrailingWhitespace": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "[typescript]": {
+      "editor.formatOnSave": true
+    },
+    "clang-format.style": "Google",
+    "files.insertFinalNewline": true,
+    "editor.detectIndentation": false,
+    "editor.wrappingIndent": "none",
+    "typescript.tsdk": "src/server/node_modules/typescript/lib",
+    "clang-format.executable": "${workspaceRoot}/node_modules/.bin/clang-format"
+  }
+}

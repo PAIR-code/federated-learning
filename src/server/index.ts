@@ -1,5 +1,5 @@
 /**
- * @license
+ * * @license
  * Copyright 2018 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,8 @@
  * =============================================================================
  */
 
-/** Shared between client and server */
-import {SerializedVariable} from './serialization';
-
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars',
-  Data = 'uploadData'
-}
-
-export type UploadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DataMsg = {
-  x: SerializedVariable,
-  y: SerializedVariable
-};
-
-export type DownloadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[]
-};
+export * from './model_db';
+export * from './api';
+export * from './server';
+export * from './common';
+export * from './audio_demo_server';
