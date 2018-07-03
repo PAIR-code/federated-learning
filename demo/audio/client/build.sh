@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 whereami=`pwd`
