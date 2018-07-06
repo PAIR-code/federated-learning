@@ -36,11 +36,13 @@ const sockServer = io(httpServer);
 
 app.use(fileUpload());
 
+// tslint:disable-next-line:no-any
 app.use((req: any, res: any, next: any) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
 });
 
+// tslint:disable-next-line:no-any
 app.post('/data', (req: any, res: any) => {
   if (!req.files) {
     return res.status(400).send('Must upload a file');
