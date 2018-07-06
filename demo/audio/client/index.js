@@ -19,31 +19,15 @@ import * as tf from '@tensorflow/tfjs';
 import MediaStreamRecorder from 'msr';
 import {ClientAPI} from 'federated-learning-client';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
-import {loadAudioTransferLearningModel, labelNames} from './model';
-import {firstPrompt, nextPrompt} from './prompts';
-import {FrequencyListener} from './audio';
-
-const runOptions = {
-  magnitudeThreshold: -40,
-  magnitudeThresholdMin: -60,
-  magnitudeThresholdMax: 0,
-  sampleRate: 44100,
-  frameSize: 1024,
-  rotatingBufferSizeMultiplier: 2,
-  refractoryPeriodMillis: 1000,
-  waitingPeriodMillis: 500,
-  numFrames: null,
-  modelFFTLength: null,
-  frameMillis: null,  // Frame duration in milliseconds.
-};
+import {loadAudioTransferLearningModel} from './model';
+import {FrequencyListener} from './frequency_listener';
+import {getNextLabel, labelNames} from './labels';
 
 const spectrumCanvas = document.getElementById('spectrum-canvas');
 const modelDiv = document.getElementById('model');
 const recordButton = document.getElementById('record-button');
 const modelVersion = document.getElementById('model-version');
-const suggestedLabel = document.getElementById('suggested-label');
 const labeledExamples = document.getElementById('labeled-examples');
-const introText = document.getElementById('intro-text');
 const waitingTemplate = `Waiting for input&hellip;`;
 const modelTemplate = `
   <div class='chart'>
@@ -56,20 +40,19 @@ const modelTemplate = `
   </div>
 `;
 
-const serverURL = 'http://localhost:3000';
+let serverURL = 'http://localhost:3000';
+if (URLSearchParams) {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('server')) {
+    serverURL = params.get('server');
+  }
+}
 
 loadAudioTransferLearningModel().then(async (model) => {
-  const inputShape = model.inputs[0].shape;
-  runOptions.numFrames = inputShape[1];
-  runOptions.modelFFTLength = inputShape[2];
-  runOptions.frameMillis = runOptions.frameSize / runOptions.sampleRate * 1e3;
-
   const clientAPI = new ClientAPI(model);
   clientAPI.onDownload((msg) => {
-    const newVersion = msg.modelVersion;
-    console.log(
-        `new model! updating from ${modelVersion.innerText} to ${newVersion}`);
-    modelVersion.innerText = newVersion;
+    console.log(`new model: ${modelVersion.innerText} -> ${msg.modelVersion}`);
+    modelVersion.innerText = msg.modelVersion;
   });
   await clientAPI.connect(serverURL);
 
@@ -81,15 +64,11 @@ loadAudioTransferLearningModel().then(async (model) => {
 });
 
 function setupUI(stream, model, clientAPI) {
-  // Ask user to provide audio for all labels, but in a random order
-  const randomLabels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-  tf.util.shuffle(randomLabels);
-
-  // Keep track of counters that change each audio frame or recording iteration
+  const inputShape = model.inputs[0].shape;
+  const numFrames = inputShape[1];
+  const fftLength = inputShape[2];
   let resultRow;
-  let yTrue;
-  let labelIdx = 0;
-  suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
+  let yTrue = getNextLabel();
 
   // Create a recorder to save the raw .wav file
   const recorder = new MediaStreamRecorder(stream);
@@ -117,16 +96,15 @@ function setupUI(stream, model, clientAPI) {
 
   // On each audio frame, update our rotating buffer with the latest FFT data
   // from our analyser. For fun, also update the spectrum plot
-  const listener = FrequencyListener(stream, runOptions);
+  const listener = FrequencyListener(stream, numFrames, fftLength);
   listener.onEachFrame(freqData => {
-    plotSpectrum(spectrumCanvas, freqData, runOptions);
+    plotSpectrum(spectrumCanvas, freqData, fftLength);
   });
   listener.listen();
 
   // Create our record button
   recordButton.innerHTML = 'Record';
   recordButton.removeAttribute('disabled');
-  introText.innerText = firstPrompt();
 
   // When we click it, record for 1 second
   recordButton.addEventListener('click', () => {
@@ -146,9 +124,6 @@ function setupUI(stream, model, clientAPI) {
     for (let i = 0; i < 4; i++)
       resultRow.appendChild(document.createElement('td'));
     labeledExamples.appendChild(resultRow);
-
-    // Compute true prediction
-    yTrue = randomLabels[labelIdx];
     resultRow.children[2].innerText = labelNames[yTrue];
 
     // Stop separate .wav recording
@@ -156,19 +131,15 @@ function setupUI(stream, model, clientAPI) {
 
     // Compute input tensor
     const freqData = listener.getFrequencyData();
-    const x = getInputTensorFromFrequencyData(freqData);
+    const x = getInputTensorFromFrequencyData(freqData, numFrames, fftLength);
 
     // Plot spectrograms
     const mainSpectrogram = document.getElementById('spectrogram-canvas');
     const miniSpectrogram = document.createElement('canvas');
     miniSpectrogram.setAttribute('width', '81');
     miniSpectrogram.setAttribute('height', '54');
-    plotSpectrogram(
-        mainSpectrogram, freqData, runOptions.modelFFTLength,
-        runOptions.modelFFTLength);
-    plotSpectrogram(
-        miniSpectrogram, freqData, runOptions.modelFFTLength,
-        runOptions.modelFFTLength);
+    plotSpectrogram(mainSpectrogram, freqData, fftLength);
+    plotSpectrogram(miniSpectrogram, freqData, fftLength);
     resultRow.children[1].appendChild(miniSpectrogram);
 
     // Compute label tensor
@@ -205,21 +176,14 @@ function setupUI(stream, model, clientAPI) {
       }
       // dispose of tensors
       tf.dispose([x, y]);
-      // decide what label to request next
-      labelIdx += 1;
-      if (labelIdx >= labelNames.length) {
-        labelIdx = 0;
-        tf.util.shuffle(randomLabels);  // reshuffle each iteration
-      }
-      suggestedLabel.innerText = labelNames[randomLabels[labelIdx]];
 
-      // thank the user
-      introText.innerText = nextPrompt();
+      // decide what label to request next
+      yTrue = getNextLabel();
 
       // re-allow recording
       recordButton.innerText = 'Record';
       recordButton.removeAttribute('disabled');
-      console.log('done cleaning up');
+      console.log('...done!');
     };
 
     // ...after we upload data and train
@@ -241,7 +205,7 @@ function normalize(x) {
   });
 }
 
-function getInputTensorFromFrequencyData(freqData) {
+function getInputTensorFromFrequencyData(freqData, numFrames, fftLength) {
   return tf.tidy(() => {
     const size = freqData.length;
     const tensorBuffer = tf.buffer([size]);
@@ -249,6 +213,6 @@ function getInputTensorFromFrequencyData(freqData) {
       tensorBuffer.set(freqData[i], i);
     }
     return normalize(tensorBuffer.toTensor().reshape(
-        [1, runOptions.numFrames, runOptions.modelFFTLength, 1]));
+        [1, numFrames, fftLength, 1]));
   });
 }
