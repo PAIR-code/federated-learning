@@ -33,6 +33,7 @@ const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
 const app = express();
 const httpServer = http.createServer(app);
 const sockServer = io(httpServer);
+const port = process.env.PORT || 3000;
 
 app.use(fileUpload());
 
@@ -66,8 +67,8 @@ loadAudioTransferLearningModel().then(model => {
       mkdir(path.join(fileDir, labelNames[i]));
     }
 
-    httpServer.listen(3000, () => {
-      console.log('listening on 3000');
+    httpServer.listen(port, () => {
+      console.log(`listening on ${port}`);
     });
   });
 });
