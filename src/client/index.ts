@@ -15,13 +15,5 @@
  * =============================================================================
  */
 
-import * as path from 'path';
-import {FederatedTfModel, loadAudioTransferLearningModel} from '../index';
-import {setup} from './server';
-
-const dataDir = path.resolve(__dirname + '/../../data');
-
-loadAudioTransferLearningModel().then((tfModel) => {
-  const fedModel = new FederatedTfModel(tfModel);
-  setup(fedModel, dataDir);
-});
+export * from './api';
+export * from './common';

@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2018 Google LLC. All Rights Reserved.
@@ -16,7 +15,7 @@
  * =============================================================================
  */
 
-export function plotSpectrum(canvas, freqData, runOptions) {
+export function plotSpectrum(canvas, freqData, modelFFTLength) {
   let instanceMax = -Infinity;
   for (const val of freqData) {
     if (val > instanceMax) {
@@ -24,31 +23,23 @@ export function plotSpectrum(canvas, freqData, runOptions) {
     }
   }
   const yscale = 0.75;
-  const xscale = canvas.width / runOptions.modelFFTLength;
+  const xscale = canvas.width / modelFFTLength;
   const yOffset = -0.1 * canvas.height;
 
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle =
-    instanceMax > runOptions.magnitudeThreshold ? '#00AA00' : '#AAAAAA';
+  ctx.strokeStyle = '#AAAAAA';
   ctx.lineWidth = 1;
   ctx.beginPath();
 
   ctx.moveTo(0, -freqData[0]*yscale + yOffset);
-  for (let i = 1; i < runOptions.modelFFTLength; ++i) {
+  for (let i = 1; i < modelFFTLength; ++i) {
     ctx.lineTo(i*xscale, -freqData[i]*yscale + yOffset);
   }
   ctx.stroke();
-
-  // Draw the threshold.
-  ctx.beginPath();
-  ctx.moveTo(0, -runOptions.magnitudeThreshold*yscale + yOffset);
-  ctx.lineTo(
-    canvas.width, -runOptions.magnitudeThreshold*yscale + yOffset);
-  ctx.stroke();
 }
 
-export function plotSpectrogram(canvas, frequencyData, fftSize, fftDisplaySize) {
+export function plotSpectrogram(canvas, frequencyData, fftSize) {
   // Get the maximum and minimum.
   let min = Infinity;
   let max = -Infinity;
@@ -72,14 +63,14 @@ export function plotSpectrogram(canvas, frequencyData, fftSize, fftDisplaySize) 
 
   const numTimeSteps = frequencyData.length / fftSize;
   const pixelWidth = canvas.width / numTimeSteps;
-  const pixelHeight = canvas.height / fftDisplaySize;
+  const pixelHeight = canvas.height / fftSize;
   for (let i = 0; i < numTimeSteps; ++i) {
     const x = pixelWidth * i;
     const spectrum = frequencyData.subarray(i * fftSize, (i + 1) * fftSize);
     if (spectrum[0] === -Infinity) {
       break;
     }
-    for (let j = 0; j < fftDisplaySize; ++j) {
+    for (let j = 0; j < fftSize; ++j) {
       const y = canvas.height - (j + 1) * pixelHeight;
 
       let colorValue = (spectrum[j] - min) / (max - min);

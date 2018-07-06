@@ -17,8 +17,8 @@
 
 import * as tf from '@tensorflow/tfjs';
 import {test_util} from '@tensorflow/tfjs-core';
-
-import * as ser from './serialization';
+// tslint:disable-next-line:max-line-length
+import {deserializeVar, jsonToSerialized, jsonToTensor, serializedToJson, serializeVar, tensorToJson} from 'federated-learning-client';
 
 describe('serialization', () => {
   const floatTensor =
@@ -27,32 +27,32 @@ describe('serialization', () => {
   const intTensor = tf.tensor2d([[1, 2], [3, 4]], [2, 2], 'int32');
 
   it('converts back and forth to JSON', async () => {
-    const floatJSON = await ser.tensorToJson(floatTensor);
-    const boolJSON = await ser.tensorToJson(boolTensor);
-    const intJSON = await ser.tensorToJson(intTensor);
-    const floatTensor2 = ser.jsonToTensor(floatJSON);
-    const boolTensor2 = ser.jsonToTensor(boolJSON);
-    const intTensor2 = ser.jsonToTensor(intJSON);
+    const floatJSON = await tensorToJson(floatTensor);
+    const boolJSON = await tensorToJson(boolTensor);
+    const intJSON = await tensorToJson(intTensor);
+    const floatTensor2 = jsonToTensor(floatJSON);
+    const boolTensor2 = jsonToTensor(boolJSON);
+    const intTensor2 = jsonToTensor(intJSON);
     test_util.expectArraysClose(floatTensor, floatTensor2);
     test_util.expectArraysClose(boolTensor, boolTensor2);
     test_util.expectArraysClose(intTensor, intTensor2);
   });
 
   it('converts back and forth to SerializedVar', async () => {
-    const floatSerial = await ser.serializeVar(floatTensor);
-    const boolSerial = await ser.serializeVar(boolTensor);
-    const intSerial = await ser.serializeVar(intTensor);
-    const floatTensor2 = ser.deserializeVar(floatSerial);
-    const boolTensor2 = ser.deserializeVar(boolSerial);
-    const intTensor2 = ser.deserializeVar(intSerial);
+    const floatSerial = await serializeVar(floatTensor);
+    const boolSerial = await serializeVar(boolTensor);
+    const intSerial = await serializeVar(intTensor);
+    const floatTensor2 = deserializeVar(floatSerial);
+    const boolTensor2 = deserializeVar(boolSerial);
+    const intTensor2 = deserializeVar(intSerial);
     test_util.expectArraysClose(floatTensor, floatTensor2);
     test_util.expectArraysClose(boolTensor, boolTensor2);
     test_util.expectArraysClose(intTensor, intTensor2);
   });
 
   it('works for an arbitrary chain', async () => {
-    const floatTensor2 = ser.jsonToTensor(await ser.serializedToJson(
-        await ser.jsonToSerialized(await ser.tensorToJson(floatTensor))));
+    const floatTensor2 = jsonToTensor(await serializedToJson(
+        await jsonToSerialized(await tensorToJson(floatTensor))));
     test_util.expectArraysClose(floatTensor2, floatTensor);
   });
 });

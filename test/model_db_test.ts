@@ -14,18 +14,16 @@
  * limitations under the License.
  * =============================================================================
  */
+
 import * as tf from '@tensorflow/tfjs';
 import {tensor, Tensor, test_util, variable} from '@tensorflow/tfjs-core';
 import EncodingDown from 'encoding-down';
+import {FederatedModel, tensorToJson, VarList} from 'federated-learning-client';
+import {ModelDB} from 'federated-learning-server';
 import * as fs from 'fs';
 import LevelDown from 'leveldown';
 import LevelUp from 'levelup';
 import * as rimraf from 'rimraf';
-
-import {tensorToJson} from '../serialization';
-import {FederatedModel, VarList} from '../types';
-
-import {ModelDB} from './model_db';
 
 const modelVersion = '1528400733553';
 const updateId1 = '4c382c89-30cc-4f81-9197-c26e345cfb5b';

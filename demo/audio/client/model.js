@@ -15,27 +15,19 @@
  * =============================================================================
  */
 
-/** Shared between client and server */
-import {SerializedVariable} from './serialization';
+import * as tf from '@tensorflow/tfjs';
 
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars',
-  Data = 'uploadData'
+const audioTransferLearningModelURL =
+    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+
+export async function loadAudioTransferLearningModel() {
+  const model = await tf.loadModel(audioTransferLearningModelURL);
+
+  for (let i = 0; i < 9; ++i) {
+    model.layers[i].trainable = false;  // freeze conv layers
+  }
+
+  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+
+  return model;
 }
-
-export type UploadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DataMsg = {
-  x: SerializedVariable,
-  y: SerializedVariable
-};
-
-export type DownloadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[]
-};

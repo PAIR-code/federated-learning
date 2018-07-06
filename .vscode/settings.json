@@ -2,8 +2,8 @@
 {
   "search.exclude": {
     "**/node_modules": true,
-    "coverage/": true,
-    "dist/": true,
+    "**/coverage/": true,
+    "**/dist/": true,
     "**/yarn.lock": true
   },
   "tslint.enable": true,
@@ -19,6 +19,6 @@
   "files.insertFinalNewline": true,
   "editor.detectIndentation": false,
   "editor.wrappingIndent": "none",
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "clang-format.executable": "${workspaceRoot}/node_modules/.bin/clang-format"
+  "typescript.tsdk": "src/server/node_modules/typescript/lib",
+  "clang-format.executable": "${workspaceRoot}/src/server/node_modules/.bin/clang-format"
 }

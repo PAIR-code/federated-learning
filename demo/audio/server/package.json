@@ -1,0 +1,26 @@
+{
+  "name": "federated-learning-test",
+  "version": "0.0.1",
+  "description": "Hardware-accelerated JavaScript library for machine intelligence",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PAIR-code/federated-learning.git"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "./dev.sh",
+    "lint": "tslint -p . -t verbose"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "0.11.7",
+    "@tensorflow/tfjs-node": "^0.1.7",
+    "federated-learning-server": "file:../../../src/server"
+  },
+  "devDependencies": {
+    "ts-node": "^6.1.0",
+    "tslint": "~5.8.0",
+    "typescript": "2.7.2",
+    "yalc": "^1.0.0-pre.22"
+  }
+}
