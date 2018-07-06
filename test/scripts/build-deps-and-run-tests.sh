@@ -22,6 +22,10 @@ echo '***** locally publish federated-learning-client *****'
 cd ../client
 yarn publish-local
 echo ''
-echo '***** run tests *****'
+echo '***** link packages *****'
 cd ../../test
+yalc link federated-learning-client
+yalc link federated-learning-server
+echo ''
+echo '***** run tests *****'
 ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json
