@@ -15,20 +15,21 @@
  * =============================================================================
  */
 
-// tslint:disable-next-line:max-line-length
 import * as express from 'express';
 import * as fileUpload from 'express-fileupload';
-import {loadAudioTransferLearningModel, setup} from 'federated-learning-server';
+import * as federatedServer from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
 import * as io from 'socket.io';
-import {promisify} from 'util';
 import * as uuid from 'uuid/v4';
 
-const mkdir = promisify(fs.mkdir);
-const exists = promisify(fs.exists);
+import {labelNames, loadAudioTransferLearningModel} from './model';
+
 const dataDir = path.resolve(__dirname + '/data');
+const fileDir = path.join(dataDir, 'files');
+const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
+
 const app = express();
 const httpServer = http.createServer(app);
 const sockServer = io(httpServer);
@@ -40,32 +41,31 @@ app.use((req: any, res: any, next: any) => {
   next();
 });
 
-// tslint:disable-next-line:no-any
-app.post('/data', async (req: any, res: any) => {
+app.post('/data', (req: any, res: any) => {
   if (!req.files) {
     return res.status(400).send('Must upload a file');
+  } else {
+    res.send('File uploaded!');
   }
 
   const file = req.files.file;
   const fileParts = file.name.split('.');
   const labelName = fileParts[0];
   const extension = fileParts[1];
-  const fileDir = path.join(dataDir, 'files');
   const labelDir = path.join(fileDir, labelName);
-
-  if (!(await exists(fileDir))) await mkdir(fileDir);
-  if (!(await exists(labelDir))) await mkdir(labelDir);
-
   const filename = path.join(labelDir, `${uuid()}.${extension}`);
-  await file.mv(filename);
-
-  res.send('File uploaded successfully');
+  file.mv(filename);
 });
 
-loadAudioTransferLearningModel().then((model) => {
-  setup(sockServer, model, dataDir);
-});
+loadAudioTransferLearningModel().then(model => {
+  federatedServer.setup(sockServer, model, dataDir).then(() => {
+    mkdir(fileDir);
+    for (let i = 0; i < labelNames.length; i++) {
+      mkdir(path.join(fileDir, labelNames[i]));
+    }
 
-httpServer.listen(3000, () => {
-  console.log('listening on 3000');
+    httpServer.listen(3000, () => {
+      console.log('listening on 3000');
+    });
+  });
 });

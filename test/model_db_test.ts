@@ -14,6 +14,7 @@
  * limitations under the License.
  * =============================================================================
  */
+
 import * as tf from '@tensorflow/tfjs';
 import {tensor, Tensor, test_util, variable} from '@tensorflow/tfjs-core';
 import EncodingDown from 'encoding-down';
