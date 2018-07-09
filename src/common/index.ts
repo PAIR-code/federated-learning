@@ -90,7 +90,11 @@ export type UpdateJson = {
 export type DataJson = {
   x: TensorJson,
   y: TensorJson,
-  clientId?: string
+  p?: TensorJson,
+  clientId?: string,
+  timestamp?: string,
+  trueLabel?: string,
+  predLabel?: string
 };
 
 export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
@@ -252,7 +256,10 @@ export type UploadMsg = {
 
 export type DataMsg = {
   x: SerializedVariable,
-  y: SerializedVariable
+  y: SerializedVariable,
+  p?: SerializedVariable,
+  trueLabel?: string,
+  predLabel?: string
 };
 
 export type DownloadMsg = {

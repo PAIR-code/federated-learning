@@ -19,3 +19,10 @@ cd ../../../src/server
 yarn publish-local
 cd $whereami
 yalc link federated-learning-server
+if [ -e ../client ]
+then
+  cd ../client
+  yarn build
+  cp dist/* ../server/client
+  cd $whereami
+fi

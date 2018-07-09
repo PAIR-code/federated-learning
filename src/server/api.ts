@@ -67,10 +67,16 @@ export class ServerAPI {
       socket.emit(Events.Download, initVars);
       socket.on(Events.Data, async (msg: DataMsg, ack) => {
         ack(true);
+        const trueLabel = msg.trueLabel;
+        const predLabel = msg.predLabel;
         const x = await serializedToJson(msg.x);
         const y = await serializedToJson(msg.y);
+        let p;
+        if (msg.p) {
+          p = await serializedToJson(msg.p);
+        }
         const clientId = socket.client.id;
-        await this.modelDB.putData({x, y, clientId});
+        await this.modelDB.putData({x, y, p, trueLabel, predLabel, clientId});
 
         log('putData', 'clientId:', clientId);
       });

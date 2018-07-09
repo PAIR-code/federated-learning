@@ -56,7 +56,10 @@ export class ModelDB {
   }
 
   async putData(data: DataJson): Promise<void> {
-    return this.db.put('data/' + currentTimestamp() + '_' + uuid(), data);
+    if (!data.timestamp) {
+      data.timestamp = currentTimestamp();
+    }
+    return this.db.put('data/' + data.timestamp + '_' + uuid(), data);
   }
 
   async getData(): Promise<DataJson[]> {
