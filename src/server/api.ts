@@ -15,36 +15,25 @@
  * =============================================================================
  */
 
-import {ModelFitConfig} from '@tensorflow/tfjs';
 import {Server, Socket} from 'socket.io';
-
-import {DownloadMsg, Events, UploadMsg} from '../common';
-import {serializedToJson, serializeVar} from '../serialization';
-
 import {ModelDB} from './model_db';
+// tslint:disable-next-line:max-line-length
+import {serializedToJson, serializeVar, DataMsg, DownloadMsg, Events, UploadMsg} from './common';
 
-export class SocketAPI {
+export class ServerAPI {
   modelDB: ModelDB;
-  fitConfig: ModelFitConfig;
   io: Server;
   numClients = 0;
 
-  constructor(
-      modelDB: ModelDB, fitConfig: ModelFitConfig, io: Server,
-      private exitOnClientExit = false) {
+  constructor(modelDB: ModelDB, io: Server, private exitOnClientExit = false) {
     this.modelDB = modelDB;
-    this.fitConfig = fitConfig;
     this.io = io;
   }
 
   async downloadMsg(): Promise<DownloadMsg> {
     const varsJson = await this.modelDB.currentVars();
     const varsSeri = await Promise.all(varsJson.map(serializeVar));
-    return {
-      fitConfig: this.fitConfig,
-      modelId: this.modelDB.modelId,
-      vars: varsSeri
-    };
+    return {modelVersion: this.modelDB.modelVersion, vars: varsSeri};
   }
 
   async setup() {
@@ -63,23 +52,31 @@ export class SocketAPI {
       const initVars = await this.downloadMsg();
       socket.emit(Events.Download, initVars);
 
+      socket.on(Events.Data, async (msg: DataMsg, ack) => {
+        ack(true);
+        const x = await serializedToJson(msg.x);
+        const y = await serializedToJson(msg.y);
+        const clientId = socket.client.id;
+        await this.modelDB.putData({x, y, clientId});
+      });
+
       // When a client sends us updated weights
       socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
-        // Save them to a file
+        // Immediately acknowledge the request
+        ack(true);
+
+        // Save weights
         const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
         const update = {
           clientId: socket.client.id,
-          modelId: msg.modelId,
+          modelVersion: msg.modelVersion,
           numExamples: msg.numExamples,
           vars: updatedVars
         };
         await this.modelDB.putUpdate(update);
 
-        // Let them know we're done saving
-        ack(true);
-
         // Potentially update the model (asynchronously)
-        if (msg.modelId === this.modelDB.modelId) {
+        if (msg.modelVersion === this.modelDB.modelVersion) {
           const updated = await this.modelDB.possiblyUpdate();
           if (updated) {
             // Send new variables to all clients if we updated

@@ -1,5 +1,5 @@
 /**
- * @license
+ * * @license
  * Copyright 2018 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,7 @@
  * =============================================================================
  */
 
-import {Model, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
-import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
-
-export type LossFun = (inputs: Tensor, labels: Tensor) => Scalar;
-export type PredFun = (inputs: Tensor) => Tensor|Tensor[];
-export type VarList = Array<Variable|LayerVariable>;
-export type ModelDict = {
-  vars: VarList,
-  loss: LossFun,
-  predict: PredFun,
-  model?: Model
-};
-
-export interface FederatedModel {
-  setup(): Promise<ModelDict>;
-}
+export * from './model_db';
+export * from './api';
+export * from './server';
+export * from './common';
