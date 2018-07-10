@@ -53,9 +53,23 @@
     protobufjs "~6.8.6"
     url "^0.11.0"
 
+"@tensorflow/tfjs-converter@latest":
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-converter/-/tfjs-converter-0.5.0.tgz#bf952dcb5b4cb2e2d0ce5ea8b1b347355ed2e27f"
+  dependencies:
+    "@types/long" "~3.0.32"
+    protobufjs "~6.8.6"
+    url "^0.11.0"
+
 "@tensorflow/tfjs-core@0.11.9":
   version "0.11.9"
   resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-core/-/tfjs-core-0.11.9.tgz#b684255359941162c64b397d515c310bd1027fe8"
+  dependencies:
+    seedrandom "~2.4.3"
+
+"@tensorflow/tfjs-core@^0.12.1":
+  version "0.12.1"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-core/-/tfjs-core-0.12.1.tgz#3d83f5676900b815a09cf8baa77862369e26f9bb"
   dependencies:
     seedrandom "~2.4.3"
 

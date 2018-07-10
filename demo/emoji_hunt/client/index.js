@@ -59,13 +59,13 @@ async function main() {
 
   const model = await loadModel();
 
-  //const client = new ClientAPI(model);
+  const client = new ClientAPI(model);
 
   client.onDownload(msg => ui.modelVersion(msg.modelVersion));
 
   ui.status('trying to connect to federated learning server...');
 
-  //await client.connect(SERVER_URL);
+  await client.connect(SERVER_URL);
 
   ui.status('trying to get access to webcam...');
 
@@ -109,7 +109,8 @@ async function main() {
           const labels = tf.oneHot(targetIdxT.expandDims(0));
           return [input, labels];
         });
-        //await client.federatedUpdate(x, y);
+
+        await client.federatedUpdate(x, y);
 
         x.dispose();
         y.dispose();
