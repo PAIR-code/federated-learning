@@ -1,17 +1,7 @@
-import * as tf from '@tensorflow/tfjs'
-
-console.log(tf);
+import * as tf from '@tensorflow/tfjs-core'
+import { loadFrozenModel } from '@tensorflow/tfjs-converter';
 
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
-
-`
-import * as emojiName from '//unpkg.com/emoji-name-map?module';
-
-import * as tf from '//unpkg.com/@tensorflow/tfjs/dist/tf.esm.js?module'
-import {SCAVENGER_HUNT_LABELS} from './labels.js';
-`
-
-
 import * as ui from './ui.js';
 import {EMOJIS_LVL_1} from './levels2.js';
 
@@ -22,17 +12,20 @@ const SERVER_URL = 'http://localhost:3000';
 
 const levels = [EMOJIS_LVL_1];
 
-for(const level of levels) {
-  for(const {name, emoji} of level) {
-    //emojiName.emoji[name] = emoji;
-  }
-}
-
-
 async function loadModel() {
-  const model = await tf.loadFrozenModel(MODEL_URL,  WEIGHT_MANIFEST);
+  const model = await loadFrozenModel(MODEL_URL,  WEIGHT_MANIFEST);
+  const vars = model.executor.weightMap;
+  const nonTrainables = /(batchnorm)|(reshape)/g;
+  for(const weightName in vars) {
+    if(!weightName.match(nonTrainables)) {
+      vars[weightName] = vars[weightName].map(t => t.dtype === 'float32'
+                                                   ? tf.variable(t, true)
+                                                   : t);
+    }
+  }
 
- /* doesnt work for frozen model
+ /*
+  doesnt work for frozen model
   for(const layer of model.layers) {
     layer.trainable = false;
   }
@@ -52,63 +45,91 @@ async function getTopPred(preds) {
   return { index: top, label: SCAVENGER_HUNT_LABELS[top] }
 }
 
+function preprocess(webcam) {
+  return tf.tidy(() => {
+    const frame = tf.fromPixels(webcam).toFloat();
+    const scaled = tf.image.resizeBilinear(frame, [224, 224]);
+    const prepped = scaled.sub(T_127_5).div(T_127_5).expandDims(0);
+    return prepped
+  });
+}
+
 async function main() {
   ui.status('loading model...');
 
   const model = await loadModel();
-  // const client = new ClientAPI(model);
 
-  // client.onDownload(msg => ui.modelVersion(msg.modelVersion));
+  //const client = new ClientAPI(model);
+
+  client.onDownload(msg => ui.modelVersion(msg.modelVersion));
 
   ui.status('trying to connect to federated learning server...');
 
- // await client.connect(SERVER_URL);
+  //await client.connect(SERVER_URL);
 
   ui.status('trying to get access to webcam...');
 
   const webcam = await ui.webcam();
 
   while(webcam.videoHeight === 0) {
-    ui.status('waiting for video to initialise...')
+    ui.status('waiting for video to initialise...');
     await tf.nextFrame();
   }
 
-  let trainingMode = false;
+  let isTraining = false;
 
-  ui.overrideButton().addEventListener('click',  evt => {
-    if(trainingMode) return;
-    ui.status('ok! training now...')
-    trainingMode = true;
+  ui.overrideButton(evt => {
+    if(isTraining) return;
+    ui.status('ok! training now...');
+    isTraining = true;
     setTimeout(() => {
-      trainingMode = false;
+      isTraining = false;
       ui.status('ready!');
-    }, 2000)
+    }, 2000);
   });
 
   ui.status('ready!');
 
-  const pick = () => EMOJIS_LVL_1[Math.floor(EMOJIS_LVL_1.length * Math.random())]
-  let lookingFor = pick();
-  ui.findMe(`find me a ${lookingFor.name}, ${lookingFor.emoji}`)
+  const pickTarget = () => {
+    const idx = Math.floor(EMOJIS_LVL_1.length * Math.random());
+    const { name, emoji, path } = EMOJIS_LVL_1[idx];
+    const targetIdx = labels.indexOf(name);
+    return { name, emoji, path, targetIdx }
+  }
+
+  let lookingFor = pickTarget();
+  ui.findMe(`find me a ${lookingFor.name}, ${lookingFor.emoji}`);
 
   while(true) {
     await tf.nextFrame();
-    if(trainingMode) continue;
-    const preds = tf.tidy(() => {
-      const frame = tf.fromPixels(webcam).toFloat();
-      const scaled = tf.image.resizeBilinear(frame, [224, 224]);
-      const prepped = scaled.sub(T_127_5).div(T_127_5).expandDims(0);
-      return model.predict(prepped)
-    });
-    const { index, label, emoji } = await getTopPred(preds);
+    if(isTraining) {
+        const [x, y] = tf.tidy(() => {
+          const input = preprocess(webcam);
+          const targetIdxT = tf.scalar(lookingFor.targetIdx, 'int32');
+          const labels = tf.oneHot(targetIdxT.expandDims(0));
+          return [input, labels];
+        });
+        //await client.federatedUpdate(x, y);
 
-    ui.status(`its a ${label}${emoji ? `, ${emoji}!` : '!'}`);
+        x.dispose();
+        y.dispose();
+    };
+
+    const preds = tf.tidy(() => {
+      return model.predict(preprocess(webcam));
+    });
+
+    const { label } = await getTopPred(preds);
+
+    preds.dispose();
+
+    ui.status(`its a ${label}`);
     if(label == lookingFor.name) {
       ui.status(`congrats! u did it !`);
       for(let i = 0; i < 30; i++) {
         await tf.nextFrame();
       }
-      lookingFor = pick();
+      lookingFor = pickTarget();
       ui.findMe(`find me a ${lookingFor.name}, ${lookingFor.emoji}`)
     }
   }

@@ -19,4 +19,4 @@ cd ../../../src/client
 yarn publish-local
 cd $whereami
 yarn run yalc link federated-learning-client
-yarn run parcel index.html --no-hmr
+yarn run parcel index.html --no-hmr --hmr-hostname 0.0.0.0

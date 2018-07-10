@@ -34,6 +34,6 @@ export async function webcam() {
   return video;
 }
 
-export function overrideButton() {
-  return overrideButtonElt;
+export function overrideButton(handler) {
+  return overrideButtonElt.addEventListener('click', handler);
 }
