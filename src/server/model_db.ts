@@ -134,7 +134,11 @@ export class ModelDB {
       const nk = tf.scalar(u.numExamples);
       const frac = nk.div(n);
       u.vars.forEach((v: TensorJson, i: number) => {
-        const update = jsonToTensor(v).mul(frac);
+        console.log(tf.version, nk.div(n), nk.div(n).dataSync());
+        console.log(
+            nk instanceof tf.Tensor, n instanceof tf.Tensor,
+            nk.div(n) instanceof tf.Tensor);
+        const update = tf.mul(frac, jsonToTensor(v));
         updatedVars[i] = updatedVars[i].add(update);
       });
     });

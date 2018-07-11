@@ -18,9 +18,6 @@
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "0.11.7",
-    "@tensorflow/tfjs-node": "^0.1.7",
-    "@tensorflow/tfjs-node-gpu": "^0.1.7",
     "@types/express": "^4.16.0",
     "@types/express-fileupload": "^0.1.1",
     "@types/node-fetch": "^2.1.1",
@@ -49,5 +46,12 @@
     "tslint": "~5.8.0",
     "typescript": "2.9.2",
     "yalc": "^1.0.0-pre.22"
+  },
+  "peerDependencies": {
+    "@tensorflow/tfjs": "0.11.7"
+  },
+  "optionalDependencies": {
+    "@tensorflow/tfjs-node": "^0.1.7",
+    "@tensorflow/tfjs-node-gpu": "^0.1.7"
   }
 }
