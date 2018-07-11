@@ -205,16 +205,18 @@ export class FederatedDynamicModel implements FederatedModel {
   loss: (xs: Tensor, ys: Tensor) => Scalar;
   optimizer: Optimizer;
   /**
-   * Construct a new `FederatedModel` wrapping a `tf.Model`.
+   * Construct a new `FederatedDynamicModel` wrapping loss function and
+   * variables it operates over.
    *
-   * @param model An instance of `tf.Model` that has already been `compile`d.
-   * @param config Optional `tf.ModelFitConfig` for training.
+   * @param vars Variables to upload/download from the server.
+   * @param loss Loss function to pass to the optimizer.
+   * @param learningRate Options ( {learningRate} ) for the optimizer
    */
   constructor(
       vars: Variable[], loss: (xs: Tensor, ys: Tensor) => Scalar,
-      {learningRate = 0.01}) {
+      optimzer: Optimizer) {
     this.vars = vars;
-    this.optimizer = tf.train.sgd(learningRate);
+    this.optimizer = optimzer;
     this.loss = loss;
   }
 
@@ -233,7 +235,8 @@ export class FederatedDynamicModel implements FederatedModel {
   }
 }
 
-export function federated(model: FederatedModel|Model): FederatedModel {
+export function federated(model: FederatedDynamicModel|FederatedModel|
+                          Model): FederatedModel {
   if (model instanceof Model) {
     return new FederatedTfModel(model);
   } else {

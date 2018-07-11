@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "clang-format": "~1.2.2",
+    "ts-node": "^7.0.0",
     "tslint": "~5.10.0",
     "typescript": "2.9.2",
     "yalc": "^1.0.0-pre.22"

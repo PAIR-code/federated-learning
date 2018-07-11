@@ -7,12 +7,13 @@
     "@tensorflow/tfjs": "0.11.7",
     "@tensorflow/tfjs-node": "^0.1.8",
     "express-fileupload": "^0.4.0",
-    "federated-learning-server": "file:../../../src/server/",
+    "federated-learning-server": "file:.yalc/federated-learning-server",
     "socket.io": "^2.1.1"
   },
   "devDependencies": {
     "ts-node": "^7.0.0",
     "ts-node-dev": "^1.0.0-pre.26",
+    "typescript": "^2.9.2",
     "yalc": "^1.0.0-pre.22"
   }
 }

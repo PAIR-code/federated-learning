@@ -1,5 +1,4 @@
 import * as tf from '@tensorflow/tfjs'
-import * as client from 'federated-learning-client';
 
 import { FederatedDynamicModel, ClientAPI } from 'federated-learning-client';
 
@@ -78,7 +77,10 @@ async function main() {
 
   const client = new ClientAPI(varsAndLoss);
 
-  client.onDownload(msg => ui.modelVersion(`model version: ${msg.modelVersion}`));
+  client.onDownload(msg => {
+    console.log(msg);
+    ui.modelVersion(`model version: ${msg.modelVersion}`);
+  });
 
   ui.status('trying to connect to federated learning server...');
 

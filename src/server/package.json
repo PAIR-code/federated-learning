@@ -35,6 +35,7 @@
     "uuid": "^3.2.1"
   },
   "devDependencies": {
+    "@tensorflow/tfjs": "0.11.7",
     "@types/jasmine": "^2.8.8",
     "@types/node": "~9.6.0",
     "@types/rimraf": "^2.0.2",
@@ -50,7 +51,7 @@
   "peerDependencies": {
     "@tensorflow/tfjs": "0.11.7"
   },
-  "optionalDependencies": {
+  "optionalPeerDependencies": {
     "@tensorflow/tfjs-node": "^0.1.7",
     "@tensorflow/tfjs-node-gpu": "^0.1.7"
   }
