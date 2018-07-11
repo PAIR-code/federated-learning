@@ -2,5 +2,17 @@
   "name": "mobilenet-example-server",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@tensorflow/tfjs": "0.11.7",
+    "@tensorflow/tfjs-node": "^0.1.8",
+    "express-fileupload": "^0.4.0",
+    "federated-learning-server": "file:../../../src/server/",
+    "socket.io": "^2.1.1"
+  },
+  "devDependencies": {
+    "ts-node": "^7.0.0",
+    "ts-node-dev": "^1.0.0-pre.26",
+    "yalc": "^1.0.0-pre.22"
+  }
 }

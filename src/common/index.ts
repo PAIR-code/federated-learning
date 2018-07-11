@@ -16,7 +16,9 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Model, ModelFitConfig, Tensor, Variable} from '@tensorflow/tfjs';
+// tslint:disable-next-line:max-line-length
+import {Model, ModelFitConfig, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {Optimizer} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
 export type SerializedVariable = {
@@ -189,6 +191,44 @@ export class FederatedTfModel implements FederatedModel {
   setVars(vals: Tensor[]) {
     for (let i = 0; i < vals.length; i++) {
       this.model.trainableWeights[i].write(vals[i]);
+    }
+  }
+}
+
+/**
+ * Implementation of `FederatedModel` designed to wrap a loss function and
+ * variables it operates over.
+ */
+export class FederatedDynamicModel implements FederatedModel {
+  vars: Variable[];
+  config: ModelFitConfig;
+  loss: (xs: Tensor, ys: Tensor) => Scalar;
+  optimizer: Optimizer;
+  /**
+   * Construct a new `FederatedModel` wrapping a `tf.Model`.
+   *
+   * @param model An instance of `tf.Model` that has already been `compile`d.
+   * @param config Optional `tf.ModelFitConfig` for training.
+   */
+  constructor(
+      vars: Variable[], loss: (xs: Tensor, ys: Tensor) => Scalar,
+      {learningRate = 0.01}) {
+    this.vars = vars;
+    this.optimizer = tf.train.sgd(learningRate);
+    this.loss = loss;
+  }
+
+  async fit(x: Tensor, y: Tensor): Promise<void> {
+    this.optimizer.minimize(() => this.loss(x, y));
+  }
+
+  getVars() {
+    return this.vars.slice();
+  }
+
+  setVars(vals: Tensor[]) {
+    for (let i = 0; i < vals.length; i++) {
+      this.vars[i].assign(vals[i]);
     }
   }
 }

@@ -1,40 +1,57 @@
-import * as tf from '@tensorflow/tfjs-core'
-import { loadFrozenModel } from '@tensorflow/tfjs-converter';
+import * as tf from '@tensorflow/tfjs'
+import * as client from 'federated-learning-client';
+
+import { FederatedDynamicModel, ClientAPI } from 'federated-learning-client';
+
+import * as ui from './ui.js';
 
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
-import * as ui from './ui.js';
 import {EMOJIS_LVL_1} from './levels2.js';
 
 const MODEL_URL = 'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/web_model.pb';
 const WEIGHT_MANIFEST = 'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json'
+
+console.log(FederatedDynamicModel, ClientAPI);
+
 const T_127_5 = tf.scalar(255 / 2);
+
 const SERVER_URL = 'http://localhost:3000';
 
-const levels = [EMOJIS_LVL_1];
-
-async function loadModel() {
-  const model = await loadFrozenModel(MODEL_URL,  WEIGHT_MANIFEST);
+// Load the model & set it up for training
+async function setupModel() {
+  const model = await tf.loadFrozenModel(MODEL_URL,  WEIGHT_MANIFEST);
   const vars = model.executor.weightMap;
+
+  // TODO: there must be a better way
   const nonTrainables = /(batchnorm)|(reshape)/g;
+
+  // Make weights trainable & extract them
+  const trainable = []
+
   for(const weightName in vars) {
     if(!weightName.match(nonTrainables)) {
-      vars[weightName] = vars[weightName].map(t => t.dtype === 'float32'
-                                                   ? tf.variable(t, true)
-                                                   : t);
+      vars[weightName] = vars[weightName].map(t => {
+        if(t.dtype === 'float32') {
+          const ret = tf.variable(t);
+          trainable.push(ret);
+          return ret;
+        } else {
+          return t;
+        }
+      });
     }
   }
 
- /*
-  doesnt work for frozen model
-  for(const layer of model.layers) {
-    layer.trainable = false;
-  }
+  // TODO: better to not run softmax and use softmaxCrossEntropy?
+  const loss = (input, label) => {
+    const preds = model.predict(input);
+    return tf.losses.logLoss(label, preds);
+    }
 
-  model.getLayer('conv_preds').trainable = true;
-  */
-  //model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+  const optimizer = tf.train.sgd(0.1);
 
-  return model;
+  const varsAndLoss = new FederatedDynamicModel(trainable, loss, optimizer)
+  return { model, varsAndLoss };
 }
 
 async function getTopPred(preds) {
@@ -57,11 +74,11 @@ function preprocess(webcam) {
 async function main() {
   ui.status('loading model...');
 
-  const model = await loadModel();
+  const { model, varsAndLoss } = await setupModel();
 
-  const client = new ClientAPI(model);
+  const client = new ClientAPI(varsAndLoss);
 
-  client.onDownload(msg => ui.modelVersion(msg.modelVersion));
+  client.onDownload(msg => ui.modelVersion(`model version: ${msg.modelVersion}`));
 
   ui.status('trying to connect to federated learning server...');
 
@@ -78,23 +95,21 @@ async function main() {
 
   let isTraining = false;
 
-  ui.overrideButton(evt => {
+  ui.overrideButton(async evt => {
     if(isTraining) return;
     ui.status('ok! training now...');
     isTraining = true;
-    setTimeout(() => {
-      isTraining = false;
-      ui.status('ready!');
-    }, 2000);
   });
 
   ui.status('ready!');
 
+
+  const numLabels = Object.keys(SCAVENGER_HUNT_LABELS).reduce((x, y) => Math.max(x, y)) + 1
   const pickTarget = () => {
     const idx = Math.floor(EMOJIS_LVL_1.length * Math.random());
     const { name, emoji, path } = EMOJIS_LVL_1[idx];
-    const targetIdx = labels.indexOf(name);
-    return { name, emoji, path, targetIdx }
+    const targetIdx = Object.entries(SCAVENGER_HUNT_LABELS).filter(([idx, val]) => val == name)[0][0]
+    return { name, emoji, path, targetIdx: parseInt(targetIdx) }
   }
 
   let lookingFor = pickTarget();
@@ -103,17 +118,18 @@ async function main() {
   while(true) {
     await tf.nextFrame();
     if(isTraining) {
-        const [x, y] = tf.tidy(() => {
+        const [input, label] = tf.tidy(() => {
           const input = preprocess(webcam);
-          const targetIdxT = tf.scalar(lookingFor.targetIdx, 'int32');
-          const labels = tf.oneHot(targetIdxT.expandDims(0));
-          return [input, labels];
+          const label = tf.oneHot([lookingFor.targetIdx], numLabels).toFloat();
+          return [input, label];
         });
 
-        await client.federatedUpdate(x, y);
+        await client.federatedUpdate(input, label);
 
-        x.dispose();
-        y.dispose();
+        input.dispose();
+        label.dispose();
+
+        isTraining = false;
     };
 
     const preds = tf.tidy(() => {

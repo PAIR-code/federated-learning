@@ -16,7 +16,7 @@
 
 whereami=`pwd`
 cd ../../../src/server
-~/bin/yarn publish-local
+yarn publish-local
 cd $whereami
-~/bin/yarn run yalc link federated-learning-client
-~/bin/yarn run node index.js
+yarn run yalc link federated-learning-client
+yarn run ts-node-dev index.ts
