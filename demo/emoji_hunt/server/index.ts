@@ -78,7 +78,7 @@ const mkdir = (dir: string) => !fs.existsSync(dir) && fs.mkdirSync(dir);
 
 const app = express();
 const httpServer = http.createServer(app);
-const sockServer = io(httpServer);
+const sockServer = io(httpServer, {transports: ['websocket']});
 const port = process.env.PORT || 3000;
 
 app.use(fileUpload());

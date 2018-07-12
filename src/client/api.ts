@@ -169,7 +169,7 @@ export class ClientAPI {
   }
 
   private async connectTo(serverURL: string): Promise<DownloadMsg> {
-    this.socket = socketio(serverURL);
+    this.socket = socketio(serverURL, {transports: ['websocket']});
     return fromEvent<DownloadMsg>(
         this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
