@@ -16,16 +16,17 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import {loadFrozenModel} from '@tensorflow/tfjs-converter'
 import {ClientAPI, FederatedDynamicModel} from 'federated-learning-client';
 
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
-import {EMOJIS_LVL_1} from './levels2.js';
+import {EMOJIS_LVL_1} from './levels.js';
 import * as ui from './ui.js';
 
 const MODEL_URL =
     'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/web_model.pb';
 const WEIGHT_MANIFEST =
-    'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json'
+    'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json';
 
 const SERVER_URL = 'http://localhost:3000';
 
@@ -35,9 +36,10 @@ const LEARNING_RATE = 0.1;
 
 // Load the model & set it up for training
 async function setupModel() {
-  const model = await tf.loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
-  const vars = model.executor.weightMap;
-
+  console.log(tf.version);
+  const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
+  const vars = model.weights;
+  console.log(vars);
   // TODO: there must be a better way
   const nonTrainables = /(batchnorm)|(reshape)/g;
 
@@ -159,8 +161,6 @@ async function main() {
     const preds = tf.tidy(() => {
       return model.predict(preprocess(webcam));
     });
-
-    console.log(preds.sum().dataSync())
 
     const {label} = await getTopPred(preds);
 

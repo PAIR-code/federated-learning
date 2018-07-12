@@ -28,6 +28,7 @@ import * as express from 'express';
 import * as fileUpload from 'express-fileupload';
 import * as federatedServer from 'federated-learning-server';
 import {FederatedDynamicModel} from 'federated-learning-server';
+import {loadFrozenModel} from '@tensorflow/tfjs-converter';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
@@ -35,8 +36,8 @@ import * as io from 'socket.io';
 
 // Load the model & set it up for training
 async function setupModel() {
-  const model = await tf.loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
-  const vars = (model as any).executor.weightMap as {[wn: string]: tf.Tensor[]};
+  const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
+  const vars = model.weights;
 
   // TODO: there must be a better way
   const nonTrainables = /(batchnorm)|(reshape)/g;

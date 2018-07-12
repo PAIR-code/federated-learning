@@ -45,39 +45,39 @@
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
 
-"@tensorflow/tfjs-converter@0.4.3":
-  version "0.4.3"
-  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-converter/-/tfjs-converter-0.4.3.tgz#c77414a4cc3563a221c9ae2644fb132c68a1cc05"
+"@tensorflow/tfjs-converter@0.5.1":
+  version "0.5.1"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-converter/-/tfjs-converter-0.5.1.tgz#8cf093b39bb56022eaa2a7930166d12b40965e62"
   dependencies:
     "@types/long" "~3.0.32"
     protobufjs "~6.8.6"
-    url "^0.11.0"
+    url "~0.11.0"
 
-"@tensorflow/tfjs-core@0.11.9":
-  version "0.11.9"
-  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-core/-/tfjs-core-0.11.9.tgz#b684255359941162c64b397d515c310bd1027fe8"
+"@tensorflow/tfjs-core@0.12.4":
+  version "0.12.4"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-core/-/tfjs-core-0.12.4.tgz#39e6239617856fce82b41936f711f78190aa71bd"
   dependencies:
     seedrandom "~2.4.3"
 
-"@tensorflow/tfjs-layers@0.6.7":
-  version "0.6.7"
-  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-layers/-/tfjs-layers-0.6.7.tgz#aa4f994c4104a8cf3f93b5e13ab051685c092c80"
+"@tensorflow/tfjs-layers@0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-layers/-/tfjs-layers-0.7.0.tgz#6bee18a220ece102a56be785cd1c67028f968a63"
 
-"@tensorflow/tfjs@0.11.7":
-  version "0.11.7"
-  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs/-/tfjs-0.11.7.tgz#5b5fe7b17bca2d2088fdd01aea0660517364b752"
+"@tensorflow/tfjs@^0.12.0":
+  version "0.12.2"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs/-/tfjs-0.12.2.tgz#fb48543f7afca7f3ee2d449d62e6145f42438ea3"
   dependencies:
-    "@tensorflow/tfjs-converter" "0.4.3"
-    "@tensorflow/tfjs-core" "0.11.9"
-    "@tensorflow/tfjs-layers" "0.6.7"
+    "@tensorflow/tfjs-converter" "0.5.1"
+    "@tensorflow/tfjs-core" "0.12.4"
+    "@tensorflow/tfjs-layers" "0.7.0"
 
 "@types/long@^3.0.32", "@types/long@~3.0.32":
   version "3.0.32"
   resolved "https://registry.yarnpkg.com/@types/long/-/long-3.0.32.tgz#f4e5af31e9e9b196d8e5fca8a5e2e20aa3d60b69"
 
 "@types/node@^8.9.4":
-  version "8.10.20"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.10.20.tgz#fe674ea52e13950ab10954433a7824438aabbcac"
+  version "8.10.21"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.10.21.tgz#12b3f2359b27aa05a45d886c8ba1eb8d1a77e285"
 
 "@types/socket.io-client@^1.4.32":
   version "1.4.32"
@@ -395,8 +395,8 @@ fstream@^1.0.0:
     rimraf "2"
 
 get-caller-file@^1.0.1:
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/get-caller-file/-/get-caller-file-1.0.2.tgz#f702e63127e7e231c160a80c1554acb70d5047e5"
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/get-caller-file/-/get-caller-file-1.0.3.tgz#f978fa4c90d1dfe7ff2d6beda2a515e713bdcf4a"
 
 glob@^7.0.0, glob@^7.0.3, glob@^7.0.5, glob@^7.1.1:
   version "7.1.2"
@@ -445,8 +445,8 @@ has-flag@^3.0.0:
   resolved "https://registry.yarnpkg.com/has-flag/-/has-flag-3.0.0.tgz#b5d454dc2199ae225699f3467e5a07f3b955bafd"
 
 hosted-git-info@^2.1.4:
-  version "2.6.1"
-  resolved "https://registry.yarnpkg.com/hosted-git-info/-/hosted-git-info-2.6.1.tgz#6e4cee78b01bb849dcf93527708c69fdbee410df"
+  version "2.7.1"
+  resolved "https://registry.yarnpkg.com/hosted-git-info/-/hosted-git-info-2.7.1.tgz#97f236977bd6e125408930ff6de3eec6281ec047"
 
 ignore@^3.2.7:
   version "3.3.10"
@@ -921,8 +921,8 @@ tslint@~5.10.0:
     tsutils "^2.12.1"
 
 tsutils@^2.12.1:
-  version "2.27.1"
-  resolved "https://registry.yarnpkg.com/tsutils/-/tsutils-2.27.1.tgz#ab0276ac23664f36ce8fd4414daec4aebf4373ee"
+  version "2.27.2"
+  resolved "https://registry.yarnpkg.com/tsutils/-/tsutils-2.27.2.tgz#60ba88a23d6f785ec4b89c6e8179cac9b431f1c7"
   dependencies:
     tslib "^1.8.1"
 
@@ -938,7 +938,7 @@ universalify@^0.1.0:
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/universalify/-/universalify-0.1.2.tgz#b646f69be3942dabcecc9d6639c80dc105efaa66"
 
-url@^0.11.0:
+url@~0.11.0:
   version "0.11.0"
   resolved "https://registry.yarnpkg.com/url/-/url-0.11.0.tgz#3838e97cfc60521eb73c525a8e55bfdd9e2e28f1"
   dependencies:
