@@ -15,62 +15,23 @@
  * =============================================================================
  */
 
+// tslint:disable:max-line-length
+const MODEL_URL =
+    'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/web_model.pb';
+const WEIGHT_MANIFEST =
+    'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json';
+
 import '@tensorflow/tfjs-node';
 
 import * as tf from '@tensorflow/tfjs';
 import * as express from 'express';
 import * as fileUpload from 'express-fileupload';
 import * as federatedServer from 'federated-learning-server';
-import {FederatedModel} from 'federated-learning-server';
+import {FederatedDynamicModel} from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
 import * as io from 'socket.io';
-
-/**
- * Implementation of `FederatedModel` designed to wrap a loss function and
- * variables it operates over.
- */
-export class FederatedDynamicModel implements FederatedModel {
-  vars: tf.Variable[];
-  loss: (xs: tf.Tensor, ys: tf.Tensor) => tf.Scalar;
-  optimizer: tf.Optimizer;
-  /**
-   * Construct a new `FederatedDynamicModel` wrapping loss function and
-   * variables it operates over.
-   *
-   * @param vars Variables to upload/download from the server.
-   * @param loss Loss function to pass to the optimizer.
-   * @param learningRate Options ( {learningRate} ) for the optimizer
-   */
-  constructor(
-      vars: tf.Variable[], loss: (xs: tf.Tensor, ys: tf.Tensor) => tf.Scalar,
-      optimzer: tf.Optimizer) {
-    this.vars = vars;
-    this.optimizer = optimzer;
-    this.loss = loss;
-  }
-
-  async fit(x: tf.Tensor, y: tf.Tensor): Promise<void> {
-    this.optimizer.minimize(() => this.loss(x, y));
-  }
-
-  getVars(): tf.Variable[] {
-    return this.vars.slice();
-  }
-
-  setVars(vals: tf.Tensor[]): void {
-    for (let i = 0; i < vals.length; i++) {
-      this.vars[i].assign(vals[i]);
-    }
-  }
-}
-
-// tslint:disable:max-line-length
-const MODEL_URL =
-    'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/web_model.pb';
-const WEIGHT_MANIFEST =
-    'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json'
 
 // Load the model & set it up for training
 async function setupModel() {
@@ -128,21 +89,6 @@ app.use((req, res, next) => {
 
 app.post('/data', (req, res) => {
   res.status(400).send('file upload TODO');
-  /*
-  if (!req.files) {
-    res.status(400).send('Must upload a file');
-  } else {
-    res.send('File uploaded!');
-  }
-
-  const file = req.files.file;
-  const fileParts = file.name.split('.');
-  const labelName = fileParts[0];
-  const extension = fileParts[1];
-  const labelDir = path.join(fileDir, labelName);
-  const filename = path.join(labelDir, `${uuid()}.${extension}`);
-  file.mv(filename);
-  */
 });
 
 setupModel().then(({varsAndLoss}) => {

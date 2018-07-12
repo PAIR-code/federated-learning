@@ -1,5 +1,5 @@
 {
-  "name": "mobilenet-example-server",
+  "name": "emoji-hunt-federated-learning-server",
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",

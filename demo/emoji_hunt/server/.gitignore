@@ -1,6 +1,6 @@
 .cache
 .yalc
-.dist
+dist
 node_modules
 yarn-error.log
 data

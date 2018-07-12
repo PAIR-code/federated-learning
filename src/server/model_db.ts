@@ -111,9 +111,7 @@ export class ModelDB {
     if (numUpdates < this.minUpdates || this.updating) {
       return false;
     }
-    // this.updating = true;
     await this.update();
-    // this.updating = false;
     return true;
   }
 
@@ -135,7 +133,7 @@ export class ModelDB {
         const nk = tf.scalar(u.numExamples);
         const frac = nk.div(n);
         u.vars.forEach((v: TensorJson, i: number) => {
-          const update = tf.mul(frac, jsonToTensor(v));
+          const update = jsonToTensor(v).mul(frac);
           const oldVar = updatedVars[i];
           updatedVars[i] = oldVar.add(update);
           oldVar.dispose();
@@ -149,8 +147,7 @@ export class ModelDB {
     // Save results and update key
     await this.writeNewVars(updatedVars);
 
-    updatedVars.map(v => v.dispose());
-    currentVars.map(v => v.dispose());
+    tf.dispose([updatedVars, currentVars]);
   }
 
   async writeNewVars(newVars: tf.Tensor[]) {
