@@ -212,7 +212,8 @@ export class FederatedDynamicModel implements FederatedModel {
       public optimizer: Optimizer) {}
 
   async fit(x: Tensor, y: Tensor): Promise<void> {
-    this.optimizer.minimize(() => this.loss(x, y)).dispose();
+    const lossVal = this.optimizer.minimize(() => this.loss(x, y));
+    if (lossVal) lossVal.dispose();
   }
 
   getVars(): Variable[] {
