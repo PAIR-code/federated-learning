@@ -36,10 +36,10 @@ const LEARNING_RATE = 0.1;
 
 // Load the model & set it up for training
 async function setupModel() {
-  console.log(tf.version);
+
   const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
   const vars = model.weights;
-  console.log(vars);
+
   // TODO: there must be a better way
   const nonTrainables = /(batchnorm)|(reshape)/g;
 
@@ -62,9 +62,9 @@ async function setupModel() {
 
   // TODO: better to not run softmax and use softmaxCrossEntropy?
   const loss = (input, label) => {
-        const preds = model.predict(input);
-        return tf.losses.logLoss(label, preds);
-      };
+    const preds = model.predict(input);
+    return tf.losses.logLoss(label, preds);
+  };
 
   const optimizer = tf.train.sgd(LEARNING_RATE);
 
@@ -126,9 +126,9 @@ async function main() {
 
   ui.status('ready!');
 
-
   const numLabels =
-      Object.keys(SCAVENGER_HUNT_LABELS).reduce((x, y) => Math.max(x, y)) + 1
+      Object.keys(SCAVENGER_HUNT_LABELS).reduce((x, y) => Math.max(x, y)) + 1;
+
   const pickTarget = () => {
     const idx = Math.floor(EMOJIS_LVL_1.length * Math.random());
     const {name, emoji, path} = EMOJIS_LVL_1[idx];
@@ -140,10 +140,12 @@ async function main() {
 
 
   let lookingFor = pickTarget();
+
   ui.findMe(`find me a ${lookingFor.name}, ${lookingFor.emoji}`);
 
   while (true) {
     await tf.nextFrame();
+
     if (isTraining) {
       const [input, label] = tf.tidy(() => {
         const input = preprocess(webcam);
