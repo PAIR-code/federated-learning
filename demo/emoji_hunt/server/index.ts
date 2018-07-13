@@ -30,7 +30,7 @@ import * as federatedServer from 'federated-learning-server';
 import {FederatedDynamicModel} from 'federated-learning-server';
 import {loadFrozenModel} from '@tensorflow/tfjs-converter';
 import * as fs from 'fs';
-import * as http from 'http';
+// import * as http from 'http';
 import * as path from 'path';
 import * as io from 'socket.io';
 
@@ -77,9 +77,9 @@ const fileDir = path.join(dataDir, 'files');
 const mkdir = (dir: string) => !fs.existsSync(dir) && fs.mkdirSync(dir);
 
 const app = express();
-const httpServer = http.createServer(app);
-const sockServer = io(httpServer, {transports: ['websocket']});
-const port = process.env.PORT || 3000;
+// const httpServer = http.createServer(app);
+const sockServer = io({secure: true});
+const port = 3000;
 
 app.use(fileUpload());
 
@@ -95,9 +95,6 @@ app.post('/data', (req, res) => {
 setupModel().then(({varsAndLoss}) => {
   federatedServer.setup(sockServer, varsAndLoss, dataDir, 1).then(() => {
     mkdir(fileDir);
-
-    httpServer.listen(port, () => {
-      console.log(`listening on ${port}`);
-    });
+    sockServer.listen(port);
   });
 });

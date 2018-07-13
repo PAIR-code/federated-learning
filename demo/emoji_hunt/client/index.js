@@ -28,7 +28,10 @@ const MODEL_URL =
 const WEIGHT_MANIFEST =
     'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json';
 
-const SERVER_URL = 'http://localhost:3000';
+// const SERVER_URL = `//${location.hostname}:3000`;
+const SERVER_URL = `35.237.250.105:3000`;
+
+console.log('server url:', SERVER_URL)
 
 const MODEL_INPUT_WIDTH = 224;
 
@@ -116,7 +119,7 @@ async function main() {
 
   let isTraining = false;
 
-  ui.overrideButton(async evt => {
+  ui.overrideButton(evt => {
     if (isTraining) {
       return
     };
@@ -137,7 +140,6 @@ async function main() {
                                                        val]) => val == name)[0];
     return {name, emoji, path, targetIdx: parseInt(targetIdx)};
   };
-
 
   let lookingFor = pickTarget();
 

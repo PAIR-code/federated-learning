@@ -47,7 +47,6 @@ export async function webcam() {
     throw exn;
   }
 
-
   return video;
 }
 

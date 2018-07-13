@@ -39,6 +39,7 @@ export class ServerAPI {
 
   async setup() {
     this.io.on('connection', async (socket: Socket) => {
+      console.log('connection');
       socket.on('disconnect', () => {
         this.numClients--;
         if (this.exitOnClientExit && this.numClients <= 0) {
