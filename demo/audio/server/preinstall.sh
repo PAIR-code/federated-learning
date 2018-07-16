@@ -18,4 +18,4 @@ whereami=`pwd`
 cd ../../../src/server
 yarn publish-local
 cd $whereami
-yalc link federated-learning-server
+yarn add yalc --dev && yalc link federated-learning-server
