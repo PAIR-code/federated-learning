@@ -15,10 +15,11 @@
   "[typescript]": {
     "editor.formatOnSave": true
   },
+  "editor.rulers": [80],
   "clang-format.style": "Google",
   "files.insertFinalNewline": true,
   "editor.detectIndentation": false,
   "editor.wrappingIndent": "none",
-  "typescript.tsdk": "src/server/node_modules/typescript/lib",
-  "clang-format.executable": "${workspaceRoot}/src/server/node_modules/.bin/clang-format"
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "clang-format.executable": "node_modules/.bin/clang-format"
 }

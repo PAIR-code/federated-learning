@@ -1760,8 +1760,8 @@ fast-levenshtein@~2.0.4:
   version "2.0.6"
   resolved "https://registry.yarnpkg.com/fast-levenshtein/-/fast-levenshtein-2.0.6.tgz#3d8a5c66883a16a30ca8643e851f19baa7797917"
 
-"federated-learning-client@file:../../../src/client":
-  version "0.0.1"
+"federated-learning-client@file:.yalc/federated-learning-client":
+  version "0.0.1-e3001de3"
   dependencies:
     "@tensorflow/tfjs" "0.11.7"
     "@types/socket.io-client" "^1.4.32"
