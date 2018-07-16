@@ -27,8 +27,9 @@ import {federated, FederatedModel} from './common';
 import {ModelDB} from './model_db';
 
 export async function setup(
-    io: Server, model: FederatedModel|Model, dataDir: string) {
-  const modelDB = new ModelDB(dataDir);
+    io: Server, model: FederatedModel|Model, dataDir: string,
+    minUpdates?: number) {
+  const modelDB = new ModelDB(dataDir, minUpdates);
   await modelDB.setup(federated(model));
 
   const api = new ServerAPI(modelDB, io);

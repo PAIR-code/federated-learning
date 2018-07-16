@@ -16,9 +16,10 @@
  */
 
 import {Server, Socket} from 'socket.io';
-import {ModelDB} from './model_db';
+
 // tslint:disable-next-line:max-line-length
-import {serializedToJson, serializeVar, DataMsg, DownloadMsg, Events, UploadMsg} from './common';
+import {DataMsg, DownloadMsg, Events, serializedToJson, serializeVar, UploadMsg} from './common';
+import {ModelDB} from './model_db';
 
 export class ServerAPI {
   modelDB: ModelDB;
@@ -38,6 +39,7 @@ export class ServerAPI {
 
   async setup() {
     this.io.on('connection', async (socket: Socket) => {
+      console.log('connection');
       socket.on('disconnect', () => {
         this.numClients--;
         if (this.exitOnClientExit && this.numClients <= 0) {
@@ -78,6 +80,7 @@ export class ServerAPI {
         // Potentially update the model (asynchronously)
         if (msg.modelVersion === this.modelDB.modelVersion) {
           const updated = await this.modelDB.possiblyUpdate();
+
           if (updated) {
             // Send new variables to all clients if we updated
             const newVars = await this.downloadMsg();
