@@ -47,7 +47,7 @@ app.use((req, res, next) => {
 });
 
 app.post('/data', (req, res) => {
-  if (!req.files) {
+  if (req.files == null) {
     return res.status(400).send('Must upload a file');
   }
 

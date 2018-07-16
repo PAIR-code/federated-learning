@@ -45,8 +45,9 @@ export function uploadAllowed() {
 
 export async function webcam() {
   const video = sel`#webcamvideo`;
-  if(webcamSetup) return video;
-
+  if(webcamSetup) {
+    return video;
+  }
   try {
     const stream =
       await navigator.mediaDevices.getUserMedia({audio: false, video: true});

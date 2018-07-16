@@ -25,6 +25,8 @@ const MODEL_URL =
 const WEIGHT_MANIFEST =
     'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json';
 
+const LEARNING_RATE = 0.01;
+
 // Load the model & set it up for training
 export async function setupModel() {
   const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
@@ -56,7 +58,7 @@ export async function setupModel() {
     return tf.losses.logLoss(label, preds) as tf.Scalar;
   };
 
-  const optimizer = tf.train.sgd(0.1);
+  const optimizer = tf.train.sgd(LEARNING_RATE);
 
   const varsAndLoss = new FederatedDynamicModel(trainable, loss, optimizer);
 

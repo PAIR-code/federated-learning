@@ -40,7 +40,6 @@ const LEARNING_RATE = 0.1;
 
 // Load the model & set it up for training
 async function setupModel() {
-
   const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
   const vars = model.weights;
 
@@ -159,11 +158,12 @@ async function main() {
       try {
         await client.federatedUpdate(input, label);
 
-        if(ui.uploadAllowed()) {
-          upload(UPLOAD_URL, lookingFor.targetIdx, webcam).catch(err => ui.status(err));
+        if (ui.uploadAllowed()) {
+          upload(UPLOAD_URL, lookingFor.targetIdx, webcam)
+              .catch(err => ui.status(err));
         }
 
-      } catch(err) {
+      } catch (err) {
         ui.status(err);
       }
 
