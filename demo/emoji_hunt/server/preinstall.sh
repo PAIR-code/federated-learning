@@ -15,7 +15,7 @@
 # =============================================================================
 
 whereami=`pwd`
-cd ../../../src/client
+cd ../../../src/server
 yarn publish-local
 cd $whereami
-yarn run cross-env NODE_ENV=development parcel index.html --no-hmr --open
+yalc link federated-learning-server

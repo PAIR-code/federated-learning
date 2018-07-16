@@ -15,8 +15,7 @@
 # =============================================================================
 
 whereami=`pwd`
-cd ../../../src/server
+cd ../../../src/client
 yarn publish-local
 cd $whereami
-yarn run yalc link federated-learning-server
-yarn run ts-node-dev index.ts --max_old_space_size 4096
+yalc link federated-learning-client

@@ -15,7 +15,7 @@
 # =============================================================================
 
 whereami=`pwd`
-cd ../../../src/server
+cd ../../../src/client
 yarn publish-local
 cd $whereami
-yarn run ts-node server.ts
+yalc link federated-learning-client

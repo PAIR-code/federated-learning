@@ -12,12 +12,12 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "publish-local": "rm -rf dist/ && yarn && yarn build && yalc push",
+    "publish-local": "rm -rf dist/ && yarn && yarn build && yalc publish",
     "build": "tsc",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "^0.12.0",
+    "@tensorflow/tfjs": "~0.12",
     "@types/socket.io-client": "^1.4.32",
     "socket.io-client": "^2.1.1"
   },

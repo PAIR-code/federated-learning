@@ -12,13 +12,13 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "publish-local": "rm -rf dist/ && yarn && yarn build && yalc push",
+    "publish-local": "rm -rf dist/ && yarn && yarn build && yalc publish",
     "build": "tsc",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "0.11.7",
-    "@tensorflow/tfjs-node": "^0.1.7",
+    "@tensorflow/tfjs": "~0.12",
+    "@tensorflow/tfjs-node": "^0.1.9",
     "@types/express": "^4.16.0",
     "@types/express-fileupload": "^0.1.1",
     "@types/node-fetch": "^2.1.1",
@@ -32,7 +32,6 @@
     "socket.io": "^2.1.1"
   },
   "devDependencies": {
-    "@tensorflow/tfjs": "0.11.7",
     "@types/jasmine": "^2.8.8",
     "@types/node": "~9.6.0",
     "@types/rimraf": "^2.0.2",
@@ -44,12 +43,5 @@
     "tslint": "~5.8.0",
     "typescript": "2.9.2",
     "yalc": "^1.0.0-pre.22"
-  },
-  "peerDependencies": {
-    "@tensorflow/tfjs": "0.11.7"
-  },
-  "optionalPeerDependencies": {
-    "@tensorflow/tfjs-node": "^0.1.7",
-    "@tensorflow/tfjs-node-gpu": "^0.1.7"
   }
 }
