@@ -9,8 +9,8 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "preinstall": "./preinstall.sh",
-    "dev": "yarn preinstall && ts-node server.ts",
+    "postinstall": "./postinstall.sh",
+    "dev": "yarn postinstall && ts-node server.ts",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
@@ -18,7 +18,7 @@
     "@tensorflow/tfjs-node": "^0.1.9",
     "express": "^4.16.3",
     "express-fileupload": "^0.4.0",
-    "federated-learning-server": "file:.yalc/federated-learning-server",
+    "federated-learning-server": "link:../../../src/server",
     "socket.io": "^2.1.1",
     "uuid": "^3.3.2"
   },

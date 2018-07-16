@@ -728,22 +728,9 @@ fast-future@~1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/fast-future/-/fast-future-1.0.2.tgz#8435a9aaa02d79248d17d704e76259301d99280a"
 
-"federated-learning-server@file:.yalc/federated-learning-server":
-  version "0.0.1-4c9f72b7"
-  dependencies:
-    "@tensorflow/tfjs" "~0.12"
-    "@tensorflow/tfjs-node" "^0.1.9"
-    "@types/express" "^4.16.0"
-    "@types/express-fileupload" "^0.1.1"
-    "@types/node-fetch" "^2.1.1"
-    "@types/socket.io" "^1.4.34"
-    "@types/uuid" "^3.4.3"
-    encoding-down "^5.0.3"
-    express "^4.16.3"
-    leveldown "^4.0.1"
-    levelup "^3.0.1"
-    node-fetch "^2.1.2"
-    socket.io "^2.1.1"
+"federated-learning-server@link:../../../src/server":
+  version "0.0.0"
+  uid ""
 
 filewatcher@~3.0.0:
   version "3.0.1"

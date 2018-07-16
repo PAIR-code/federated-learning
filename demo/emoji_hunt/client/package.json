@@ -6,11 +6,11 @@
   "dependencies": {
     "@tensorflow/tfjs": "~0.12",
     "@tensorflow/tfjs-converter": "^0.5.2",
-    "federated-learning-client": "file:.yalc/federated-learning-client"
+    "federated-learning-client": "link:../../../src/client"
   },
   "scripts": {
-    "preinstall": "./preinstall.sh",
-    "watch": "yarn preinstall && parcel index.html --no-hmr --hmr-hostname 0.0.0.0"
+    "postinstall": "./postinstall.sh",
+    "watch": "yarn postinstall && parcel index.html --no-hmr --hmr-hostname 0.0.0.0"
   },
   "devDependencies": {
     "babel-plugin-transform-runtime": "^6.23.0",
