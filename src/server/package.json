@@ -32,6 +32,7 @@
     "socket.io": "^2.1.1"
   },
   "devDependencies": {
+    "@tensorflow/tfjs": "0.11.7",
     "@types/jasmine": "^2.8.8",
     "@types/node": "~9.6.0",
     "@types/rimraf": "^2.0.2",
@@ -43,5 +44,12 @@
     "tslint": "~5.8.0",
     "typescript": "2.9.2",
     "yalc": "^1.0.0-pre.22"
+  },
+  "peerDependencies": {
+    "@tensorflow/tfjs": "0.11.7"
+  },
+  "optionalPeerDependencies": {
+    "@tensorflow/tfjs-node": "^0.1.7",
+    "@tensorflow/tfjs-node-gpu": "^0.1.7"
   }
 }

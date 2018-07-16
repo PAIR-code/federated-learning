@@ -1,0 +1,6 @@
+.cache
+.yalc
+dist
+node_modules
+yarn-error.log
+data
