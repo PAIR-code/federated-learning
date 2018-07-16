@@ -21,6 +21,7 @@ import {ClientAPI, FederatedDynamicModel} from 'federated-learning-client';
 
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
 import {EMOJIS_LVL_1} from './levels.js';
+import {upload} from './training_data_upload.js';
 import * as ui from './ui.js';
 
 const MODEL_URL =
@@ -28,8 +29,8 @@ const MODEL_URL =
 const WEIGHT_MANIFEST =
     'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json';
 
-// const SERVER_URL = `//${location.hostname}:3000`;
-const SERVER_URL = `35.237.250.105:3000`;
+const SERVER_URL = `//${location.hostname}:3000`;
+const UPLOAD_URL = `//${location.hostname}:3000/data`;
 
 console.log('server url:', SERVER_URL)
 
@@ -155,7 +156,16 @@ async function main() {
         return [input, label];
       });
 
-      await client.federatedUpdate(input, label);
+      try {
+        await client.federatedUpdate(input, label);
+
+        if(ui.uploadAllowed()) {
+          upload(UPLOAD_URL, lookingFor.targetIdx, webcam).catch(err => ui.status(err));
+        }
+
+      } catch(err) {
+        ui.status(err);
+      }
 
       tf.dispose([input, label]);
 
