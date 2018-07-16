@@ -1,11 +1,10 @@
-node_modules/
+**/node_modules/
 scripts/**/*.js
 coverage/
 npm-debug.log
 yarn-error.log
 .DS_Store
-dist/
-dist-es6/
+**/dist/
 .idea/
 *.tgz
 **/*.pyc

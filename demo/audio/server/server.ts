@@ -23,7 +23,6 @@ import * as http from 'http';
 import * as path from 'path';
 import * as io from 'socket.io';
 import * as uuid from 'uuid/v4';
-
 import {labelNames, loadAudioTransferLearningModel} from './model';
 
 const dataDir = path.resolve(__dirname + '/data');
