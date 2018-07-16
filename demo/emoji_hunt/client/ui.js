@@ -23,6 +23,9 @@ const modelVersionElt = sel`#modelversion`
 const statusElt = sel`#status`
 const findMeElt = sel`#findme`
 const overrideButtonElt = sel`#override`
+const uploadAllowedElt = sel`#uploaddata`
+
+let webcamSetup = false;
 
 export function modelVersion(str) {
   modelVersionElt.innerText = str;
@@ -36,12 +39,20 @@ export function findMe(str) {
   findMeElt.innerText = str;
 }
 
+export function uploadAllowed() {
+  return uploadAllowedElt.checked;
+}
+
 export async function webcam() {
   const video = sel`#webcamvideo`;
+  if(webcamSetup) {
+    return video;
+  }
   try {
     const stream =
       await navigator.mediaDevices.getUserMedia({audio: false, video: true});
     video.srcObject = stream;
+    webcamSetup = true;
   } catch (exn) {
     status(`Error in accessing webcam: ${exn.toString()}`);
     throw exn;
