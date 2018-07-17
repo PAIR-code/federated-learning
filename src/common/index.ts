@@ -213,7 +213,9 @@ export class FederatedDynamicModel implements FederatedModel {
 
   async fit(x: Tensor, y: Tensor): Promise<void> {
     const lossVal = this.optimizer.minimize(() => this.loss(x, y));
-    if (lossVal) lossVal.dispose();
+    if (lossVal) {
+      lossVal.dispose();
+    }
   }
 
   getVars(): Variable[] {
@@ -255,5 +257,21 @@ export type DataMsg = {
 
 export type DownloadMsg = {
   modelVersion: string,
-  vars: SerializedVariable[]
+  vars: SerializedVariable[],
+  hyperparams: HyperParamsMsg
 };
+
+export type HyperParamsMsg = object;
+
+let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;
+
+export function verbose(enabled: boolean) {
+  LOGGING_ENABLED = enabled;
+}
+
+// tslint:disable-next-line:no-any
+export function log(...args: any[]) {
+  if (LOGGING_ENABLED) {
+    console.error(...args);
+  }
+}

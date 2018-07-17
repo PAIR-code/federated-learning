@@ -26,6 +26,8 @@ import * as path from 'path';
 import * as io from 'socket.io';
 import {setupModel} from './model';
 
+federatedServer.verbose(true);
+
 const dataDir = path.resolve(__dirname + '/modelData');
 const fileDir = path.resolve(__dirname + '/trainingData');
 
@@ -59,7 +61,8 @@ app.post('/data', (req, res) => {
 });
 
 setupModel().then(({varsAndLoss}) => {
-  federatedServer.setup(sockServer, varsAndLoss, dataDir, 1).then(() => {
+  federatedServer.setup(sockServer, varsAndLoss, dataDir, 1).then((server) => {
+    server.setHyperparams({'learningRate': 3e-4});
     mkdir(fileDir);
     httpServer.listen(port, () => console.log(`listening on ${port}`));
   });

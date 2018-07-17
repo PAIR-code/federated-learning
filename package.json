@@ -1,6 +1,0 @@
-{
-  "devDependencies": {
-    "clang-format": "^1.2.3",
-    "typescript": "^2.9.2"
-  }
-}

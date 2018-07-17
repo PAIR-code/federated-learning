@@ -17,7 +17,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import {loadFrozenModel} from '@tensorflow/tfjs-converter'
-import {ClientAPI, FederatedDynamicModel} from 'federated-learning-client';
+import {ClientAPI, FederatedDynamicModel, verbose} from 'federated-learning-client';
 
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
 import {EMOJIS_LVL_1} from './levels.js';
@@ -33,6 +33,8 @@ const SERVER_URL = `//${location.hostname}:3000`;
 const UPLOAD_URL = `//${location.hostname}:3000/data`;
 
 console.log('server url:', SERVER_URL)
+
+verbose(true);
 
 const MODEL_INPUT_WIDTH = 224;
 
@@ -72,7 +74,7 @@ async function setupModel() {
   const optimizer = tf.train.sgd(LEARNING_RATE);
 
   const varsAndLoss = new FederatedDynamicModel(trainable, loss, optimizer)
-  return {model, varsAndLoss};
+  return {model, varsAndLoss, optimizer};
 }
 
 async function getTopPred(preds) {
@@ -96,7 +98,7 @@ function preprocess(webcam) {
 async function main() {
   ui.status('loading model...');
 
-  const {model, varsAndLoss} = await setupModel();
+  const {model, varsAndLoss, optimizer} = await setupModel();
 
   const client = new ClientAPI(varsAndLoss);
 
@@ -107,6 +109,10 @@ async function main() {
   ui.status('trying to connect to federated learning server...');
 
   await client.connect(SERVER_URL);
+
+  const hyperparams = client.hyperparams();
+
+  optimizer.setLearningRate(hyperparams['learningRate']);
 
   ui.status('trying to get access to webcam...');
 

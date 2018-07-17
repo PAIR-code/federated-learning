@@ -8,7 +8,7 @@
     "@tensorflow/tfjs-converter": "^0.5.2",
     "@tensorflow/tfjs-node": "^0.1.9",
     "express-fileupload": "^0.4.0",
-    "federated-learning-server": "link:../../../src/server",
+    "federated-learning-server": "file:../../../src/server",
     "socket.io": "^2.1.1"
   },
   "scripts": {
