@@ -34,4 +34,5 @@ export async function setup(
 
   const api = new ServerAPI(modelDB, io);
   await api.setup();
+  return api;
 }

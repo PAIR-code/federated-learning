@@ -74,7 +74,7 @@ async function setupModel() {
   const optimizer = tf.train.sgd(LEARNING_RATE);
 
   const varsAndLoss = new FederatedDynamicModel(trainable, loss, optimizer)
-  return {model, varsAndLoss};
+  return {model, varsAndLoss, optimizer};
 }
 
 async function getTopPred(preds) {
@@ -98,7 +98,7 @@ function preprocess(webcam) {
 async function main() {
   ui.status('loading model...');
 
-  const {model, varsAndLoss} = await setupModel();
+  const {model, varsAndLoss, optimizer} = await setupModel();
 
   const client = new ClientAPI(varsAndLoss);
 
@@ -109,6 +109,10 @@ async function main() {
   ui.status('trying to connect to federated learning server...');
 
   await client.connect(SERVER_URL);
+
+  const hyperparams = await client.hyperparams();
+
+  optimizer.setLearningRate(hyperparams['learningRate']);
 
   ui.status('trying to get access to webcam...');
 

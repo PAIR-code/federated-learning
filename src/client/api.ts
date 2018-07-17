@@ -20,7 +20,7 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, log, SerializedVariable, serializeVar, serializeVars, federated} from './common';
+import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, log, SerializedVariable, serializeVar, serializeVars, federated, HyperParamsMsg} from './common';
 import {Model} from '@tensorflow/tfjs';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
@@ -48,6 +48,7 @@ export class ClientAPI {
   private model: FederatedModel;
   private socket: SocketIOClient.Socket;
   private downloadCallbacks: DownloadCallback[];
+  private broadcastHyperparams: HyperParamsMsg;
 
   /**
    * Construct a client API for federated learning that will push and pull
@@ -91,6 +92,11 @@ export class ClientAPI {
       this.setVars(msg.vars);
       this.downloadCallbacks.forEach(cb => cb(msg));
       log('download', 'modelVersion:', msg.modelVersion);
+    });
+
+    this.socket.on(Events.HyperParams, (msg: HyperParamsMsg) => {
+      this.broadcastHyperparams = msg;
+      log('hyperParams', 'hyperParams:', msg);
     });
   }
 
@@ -147,6 +153,18 @@ export class ClientAPI {
     // upload the updates to the server
     await this.uploadVars(
         {modelVersion, numExamples: xs.shape[0], vars: newVars});
+  }
+
+  public async hyperparams(): Promise<object> {
+    if (this.broadcastHyperparams !== undefined) {
+      return this.broadcastHyperparams;
+    }
+    return new Promise((res, rej) => {
+      this.socket.emit(Events.HyperParams, (reply: HyperParamsMsg) => {
+        this.broadcastHyperparams = reply;
+        res(reply);
+      });
+    });
   }
 
   /**

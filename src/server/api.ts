@@ -26,9 +26,16 @@ export class ServerAPI {
   io: Server;
   numClients = 0;
 
-  constructor(modelDB: ModelDB, io: Server, private exitOnClientExit = false) {
+  constructor(
+      modelDB: ModelDB, io: Server, private hyperParams: object = null,
+      private exitOnClientExit = false) {
     this.modelDB = modelDB;
     this.io = io;
+  }
+
+  setHyperparams(hyperParams: object) {
+    this.hyperParams = hyperParams;
+    this.io.emit(Events.HyperParams, hyperParams);
   }
 
   async downloadMsg(): Promise<DownloadMsg> {
@@ -54,7 +61,9 @@ export class ServerAPI {
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();
       socket.emit(Events.Download, initVars);
-
+      if (this.hyperParams) {
+        socket.emit(Events.HyperParams, this.hyperParams);
+      }
       socket.on(Events.Data, async (msg: DataMsg, ack) => {
         ack(true);
         const x = await serializedToJson(msg.x);
@@ -95,6 +104,10 @@ export class ServerAPI {
             log('newModel', newVars.modelVersion);
           }
         }
+      });
+
+      socket.on(Events.HyperParams, (ack) => {
+        ack(this.hyperParams);
       });
     });
   }
