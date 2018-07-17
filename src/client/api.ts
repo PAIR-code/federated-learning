@@ -56,7 +56,10 @@ export class ClientAPI {
    */
   constructor(model: FederatedModel|Model) {
     this.model = federated(model);
-    this.downloadCallbacks = [];
+    this.downloadCallbacks = [msg => {
+      log('download', 'modelVersion:', msg.modelVersion);
+      log('hyperparams', 'hyperparams:', msg.hyperparams);
+    }];
   }
 
   /**
@@ -90,8 +93,6 @@ export class ClientAPI {
       this.msg = msg;
       this.setVars(msg.vars);
       this.downloadCallbacks.forEach(cb => cb(msg));
-      log('download', 'modelVersion:', msg.modelVersion);
-      log('hyperparams', 'hyperparams:', msg.hyperparams);
     });
   }
 
