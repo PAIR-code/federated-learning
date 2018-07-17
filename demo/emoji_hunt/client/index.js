@@ -17,7 +17,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import {loadFrozenModel} from '@tensorflow/tfjs-converter'
-import {ClientAPI, FederatedDynamicModel} from 'federated-learning-client';
+import {ClientAPI, FederatedDynamicModel, verbose} from 'federated-learning-client';
 
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
 import {EMOJIS_LVL_1} from './levels.js';
@@ -33,6 +33,8 @@ const SERVER_URL = `//${location.hostname}:3000`;
 const UPLOAD_URL = `//${location.hostname}:3000/data`;
 
 console.log('server url:', SERVER_URL)
+
+verbose(true);
 
 const MODEL_INPUT_WIDTH = 224;
 

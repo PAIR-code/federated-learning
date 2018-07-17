@@ -18,7 +18,7 @@
 import {Server, Socket} from 'socket.io';
 
 // tslint:disable-next-line:max-line-length
-import {DataMsg, DownloadMsg, Events, serializedToJson, serializeVar, UploadMsg} from './common';
+import {DataMsg, DownloadMsg, Events, log, serializedToJson, serializeVar, UploadMsg} from './common';
 import {ModelDB} from './model_db';
 
 export class ServerAPI {
@@ -39,9 +39,9 @@ export class ServerAPI {
 
   async setup() {
     this.io.on('connection', async (socket: Socket) => {
-      console.log('connection');
       socket.on('disconnect', () => {
         this.numClients--;
+        log('disconnect', 'numClients:', this.numClients);
         if (this.exitOnClientExit && this.numClients <= 0) {
           this.io.close();
           process.exit(0);
@@ -49,6 +49,7 @@ export class ServerAPI {
       });
 
       this.numClients++;
+      log('connection', 'numClients:', this.numClients);
 
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();
@@ -60,6 +61,8 @@ export class ServerAPI {
         const y = await serializedToJson(msg.y);
         const clientId = socket.client.id;
         await this.modelDB.putData({x, y, clientId});
+
+        log('putData', 'clientId:', clientId);
       });
 
       // When a client sends us updated weights
@@ -77,6 +80,9 @@ export class ServerAPI {
         };
         await this.modelDB.putUpdate(update);
 
+        log('putUpdate', 'modelVersion:', msg.modelVersion,
+            'clientId:', socket.client.id, 'numExamples:', msg.numExamples);
+
         // Potentially update the model (asynchronously)
         if (msg.modelVersion === this.modelDB.modelVersion) {
           const updated = await this.modelDB.possiblyUpdate();
@@ -85,6 +91,8 @@ export class ServerAPI {
             // Send new variables to all clients if we updated
             const newVars = await this.downloadMsg();
             this.io.sockets.emit(Events.Download, newVars);
+
+            log('newModel', newVars.modelVersion);
           }
         }
       });

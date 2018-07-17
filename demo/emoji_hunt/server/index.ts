@@ -26,6 +26,8 @@ import * as path from 'path';
 import * as io from 'socket.io';
 import {setupModel} from './model';
 
+federatedServer.verbose(true);
+
 const dataDir = path.resolve(__dirname + '/modelData');
 const fileDir = path.resolve(__dirname + '/trainingData');
 

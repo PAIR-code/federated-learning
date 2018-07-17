@@ -20,7 +20,7 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, SerializedVariable, serializeVar, serializeVars, federated} from './common';
+import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, log, SerializedVariable, serializeVar, serializeVars, federated} from './common';
 import {Model} from '@tensorflow/tfjs';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
@@ -90,6 +90,7 @@ export class ClientAPI {
       this.msg = msg;
       this.setVars(msg.vars);
       this.downloadCallbacks.forEach(cb => cb(msg));
+      log('download', 'modelVersion:', msg.modelVersion);
     });
   }
 
@@ -98,6 +99,7 @@ export class ClientAPI {
    */
   public dispose(): void {
     this.socket.disconnect();
+    log('disconnected');
   }
 
   /**
@@ -115,6 +117,7 @@ export class ClientAPI {
       this.socket.emit(Events.Data, msg, () => {
         clearTimeout(rejectTimer);
         resolve();
+        log('uploadData');
       });
     });
     return prom;

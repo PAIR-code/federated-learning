@@ -728,9 +728,23 @@ fast-future@~1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/fast-future/-/fast-future-1.0.2.tgz#8435a9aaa02d79248d17d704e76259301d99280a"
 
-"federated-learning-server@link:../../../src/server":
-  version "0.0.0"
-  uid ""
+"federated-learning-server@file:../../../src/server":
+  version "0.0.1"
+  dependencies:
+    "@tensorflow/tfjs" "~0.12"
+    "@tensorflow/tfjs-node" "^0.1.9"
+    "@types/express" "^4.16.0"
+    "@types/express-fileupload" "^0.1.1"
+    "@types/node-fetch" "^2.1.1"
+    "@types/socket.io" "^1.4.34"
+    "@types/uuid" "^3.4.3"
+    encoding-down "^5.0.3"
+    express "^4.16.3"
+    leveldown "^4.0.1"
+    levelup "^3.0.1"
+    node-fetch "^2.1.2"
+    socket.io "^2.1.1"
+    uuid "^3.3.2"
 
 filewatcher@~3.0.0:
   version "3.0.1"
@@ -1991,6 +2005,10 @@ util-deprecate@~1.0.1:
 utils-merge@1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/utils-merge/-/utils-merge-1.0.1.tgz#9f95710f50a267947b2ccc124741c1028427e713"
+
+uuid@^3.3.2:
+  version "3.3.2"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.2.tgz#1b4af4955eb3077c501c23872fc6513811587131"
 
 validate-npm-package-license@^3.0.1:
   version "3.0.3"
