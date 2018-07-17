@@ -36,7 +36,10 @@ mkdir(fileDir)
 
 const app = express();
 const httpServer = http.createServer(app);
-const sockServer = io(httpServer);
+const sockServer = io(httpServer, {
+  transports: process.env.WSONLY ? ['websocket'] : ['polling', 'websocket']
+});
+
 const port = process.env.PORT || 3000;
 
 

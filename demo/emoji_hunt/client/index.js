@@ -22,6 +22,7 @@ import {ClientAPI, FederatedDynamicModel, verbose} from 'federated-learning-clie
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
 import {EMOJIS_LVL_1} from './levels.js';
 import {upload} from './training_data_upload.js';
+import {queryParam} from './util';
 import * as ui from './ui.js';
 
 const MODEL_URL =
@@ -29,8 +30,11 @@ const MODEL_URL =
 const WEIGHT_MANIFEST =
     'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json';
 
-const SERVER_URL = `//${location.hostname}:3000`;
-const UPLOAD_URL = `//${location.hostname}:3000/data`;
+
+let serverRoot = queryParam('server', location.href) || location.hostname;
+
+const SERVER_URL = `//${serverRoot}:3000`;
+const UPLOAD_URL = `//${serverRoot}:3000/data`;
 
 console.log('server url:', SERVER_URL)
 
