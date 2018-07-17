@@ -62,7 +62,7 @@ app.post('/data', (req, res) => {
 
 setupModel().then(({varsAndLoss}) => {
   federatedServer.setup(sockServer, varsAndLoss, dataDir, 1).then((server) => {
-    server.setHyperparams({'learningRate': 100});
+    server.setHyperparams({'learningRate': 3e-4});
     mkdir(fileDir);
     httpServer.listen(port, () => console.log(`listening on ${port}`));
   });

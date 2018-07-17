@@ -241,8 +241,7 @@ export function federated(model: FederatedDynamicModel|FederatedModel|
 export enum Events {
   Download = 'downloadVars',
   Upload = 'uploadVars',
-  Data = 'uploadData',
-  HyperParams = 'hyperParams'
+  Data = 'uploadData'
 }
 
 export type UploadMsg = {
@@ -258,21 +257,21 @@ export type DataMsg = {
 
 export type DownloadMsg = {
   modelVersion: string,
-  vars: SerializedVariable[]
+  vars: SerializedVariable[],
+  hyperparams: HyperParamsMsg
 };
 
 export type HyperParamsMsg = object;
 
-let ENABLED =
-    ((process as {}) !== undefined ? process.env.VERBOSE : false) || false;
+let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;
 
 export function verbose(enabled: boolean) {
-  ENABLED = enabled;
+  LOGGING_ENABLED = enabled;
 }
 
 // tslint:disable-next-line:no-any
 export function log(...args: any[]) {
-  if (ENABLED) {
+  if (LOGGING_ENABLED) {
     console.error(...args);
   }
 }

@@ -110,9 +110,11 @@ async function main() {
 
   await client.connect(SERVER_URL);
 
-  const hyperparams = await client.hyperparams();
+  const hyperparams = client.hyperparams();
 
   optimizer.setLearningRate(hyperparams['learningRate']);
+
+  console.log(hyperparams);
 
   ui.status('trying to get access to webcam...');
 

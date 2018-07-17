@@ -27,21 +27,25 @@ export class ServerAPI {
   numClients = 0;
 
   constructor(
-      modelDB: ModelDB, io: Server, private hyperParams: object = null,
+      modelDB: ModelDB, io: Server, private hyperparams: object = null,
       private exitOnClientExit = false) {
     this.modelDB = modelDB;
     this.io = io;
   }
 
-  setHyperparams(hyperParams: object) {
-    this.hyperParams = hyperParams;
-    this.io.emit(Events.HyperParams, hyperParams);
+  async setHyperparams(hyperParams: object) {
+    this.hyperparams = hyperParams;
+    this.io.emit(Events.Download, await this.downloadMsg());
   }
 
   async downloadMsg(): Promise<DownloadMsg> {
     const varsJson = await this.modelDB.currentVars();
     const varsSeri = await Promise.all(varsJson.map(serializeVar));
-    return {modelVersion: this.modelDB.modelVersion, vars: varsSeri};
+    return {
+      modelVersion: this.modelDB.modelVersion,
+      vars: varsSeri,
+      hyperparams: this.hyperparams
+    };
   }
 
   async setup() {
@@ -61,9 +65,6 @@ export class ServerAPI {
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();
       socket.emit(Events.Download, initVars);
-      if (this.hyperParams) {
-        socket.emit(Events.HyperParams, this.hyperParams);
-      }
       socket.on(Events.Data, async (msg: DataMsg, ack) => {
         ack(true);
         const x = await serializedToJson(msg.x);
@@ -104,10 +105,6 @@ export class ServerAPI {
             log('newModel', newVars.modelVersion);
           }
         }
-      });
-
-      socket.on(Events.HyperParams, (ack) => {
-        ack(this.hyperParams);
       });
     });
   }

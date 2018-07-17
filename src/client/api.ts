@@ -48,7 +48,6 @@ export class ClientAPI {
   private model: FederatedModel;
   private socket: SocketIOClient.Socket;
   private downloadCallbacks: DownloadCallback[];
-  private broadcastHyperparams: HyperParamsMsg;
 
   /**
    * Construct a client API for federated learning that will push and pull
@@ -92,11 +91,7 @@ export class ClientAPI {
       this.setVars(msg.vars);
       this.downloadCallbacks.forEach(cb => cb(msg));
       log('download', 'modelVersion:', msg.modelVersion);
-    });
-
-    this.socket.on(Events.HyperParams, (msg: HyperParamsMsg) => {
-      this.broadcastHyperparams = msg;
-      log('hyperParams', 'hyperParams:', msg);
+      log('hyperparams', 'hyperparams:', msg.hyperparams);
     });
   }
 
@@ -155,16 +150,8 @@ export class ClientAPI {
         {modelVersion, numExamples: xs.shape[0], vars: newVars});
   }
 
-  public async hyperparams(): Promise<object> {
-    if (this.broadcastHyperparams !== undefined) {
-      return this.broadcastHyperparams;
-    }
-    return new Promise((res, rej) => {
-      this.socket.emit(Events.HyperParams, (reply: HyperParamsMsg) => {
-        this.broadcastHyperparams = reply;
-        res(reply);
-      });
-    });
+  public hyperparams(): HyperParamsMsg {
+    return this.msg.hyperparams;
   }
 
   /**
