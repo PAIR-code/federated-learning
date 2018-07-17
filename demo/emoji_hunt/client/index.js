@@ -114,8 +114,6 @@ async function main() {
 
   optimizer.setLearningRate(hyperparams['learningRate']);
 
-  console.log(hyperparams);
-
   ui.status('trying to get access to webcam...');
 
   const webcam = await ui.webcam();
