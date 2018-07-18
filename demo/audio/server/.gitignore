@@ -1,6 +1,2 @@
-.env
-client/*.html
-client/*.css
-client/*.js
-client/*.map
+secrets/
 deploy.sh

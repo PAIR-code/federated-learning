@@ -84,7 +84,7 @@ app.post('/data', (req: any, res: any) => {
   file.mv(filename);
 });
 
-app.use(express.static(path.resolve(__dirname + '/client')));
+app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
 loadAudioTransferLearningModel().then(model => {
   federatedServer.setup(sockServer, model, dataDir).then((api) => {

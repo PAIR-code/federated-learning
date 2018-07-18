@@ -15,6 +15,7 @@
 # =============================================================================
 
 whereami=`pwd`
+mkdir -p dist/client
 cd ../../../src/server
 yarn publish-local
 cd $whereami
@@ -23,6 +24,6 @@ if [ -e ../client ]
 then
   cd ../client
   yarn build
-  cp dist/* ../server/client
+  cp dist/* ../server/dist/client
   cd $whereami
 fi
