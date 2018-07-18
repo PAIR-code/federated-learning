@@ -189,7 +189,11 @@ function setupUI(stream, model, clientAPI) {
     // ...after we upload data and train
     console.log('uploading data...');
     recordButton.innerHTML = 'Uploading Data&hellip;'
-    clientAPI.uploadData(x, y, p, labelNames[yTrue], labelNames[yPred]).then(() => {
+    const metadata = {
+      yTrue: labelNames[yTrue],
+      yPred: labelNames[yPred]
+    }
+    clientAPI.uploadData(x, y, p, metadata).then(() => {
       console.log('fitting model...');
       recordButton.innerHTML = 'Fitting Model&hellip;'
       clientAPI.federatedUpdate(x, y).then(cleanup, cleanup);

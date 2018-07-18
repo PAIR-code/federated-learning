@@ -103,14 +103,16 @@ loadAudioTransferLearningModel().then(model => {
         }`;
         let html = `<html><head><style>${css}</style></head>`;
         html += '<body><table><thead><tr>';
-        html += '<th>Client</th><th>Time</th><th>Predicted</th><th>Actual</th>';
+        html += '<th>Model</th><th>Client</th><th>Time</th>';
+        html += '<th>Predicted</th><th>Actual</th>';
         html += '</tr></thead><tbody>';
         for (let i = 0; i < data.length; i++) {
           html += '<tr>';
+          html += `<td>${data[i].modelVersion}</td>`;
           html += `<td>${data[i].clientId}</td>`;
           html += `<td>${new Date(parseInt(data[i].timestamp, 10))}</td>`;
-          html += `<td>${data[i].trueLabel}</td>`;
-          html += `<td>${data[i].predLabel}</td>`;
+          html += `<td>${data[i].metadata.yTrue}</td>`;
+          html += `<td>${data[i].metadata.yPred}</td>`;
           html += '</tr>';
         }
         html += '</tbody></table></body></html>';

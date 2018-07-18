@@ -87,16 +87,6 @@ export type UpdateJson = {
   clientId?: string
 };
 
-export type DataJson = {
-  x: TensorJson,
-  y: TensorJson,
-  p?: TensorJson,
-  clientId?: string,
-  timestamp?: string,
-  trueLabel?: string,
-  predLabel?: string
-};
-
 export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
   let data;
   // tslint:disable-next-line:no-any
@@ -254,12 +244,25 @@ export type UploadMsg = {
   numExamples: number
 };
 
+export type DataJson = {
+  input: TensorJson,
+  target: TensorJson,
+  output?: TensorJson,
+  clientId?: string,
+  timestamp?: string,
+  modelVersion?: string,
+  // tslint:disable-next-line no-any
+  metadata?: any
+};
+
 export type DataMsg = {
-  x: SerializedVariable,
-  y: SerializedVariable,
-  p?: SerializedVariable,
-  trueLabel?: string,
-  predLabel?: string
+  input: SerializedVariable,
+  target: SerializedVariable,
+  output?: SerializedVariable,
+  modelVersion?: string,
+  timestamp?: string,
+  // tslint:disable-next-line no-any
+  metadata?: any
 };
 
 export type DownloadMsg = {

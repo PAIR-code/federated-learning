@@ -111,14 +111,16 @@ export class ClientAPI {
    * @return A promise that resolves when the server has recieved the data
    */
   public async uploadData(
-      x: tf.Tensor, y: tf.Tensor, p?: tf.Tensor, trueLabel?: string,
-      predLabel?: string): Promise<{}> {
+      input: tf.Tensor, target: tf.Tensor, output?: tf.Tensor,
+      // tslint:disable-next-line:no-any
+      metadata?: any): Promise<{}> {
     const msg: DataMsg = {
-      x: await serializeVar(x),
-      y: await serializeVar(y),
-      p: p ? await serializeVar(p) : null,
-      trueLabel,
-      predLabel
+      input: await serializeVar(input),
+      target: await serializeVar(target),
+      output: output ? await serializeVar(output) : null,
+      modelVersion: this.msg.modelVersion,
+      timestamp: new Date().getTime().toString(),
+      metadata
     };
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =

@@ -59,6 +59,9 @@ export class ModelDB {
     if (!data.timestamp) {
       data.timestamp = currentTimestamp();
     }
+    if (!data.modelVersion) {
+      data.modelVersion = this.modelVersion;
+    }
     return this.db.put('data/' + data.timestamp + '_' + uuid(), data);
   }
 
