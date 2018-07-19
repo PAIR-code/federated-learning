@@ -74,9 +74,15 @@ export async function login() {
       'clientId': '834911136599-o3feieivbdf7kff50hjn1tnfmkv4noqo.apps.googleusercontent.com',
       'fetch_basic_profile': true
     });
-    await auth.signIn();
-    return auth.isSignedIn.get();
+    const user = await auth.signIn();
+    const token = user.getAuthResponse().id_token;
+
+    // backend checks for this cookie
+    document.cookie = 'oauth2token=' + token + ';';
+
+    return { signedIn: auth.isSignedIn.get(), token };
   } catch (err) {
-    return false;
+    console.error(err);
+    return { signedIn: false, token: '' };
   }
 }

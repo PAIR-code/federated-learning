@@ -22,23 +22,53 @@ import * as fileUpload from 'express-fileupload';
 import * as federatedServer from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
-import * as path from 'path';
+import * as https from 'https';
+import {resolve} from 'path';
 import * as io from 'socket.io';
+import {verify} from './verify';
 import {setupModel} from './model';
-
+import * as cookieParser from 'cookie-parser';
 federatedServer.verbose(true);
 
-const dataDir = path.resolve(__dirname + '/modelData');
-const fileDir = path.resolve(__dirname + '/trainingData');
+const dataDir = resolve(__dirname + '/modelData');
+const fileDir = resolve(__dirname + '/trainingData');
 
 const mkdir = (dir: string) => !fs.existsSync(dir) && fs.mkdirSync(dir);
 mkdir(fileDir)
 
 const app = express();
-const httpServer = http.createServer(app);
-const sockServer = io(httpServer);
-const port = process.env.PORT || 3000;
 
+let port: number;
+let httpServer: http.Server | https.Server;
+if (process.env.SSL_KEY && process.env.SSL_CERT) {
+  const httpsOptions = {
+    key: fs.readFileSync(process.env.SSL_KEY),
+    cert: fs.readFileSync(process.env.SSL_CERT)
+  };
+  httpServer = https.createServer(httpsOptions, app);
+  port = parseInt(process.env.PORT, 10) || 443;
+} else {
+  httpServer = http.createServer(app);
+  port = parseInt(process.env.PORT, 10) || 3000;
+}
+
+const sockServer = io(httpServer);
+
+app.use(express.static(resolve(`${__dirname}/client-dist`)));
+
+app.use(cookieParser());
+
+app.use(async (req, res, next) => {
+  try {
+    const token = req.cookies['oauth2token'];
+    const userid = await verify(token);
+    (req as any).googleUserID = userid;
+    next();
+  } catch (exn) {
+    console.log('unauthorized connection: ', exn.message);
+    res.status(403).send({err: exn.message}).end();
+  }
+})
 
 app.use(fileUpload());
 

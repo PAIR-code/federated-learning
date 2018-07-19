@@ -15,7 +15,25 @@
 # =============================================================================
 
 whereami=`pwd`
+
+if [ ! -e cert.pem ]
+then
+  echo "generating self-signed cert..."
+  openssl req -x509 -newkey rsa:4096 -keyout key.pem \
+      -out cert.pem -days 365 \
+      -nodes \
+      -sha256 \
+      -subj '/CN=localhost'
+fi
+
 cd ../../../src/server
 yarn publish-local
 cd $whereami
+
+cd ../client
+yarn build
+cd $whereami
+rm -rf client-dist
+cp -R ../client/dist client-dist
+
 yalc link federated-learning-server
