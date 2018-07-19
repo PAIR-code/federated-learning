@@ -18,19 +18,26 @@
 import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
-import * as federatedServer from 'federated-learning-server';
 import {ServerAPI} from 'federated-learning-server';
+import {log, verbose} from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
 import * as io from 'socket.io';
 import * as uuid from 'uuid/v4';
+
 import {labelNames, loadAudioTransferLearningModel} from './model';
 
-const dataDir = path.resolve(__dirname + '/data');
-const fileDir = path.join(dataDir, 'files');
+const rootDir = path.resolve(__dirname + '/data');
+const dataDir = path.join(rootDir, 'data');
+const fileDir = path.join(rootDir, 'files');
+const modelDir = path.join(rootDir, 'models');
 const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
+[rootDir, modelDir, fileDir, dataDir].forEach(mkdir);
+for (let i = 0; i < labelNames.length; i++) {
+  mkdir(path.join(fileDir, labelNames[i]));
+}
 
 const app = express();
 
@@ -67,61 +74,55 @@ app.use((req: any, res: any, next: any) => {
   next();
 });
 
+const dataResults = [];
+const existingData = fs.readdirSync(dataDir);
+existingData.forEach(fn => {
+  const json = fs.readFileSync(`${dataDir}/${fn}`).toString();
+  dataResults.push(JSON.parse(json));
+});
+
 // tslint:disable-next-line:no-any
 app.post('/data', (req: any, res: any) => {
   if (!req.files) {
     return res.status(400).send('Must upload a file');
-  } else {
-    res.send('File uploaded!');
   }
-
   const file = req.files.file;
   const fileParts = file.name.split('.');
   const labelName = fileParts[0];
   const extension = fileParts[1];
   const labelDir = path.join(fileDir, labelName);
-  const filename = path.join(labelDir, `${uuid()}.${extension}`);
-  file.mv(filename);
+  const fileId = uuid();
+  const filename = path.join(labelDir, `${fileId}.${extension}`);
+  file.mv(filename);           // save raw file
+  dataResults.push(req.body);  // save metadata
+  fs.writeFile(`${dataDir}/${fileId}.json`, JSON.stringify(req.body), log);
+  res.send('File uploaded!');
+});
+
+// tslint:disable-next-line:no-any
+app.get('/data', (req: any, res: any) => {
+  res.send(dataResults);
 });
 
 app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
-loadAudioTransferLearningModel().then(model => {
-  federatedServer.setup(sockServer, model, dataDir).then((api) => {
-    mkdir(fileDir);
-    for (let i = 0; i < labelNames.length; i++) {
-      mkdir(path.join(fileDir, labelNames[i]));
-    }
+verbose(true);
 
-    // tslint:disable-next-line:no-any
-    app.get('/status', (req: any, res: any) => {
-      api.modelDB.getData().then(data => {
-        const css = `td, th {
-          font-family: monospace;
-          text-align: left;
-          padding-right: 1em;
-        }`;
-        let html = `<html><head><style>${css}</style></head>`;
-        html += '<body><table><thead><tr>';
-        html += '<th>Model</th><th>Client</th><th>Time</th>';
-        html += '<th>Predicted</th><th>Actual</th>';
-        html += '</tr></thead><tbody>';
-        for (let i = 0; i < data.length; i++) {
-          html += '<tr>';
-          html += `<td>${data[i].modelVersion}</td>`;
-          html += `<td>${data[i].clientId}</td>`;
-          html += `<td>${new Date(parseInt(data[i].timestamp, 10))}</td>`;
-          html += `<td>${data[i].metadata.yTrue}</td>`;
-          html += `<td>${data[i].metadata.yPred}</td>`;
-          html += '</tr>';
-        }
-        html += '</tbody></table></body></html>';
-        res.send(html);
-      });
-    });
+let url =
+    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+let modelVersion = new Date().getTime().toString();
+const existingModels = fs.readdirSync(modelDir);
+existingModels.sort();
+if (existingModels.length) {
+  modelVersion = existingModels[existingModels.length - 1];
+  url = `file://${modelDir}/${modelVersion}/model.json`;
+}
 
-    httpServer.listen(port, () => {
-      console.log(`listening on ${port}`);
-    });
+loadAudioTransferLearningModel(url).then(model => {
+  const api = new ServerAPI(model, modelVersion, modelDir, sockServer);
+  log(`ServerAPI started up at v${api.modelVersion}`);
+
+  httpServer.listen(port, () => {
+    console.log(`listening on ${port}`);
   });
 });

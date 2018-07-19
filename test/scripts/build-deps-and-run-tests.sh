@@ -28,4 +28,4 @@ yalc link federated-learning-client
 yalc link federated-learning-server
 echo ''
 echo '***** run tests *****'
-ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json
+VERBOSE=true ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json

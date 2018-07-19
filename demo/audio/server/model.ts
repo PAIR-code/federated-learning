@@ -17,20 +17,19 @@
 
 import * as tf from '@tensorflow/tfjs';
 
-const audioTransferLearningModelURL =
-    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
-
-import '@tensorflow/tfjs-node';
-
 export const labelNames = [
   'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
   'zero', 'left', 'right', 'go', 'stop'
 ];
 
-export async function loadAudioTransferLearningModel() {
+import '@tensorflow/tfjs-node';
+
+export async function loadAudioTransferLearningModel(url) {
   // NOTE: have to temporarily pretend that this is a browser
   tf.ENV.set('IS_BROWSER', true);
-  const model = await tf.loadModel(audioTransferLearningModelURL);
+  console.log(`about to load model: ${url}`);
+  const model = await tf.loadModel(url);
+  console.log('done');
   tf.ENV.set('IS_BROWSER', false);
 
   for (let i = 0; i < 9; ++i) {

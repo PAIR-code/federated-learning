@@ -16,6 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import * as uuid from 'uuid/v4';
 import MediaStreamRecorder from 'msr';
 import {ClientAPI} from 'federated-learning-client';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
@@ -69,6 +70,14 @@ function setupUI(stream, model, clientAPI) {
   const fftLength = inputShape[2];
   let resultRow;
   let yTrue = getNextLabel();
+  let yPred;
+  let probs;
+
+  if (!getCookie('federated-learner-uuid')) {
+    setCookie('federated-learner-uuid', uuid());
+  }
+
+  const clientId = getCookie('federated-learner-uuid');
 
   // Create a recorder to save the raw .wav file
   const recorder = new MediaStreamRecorder(stream);
@@ -90,6 +99,12 @@ function setupUI(stream, model, clientAPI) {
     const req = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('clientId', clientId);
+    formData.append('modelVersion', clientAPI.modelVersion());
+    formData.append('timestamp', new Date().getTime().toString());
+    formData.append('predictedLabel', yPred);
+    formData.append('trueLabel', yTrue);
+    formData.append('modelOutput', probs);
     req.open('POST', serverURL + '/data');
     req.send(formData);
   };
@@ -126,12 +141,19 @@ function setupUI(stream, model, clientAPI) {
     labeledExamples.appendChild(resultRow);
     resultRow.children[2].innerText = labelNames[yTrue];
 
-    // Stop separate .wav recording
-    recorder.stop();
-
     // Compute input tensor
     const freqData = listener.getFrequencyData();
     const x = getInputTensorFromFrequencyData(freqData, numFrames, fftLength);
+
+    // Compute predictions
+    const p = model.predict(x);
+    tf.tidy(() => {
+      yPred = tf.argMax(p, 1).dataSync()[0];
+      probs = p.dataSync();
+    });
+
+    // Stop separate .wav recording
+    recorder.stop();
 
     // Plot spectrograms
     const mainSpectrogram = document.getElementById('spectrogram-canvas');
@@ -147,14 +169,6 @@ function setupUI(stream, model, clientAPI) {
     onehotY[yTrue] = 1;
     const y = tf.tensor2d([onehotY]);
 
-    // Compute predictions
-    let yPred;
-    let probs;
-    const p = model.predict(x);
-    tf.tidy(() => {
-      yPred = tf.argMax(p, 1).dataSync()[0];
-      probs = p.dataSync();
-    });
     resultRow.children[3].innerText = labelNames[yPred];
     if (yTrue != yPred) {
       resultRow.children[3].className = 'incorrect-prediction';
@@ -163,17 +177,13 @@ function setupUI(stream, model, clientAPI) {
     // Plot probabilities
     Plotly.newPlot('probs', [{x: labelNames, y: probs, type: 'bar'}], {
       autosize: false,
-      width: 480,
+      width: Math.min(480, document.getElementById('model').clientWidth),
       height: 180,
       margin: {l: 30, r: 5, b: 30, t: 5, pad: 0},
     });
 
     // Prepare our next loop...
     const cleanup = (err) => {
-      if (err) {
-        console.log('error uploading data or fitting model:');
-        console.log(err);
-      }
       // dispose of tensors
       tf.dispose([x, y, p]);
 
@@ -186,18 +196,10 @@ function setupUI(stream, model, clientAPI) {
       console.log('...done!');
     };
 
-    // ...after we upload data and train
-    console.log('uploading data...');
-    recordButton.innerHTML = 'Uploading Data&hellip;'
-    const metadata = {
-      yTrue: labelNames[yTrue],
-      yPred: labelNames[yPred]
-    }
-    clientAPI.uploadData(x, y, p, metadata).then(() => {
-      console.log('fitting model...');
-      recordButton.innerHTML = 'Fitting Model&hellip;'
-      clientAPI.federatedUpdate(x, y).then(cleanup, cleanup);
-    }, cleanup);
+    // ...after we train
+    console.log('fitting model...');
+    recordButton.innerHTML = 'Fitting Model&hellip;'
+    clientAPI.federatedUpdate(x, y).catch(console.log).finally(cleanup);
   }
 }
 
@@ -219,4 +221,15 @@ function getInputTensorFromFrequencyData(freqData, numFrames, fftLength) {
     return normalize(tensorBuffer.toTensor().reshape(
         [1, numFrames, fftLength, 1]));
   });
+}
+
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : null;
+}
+
+function setCookie(name, value) {
+  var d = new Date;
+  d.setTime(d.getTime() + 24*60*60*1000*365);
+  document.cookie = name + "=" + value + ";path=/;expires=" + d.toGMTString();
 }

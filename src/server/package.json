@@ -22,10 +22,7 @@
     "@types/node-fetch": "^2.1.1",
     "@types/socket.io": "^1.4.34",
     "@types/uuid": "^3.4.3",
-    "encoding-down": "^5.0.3",
     "es6-promise": "^4.2.4",
-    "leveldown": "^4.0.1",
-    "levelup": "^3.0.1",
     "node-fetch": "^2.1.2",
     "socket.io": "^2.1.1",
     "uuid": "^3.3.2"
