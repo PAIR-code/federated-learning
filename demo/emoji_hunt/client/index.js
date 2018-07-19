@@ -96,6 +96,10 @@ function preprocess(webcam) {
 }
 
 async function main() {
+  if(!await ui.login()) {
+    ui.status('please refresh & login to proceed');
+    return;
+  }
   ui.status('loading model...');
 
   const {model, varsAndLoss, optimizer} = await setupModel();
