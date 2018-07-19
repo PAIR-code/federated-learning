@@ -27,7 +27,8 @@ export async function loadAudioTransferLearningModel() {
     model.layers[i].trainable = false;  // freeze conv layers
   }
 
-  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+  const optimizer = tf.train.sgd(0.001);
+  model.compile({'optimizer': optimizer, loss: 'categoricalCrossentropy'});
 
   return model;
 }

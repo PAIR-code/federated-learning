@@ -21,5 +21,5 @@
   "editor.detectIndentation": false,
   "editor.wrappingIndent": "none",
   "typescript.tsdk": "node_modules/typescript/lib",
-  "clang-format.executable": "node_modules/.bin/clang-format"
+  "clang-format.executable": "${workspaceRoot}/src/server/node_modules/.bin/clang-format"
 }

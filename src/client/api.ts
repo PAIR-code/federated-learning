@@ -20,7 +20,7 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, log, SerializedVariable, serializeVar, serializeVars, federated, HyperParamsMsg} from './common';
+import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, log, SerializedVariable, serializeVar, serializeVars, federated} from './common';
 import {Model} from '@tensorflow/tfjs';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
@@ -58,7 +58,6 @@ export class ClientAPI {
     this.model = federated(model);
     this.downloadCallbacks = [msg => {
       log('download', 'modelVersion:', msg.modelVersion);
-      log('hyperparams', 'hyperparams:', msg.hyperparams);
     }];
   }
 
@@ -157,12 +156,7 @@ export class ClientAPI {
     // revert our model back to its original weights
     this.setVars(this.msg.vars);
     // upload the updates to the server
-    await this.uploadVars(
-        {modelVersion, numExamples: xs.shape[0], vars: newVars});
-  }
-
-  public hyperparams(): HyperParamsMsg {
-    return this.msg.hyperparams;
+    await this.uploadVars({modelVersion, vars: newVars});
   }
 
   /**
