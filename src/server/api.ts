@@ -65,14 +65,26 @@ export class ServerAPI {
       // Send current variables to newly connected client
       const initVars = await this.downloadMsg();
       socket.emit(Events.Download, initVars);
+
+      // Handle data updates (don't expect all clients to use this)
       socket.on(Events.Data, async (msg: DataMsg, ack) => {
         ack(true);
-        const x = await serializedToJson(msg.x);
-        const y = await serializedToJson(msg.y);
-        const clientId = socket.client.id;
-        await this.modelDB.putData({x, y, clientId});
-
-        log('putData', 'clientId:', clientId);
+        const input = await serializedToJson(msg.input);
+        const target = await serializedToJson(msg.target);
+        let output;
+        if (msg.output) {
+          output = await serializedToJson(msg.output);
+        }
+        await this.modelDB.putData({
+          input,
+          target,
+          output,
+          clientId: socket.client.id,
+          modelVersion: msg.modelVersion,
+          timestamp: msg.timestamp,
+          metadata: msg.metadata
+        });
+        log('putData', 'clientId:', socket.client.id);
       });
 
       // When a client sends us updated weights

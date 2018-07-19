@@ -16,10 +16,13 @@
  */
 
 import * as express from 'express';
+import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
 import * as federatedServer from 'federated-learning-server';
+import {ServerAPI} from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
+import * as https from 'https';
 import * as path from 'path';
 import * as io from 'socket.io';
 import * as uuid from 'uuid/v4';
@@ -30,9 +33,31 @@ const fileDir = path.join(dataDir, 'files');
 const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
 
 const app = express();
-const httpServer = http.createServer(app);
+
+// Use either HTTP or HTTPS, depending on environment variables
+let httpServer;
+let port;
+if (process.env.SSL_KEY && process.env.SSL_CERT) {
+  const httpsOptions = {
+    key: fs.readFileSync(process.env.SSL_KEY),
+    cert: fs.readFileSync(process.env.SSL_CERT)
+  };
+  httpServer = https.createServer(httpsOptions, app);
+  port = process.env.PORT || 443;
+} else {
+  httpServer = http.createServer(app);
+  port = process.env.PORT || 3000;
+}
+
+// Set up websockets
 const sockServer = io(httpServer);
-const port = process.env.PORT || 3000;
+
+// Optionally use basic auth
+if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
+  const users = {};
+  users[process.env.BASIC_AUTH_USER] = process.env.BASIC_AUTH_PASS;
+  app.use(basicAuth({users, challenge: true}));
+}
 
 app.use(fileUpload());
 
@@ -59,12 +84,41 @@ app.post('/data', (req: any, res: any) => {
   file.mv(filename);
 });
 
+app.use(express.static(path.resolve(__dirname + '/dist/client')));
+
 loadAudioTransferLearningModel().then(model => {
-  federatedServer.setup(sockServer, model, dataDir).then(() => {
+  federatedServer.setup(sockServer, model, dataDir).then((api) => {
     mkdir(fileDir);
     for (let i = 0; i < labelNames.length; i++) {
       mkdir(path.join(fileDir, labelNames[i]));
     }
+
+    // tslint:disable-next-line:no-any
+    app.get('/status', (req: any, res: any) => {
+      api.modelDB.getData().then(data => {
+        const css = `td, th {
+          font-family: monospace;
+          text-align: left;
+          padding-right: 1em;
+        }`;
+        let html = `<html><head><style>${css}</style></head>`;
+        html += '<body><table><thead><tr>';
+        html += '<th>Model</th><th>Client</th><th>Time</th>';
+        html += '<th>Predicted</th><th>Actual</th>';
+        html += '</tr></thead><tbody>';
+        for (let i = 0; i < data.length; i++) {
+          html += '<tr>';
+          html += `<td>${data[i].modelVersion}</td>`;
+          html += `<td>${data[i].clientId}</td>`;
+          html += `<td>${new Date(parseInt(data[i].timestamp, 10))}</td>`;
+          html += `<td>${data[i].metadata.yTrue}</td>`;
+          html += `<td>${data[i].metadata.yPred}</td>`;
+          html += '</tr>';
+        }
+        html += '</tbody></table></body></html>';
+        res.send(html);
+      });
+    });
 
     httpServer.listen(port, () => {
       console.log(`listening on ${port}`);

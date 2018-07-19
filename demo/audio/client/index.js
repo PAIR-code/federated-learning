@@ -40,9 +40,9 @@ const modelTemplate = `
   </div>
 `;
 
-let serverURL = 'http://localhost:3000';
+let serverURL = location.origin;
 if (URLSearchParams) {
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(location.search);
   if (params.get('server')) {
     serverURL = params.get('server');
   }
@@ -150,8 +150,8 @@ function setupUI(stream, model, clientAPI) {
     // Compute predictions
     let yPred;
     let probs;
+    const p = model.predict(x);
     tf.tidy(() => {
-      const p = model.predict(x);
       yPred = tf.argMax(p, 1).dataSync()[0];
       probs = p.dataSync();
     });
@@ -175,7 +175,7 @@ function setupUI(stream, model, clientAPI) {
         console.log(err);
       }
       // dispose of tensors
-      tf.dispose([x, y]);
+      tf.dispose([x, y, p]);
 
       // decide what label to request next
       yTrue = getNextLabel();
@@ -189,7 +189,11 @@ function setupUI(stream, model, clientAPI) {
     // ...after we upload data and train
     console.log('uploading data...');
     recordButton.innerHTML = 'Uploading Data&hellip;'
-    clientAPI.uploadData(x, y).then(() => {
+    const metadata = {
+      yTrue: labelNames[yTrue],
+      yPred: labelNames[yPred]
+    }
+    clientAPI.uploadData(x, y, p, metadata).then(() => {
       console.log('fitting model...');
       recordButton.innerHTML = 'Fitting Model&hellip;'
       clientAPI.federatedUpdate(x, y).then(cleanup, cleanup);

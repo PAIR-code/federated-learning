@@ -110,8 +110,18 @@ export class ClientAPI {
    * Upload x and y tensors to the server (for debugging/training)
    * @return A promise that resolves when the server has recieved the data
    */
-  public async uploadData(x: tf.Tensor, y: tf.Tensor): Promise<{}> {
-    const msg: DataMsg = {x: await serializeVar(x), y: await serializeVar(y)};
+  public async uploadData(
+      input: tf.Tensor, target: tf.Tensor, output?: tf.Tensor,
+      // tslint:disable-next-line:no-any
+      metadata?: any): Promise<{}> {
+    const msg: DataMsg = {
+      input: await serializeVar(input),
+      target: await serializeVar(target),
+      output: output ? await serializeVar(output) : null,
+      modelVersion: this.msg.modelVersion,
+      timestamp: new Date().getTime().toString(),
+      metadata
+    };
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadData timed out`), UPLOAD_TIMEOUT);

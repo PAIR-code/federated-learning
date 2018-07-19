@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@tensorflow/tfjs": "~0.12",
-    "federated-learning-client": "link:../../../src/client",
+    "federated-learning-client": "file:../../../src/client",
     "msr": "~1.3.4"
   },
   "scripts": {
