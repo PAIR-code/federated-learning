@@ -183,6 +183,9 @@ async function main() {
       tf.dispose([input, label]);
 
       isTraining = false;
+
+      lookingFor = pickTarget();
+      ui.findMe(`find me a ${lookingFor.name}, ${lookingFor.emoji}`)
     };
 
     const preds = tf.tidy(() => {
