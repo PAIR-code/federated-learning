@@ -14,9 +14,14 @@
 # limitations under the License.
 # =============================================================================
 
+
 whereami=`pwd`
 
-if [ ! -e cert.pem ]
+DEV_ENV=${DEV:-false}
+SSL_CERT=${SSL_CERT:-cert.pem}
+SSL_KEY=${SSL_KEY:-key.pem}
+
+if [ ! -e $SSL_CERT ]
 then
   echo "generating self-signed cert..."
   openssl req -x509 -newkey rsa:4096 -keyout key.pem \
@@ -26,14 +31,24 @@ then
       -subj '/CN=localhost'
 fi
 
-cd ../../../src/server
-yarn publish-local
-cd $whereami
-
 cd ../client
-yarn build
-cd $whereami
-rm -rf client-dist
-cp -R ../client/dist client-dist
 
-yalc link federated-learning-server
+if [ "$DEV_ENV" = true ]
+then
+  yarn run parcel watch index.html &
+else
+  yarn build
+fi
+
+cd $whereami
+
+TSNODE=ts-node
+
+if [ "$DEV_ENV" = true ]
+then
+  TSNODE=ts-node-dev
+fi
+
+PORT=${PORT:-3000}
+
+USE_OAUTH=1 SSL_KEY=$SSL_KEY SSL_CERT=$SSL_CERT PORT=$PORT $TSNODE index.ts

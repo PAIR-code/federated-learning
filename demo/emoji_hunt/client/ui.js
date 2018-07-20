@@ -45,6 +45,7 @@ export function uploadAllowed() {
 
 export async function webcam() {
   const video = sel`#webcamvideo`;
+
   if(webcamSetup) {
     return video;
   }
@@ -63,4 +64,29 @@ export async function webcam() {
 
 export function overrideButton(handler) {
   return overrideButtonElt.addEventListener('click', handler);
+}
+
+export async function login() {
+  try {
+    await new Promise(res => window.gapi.load('auth2', res));
+    const auth = await window.gapi.auth2.init({
+      'apiKey': 'AIzaSyCrGSYfv2YIOs7bN1WKni4yUT3PL9JMUx4',
+      'clientId': '834911136599-o3feieivbdf7kff50hjn1tnfmkv4noqo.apps.googleusercontent.com',
+      'fetch_basic_profile': true
+    });
+    const user = await auth.signIn();
+    const token = user.getAuthResponse().id_token;
+
+    // backend checks for this cookie
+    document.cookie = 'oauth2token=' + token + ';';
+
+    return auth.isSignedIn.get();
+  } catch (err) {
+
+    if(err.error === 'popup_blocked_by_browser') {
+      status('please enable popups and refresh this page');
+      throw err;
+    }
+    return false;
+  }
 }

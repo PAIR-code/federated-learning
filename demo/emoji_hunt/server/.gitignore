@@ -5,3 +5,6 @@ node_modules
 yarn-error.log
 modelData
 trainingData
+client-dist
+cert.pem
+key.pem

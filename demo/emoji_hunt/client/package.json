@@ -10,7 +10,8 @@
   },
   "scripts": {
     "postinstall": "./postinstall.sh",
-    "watch": "yarn postinstall && parcel index.html --no-hmr --hmr-hostname 0.0.0.0"
+    "watch": "yarn postinstall && parcel index.html --no-hmr --hmr-hostname 0.0.0.0",
+    "build": "yarn postinstall && parcel build index.html"
   },
   "devDependencies": {
     "babel-plugin-transform-runtime": "^6.23.0",

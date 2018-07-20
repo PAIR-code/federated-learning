@@ -31,6 +31,7 @@ const WEIGHT_MANIFEST =
 
 const SERVER_URL = `//${location.hostname}:3000`;
 const UPLOAD_URL = `//${location.hostname}:3000/data`;
+const USE_OAUTH = true;
 
 console.log('server url:', SERVER_URL)
 
@@ -96,6 +97,12 @@ function preprocess(webcam) {
 }
 
 async function main() {
+  const signedIn = (!USE_OAUTH) || await ui.login();
+  if(!signedIn) {
+    ui.status('please refresh & login to proceed');
+    return;
+  }
+
   ui.status('loading model...');
 
   const {model, varsAndLoss, optimizer} = await setupModel();
