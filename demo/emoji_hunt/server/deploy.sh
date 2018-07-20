@@ -1,8 +1,10 @@
 whereami=`pwd`
 
 DEV_ENV=${DEV:false}
+SSL_CERT=${SSL_CERT:cert.pem}
+SSL_KEY=${SSL_KEY:key.pem}
 
-if [ ! -e cert.pem ]
+if [ ! -e $SSL_CERT ]
 then
   echo "generating self-signed cert..."
   openssl req -x509 -newkey rsa:4096 -keyout key.pem \
@@ -32,4 +34,4 @@ fi
 
 PORT=${PORT:-3000}
 
-USE_OAUTH=1 SSL_KEY=key.pem SSL_CERT=cert.pem PORT=$PORT $TSNODE index.ts
+USE_OAUTH=1 SSL_KEY=$SSL_KEY SSL_CERT=$SSL_CERT PORT=$PORT $TSNODE index.ts
