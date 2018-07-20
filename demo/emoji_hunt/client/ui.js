@@ -80,9 +80,9 @@ export async function login() {
     // backend checks for this cookie
     document.cookie = 'oauth2token=' + token + ';';
 
-    return { signedIn: auth.isSignedIn.get(), token };
+    return auth.isSignedIn.get();
   } catch (err) {
     console.error(err);
-    return { signedIn: false, token: '' };
+    return false;
   }
 }

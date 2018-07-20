@@ -58,17 +58,19 @@ app.use(express.static(resolve(`${__dirname}/client-dist`)));
 
 app.use(cookieParser());
 
-app.use(async (req, res, next) => {
-  try {
-    const token = req.cookies['oauth2token'];
-    const userid = await verify(token);
-    (req as any).googleUserID = userid;
-    next();
-  } catch (exn) {
-    console.log('unauthorized connection: ', exn.message);
-    res.status(403).send({err: exn.message}).end();
-  }
-})
+if(process.env.USE_OAUTH) {
+  app.use(async (req, res, next) => {
+    try {
+      const token = req.cookies['oauth2token'];
+      const userid = await verify(token);
+      (req as any).googleUserID = userid;
+      next();
+    } catch (exn) {
+      console.log('unauthorized connection: ', exn.message);
+      res.status(403).send({err: exn.message}).end();
+    }
+  });
+}
 
 app.use(fileUpload());
 
