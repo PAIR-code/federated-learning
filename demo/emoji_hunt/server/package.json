@@ -18,7 +18,8 @@
   },
   "scripts": {
     "postinstall": "./postinstall.sh",
-    "dev": "yarn postinstall && ts-node-dev index.ts --max_old_space_size 4096"
+    "dev": "DEV=true yarn deploy",
+    "deploy": "yarn postinstall && ./deploy.sh"
   },
   "devDependencies": {
     "ts-node": "^7.0.0",

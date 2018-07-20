@@ -54,7 +54,7 @@ if (process.env.SSL_KEY && process.env.SSL_CERT) {
 
 const sockServer = io(httpServer);
 
-app.use(express.static(resolve(`${__dirname}/client-dist`)));
+app.use(express.static(resolve(`${__dirname}/../client/dist`)));
 
 app.use(cookieParser());
 
