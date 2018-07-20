@@ -83,7 +83,7 @@ export async function login() {
     return auth.isSignedIn.get();
   } catch (err) {
 
-    if(err.error == 'popup_blocked_by_browser') {
+    if(err.error === 'popup_blocked_by_browser') {
       status('please enable popups and refresh this page');
       throw err;
     }
