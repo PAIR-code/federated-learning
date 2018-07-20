@@ -30,4 +30,6 @@ then
   TSNODE=ts-node-dev
 fi
 
-USE_OAUTH=1 SSL_KEY=key.pem SSL_CERT=cert.pem PORT=3000 $TSNODE index.ts
+PORT=${PORT:-3000}
+
+USE_OAUTH=1 SSL_KEY=key.pem SSL_CERT=cert.pem PORT=$PORT $TSNODE index.ts
