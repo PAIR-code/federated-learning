@@ -1,8 +1,8 @@
 whereami=`pwd`
 
-DEV_ENV=${DEV:false}
-SSL_CERT=${SSL_CERT:cert.pem}
-SSL_KEY=${SSL_KEY:key.pem}
+DEV_ENV=${DEV:-false}
+SSL_CERT=${SSL_CERT:-cert.pem}
+SSL_KEY=${SSL_KEY:-key.pem}
 
 if [ ! -e $SSL_CERT ]
 then
