@@ -24,7 +24,6 @@ const statusElt = sel`#status`
 const findMeElt = sel`#findme`
 const overrideButtonElt = sel`#override`
 const uploadAllowedElt = sel`#uploaddata`
-const inputcheckboxElt = sel`#inputcheckbox`
 
 let webcamSetup = false;
 
@@ -46,7 +45,7 @@ export function uploadAllowed() {
 
 export async function webcam() {
   const video = sel`#webcamvideo`;
-  const bgvideo = sel`#bgvideo`
+
   if(webcamSetup) {
     return video;
   }
@@ -58,7 +57,6 @@ export async function webcam() {
       });
 
     video.srcObject = stream;
-    bgvideo.srcObject = stream;
 
     while (video.videoHeight === 0 || video.videoWidth === 0) {
       status('waiting for video to initialise...');
@@ -67,7 +65,6 @@ export async function webcam() {
 
     video.width = video.videoWidth;
     video.height = video.videoHeight;
-
     webcamSetup = true;
 
   } catch (exn) {

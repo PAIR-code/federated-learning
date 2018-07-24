@@ -200,6 +200,9 @@ async function main() {
       ui.findMe(`find me a ${lookingFor.name}, ${lookingFor.emoji}`)
     };
 
+    //const forVis = tf.tidy(() => preprocess(webcam).squeeze().add(1.0).mul(0.5));
+    //await tf.toPixels(forVis, document.getElementById('debugCanvas'))
+    //forVis.dispose();
     const preds = tf.tidy(() => {
       return model.predict(preprocess(webcam));
     });
@@ -208,7 +211,7 @@ async function main() {
 
     tf.dispose(preds);
 
-    ui.status(`its a ${label}`);
+    ui.status(`i see a ${label}...`);
     if (label === lookingFor.name) {
       ui.status(`congrats! u did it !`);
       for (let i = 0; i < 30; i++) {
