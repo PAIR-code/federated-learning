@@ -31,7 +31,7 @@ const WEIGHT_MANIFEST =
 
 const SERVER_URL = `//${location.hostname}:3000`;
 const UPLOAD_URL = `//${location.hostname}:3000/data`;
-const USE_OAUTH = true;
+const USE_OAUTH = false;
 
 console.log('server url:', SERVER_URL)
 
@@ -86,11 +86,28 @@ async function getTopPred(preds) {
   return {index: top, label: SCAVENGER_HUNT_LABELS[top]};
 }
 
+// center-crop input Tensor3D into a square
+function squareCrop(frame) {
+  return tf.tidy(() => {
+    const [h, w] = frame.shape;
+    if(h > w) {
+      const halfW = Math.floor(w / 2);
+      const halfH = Math.floor(h / 2);
+      return frame.slice([halfH - halfW, 0], [halfW * 2, -1]);
+    } else {
+      const halfH = Math.floor(h / 2);
+      const halfW = Math.floor(w / 2);
+      return frame.slice([0, halfW - halfH], [-1, halfH * 2]);
+    }
+  })
+}
+
 function preprocess(webcam) {
   return tf.tidy(() => {
-    const frame = tf.fromPixels(webcam).toFloat();
+    const frame = tf.fromPixels(webcam);
+    const cropped = squareCrop(frame).toFloat();
     const scaled =
-        tf.image.resizeBilinear(frame, [MODEL_INPUT_WIDTH, MODEL_INPUT_WIDTH]);
+        tf.image.resizeBilinear(cropped, [MODEL_INPUT_WIDTH, MODEL_INPUT_WIDTH]);
     const prepped = scaled.sub(255 / 2).div(255 / 2).expandDims(0);
     return prepped;
   });
@@ -102,6 +119,10 @@ async function main() {
     ui.status('please refresh & login to proceed');
     return;
   }
+
+  ui.status('trying to get access to webcam...');
+
+  const webcam = await ui.webcam();
 
   ui.status('loading model...');
 
@@ -115,20 +136,11 @@ async function main() {
 
   ui.status('trying to connect to federated learning server...');
 
-  await client.connect(SERVER_URL);
+  //await client.connect(SERVER_URL);
 
-  const hyperparams = client.hyperparams();
+  //const hyperparams = client.hyperparams();
 
-  optimizer.setLearningRate(hyperparams['learningRate']);
-
-  ui.status('trying to get access to webcam...');
-
-  const webcam = await ui.webcam();
-
-  while (webcam.videoHeight === 0) {
-    ui.status('waiting for video to initialise...');
-    await tf.nextFrame();
-  }
+  //optimizer.setLearningRate(hyperparams['learningRate']);
 
   let isTraining = false;
 

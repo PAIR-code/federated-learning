@@ -29,21 +29,48 @@ limitations under the License.
   #override {
     width: 100%;
     height: 100px;
+    font-family: 'San Francisco', Roboto, sans-serif;
+    font-size: 2em;
+    font-weight: bold;
   }
+
+  #webcamvideo {
+    visibility: hidden;
+    overflow: hidden;
+  }
+
+  #bgvideo {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    min-height: 100%;
+    z-index: -1;
+    overflow: hidden;
+  }
+
+  .transparent-bg {
+    background-color: rgba(255, 255, 255, 0.51);
+    color: black;
+    font-family: 'San Francisco', Roboto, sans-serif;
+  }
+
   </style>
   <body>
-    <h1 class="centered">Demo client</h1>
-    <h1 class="centered" id='modelversion' class="centered"></h1>
-    <h1 class="centered" id='status' class="centered"></h1>
-    <h1 class="centered" id='findme' class="centered"></h1>
+    <div class="transparent-bg">
+        <h1 class="centered">Demo client</h1>
+        <h1 class="centered" id='modelversion' class="centered"></h1>
+        <h1 class="centered" id='status' class="centered"></h1>
+        <h1 class="centered" id='findme' class="centered"></h1>
+    </div>
     <button class="centered" id="override">I'm looking at it!</button>
-    <video playsinline muted autoplay id='webcamvideo' width="100%" height="224"></video>
     <div>
-      <div class="centered" >
+      <div id="inputcheckbox" class="centered" >
         <input type="checkbox" id="uploaddata" checked>
         <label for="uploaddata">Upload collected training data to server?</label>
       </div>
     </div>
+    <video id="bgvideo" class="centered" playsinline muted autoplay></video>
+    <video class="centered" playsinline muted autoplay id='webcamvideo' width="100%" height="224"></video>
     <script src="index.js"></script>
 
   </body>

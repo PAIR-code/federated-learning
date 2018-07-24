@@ -24,6 +24,7 @@ const statusElt = sel`#status`
 const findMeElt = sel`#findme`
 const overrideButtonElt = sel`#override`
 const uploadAllowedElt = sel`#uploaddata`
+const inputcheckboxElt = sel`#inputcheckbox`
 
 let webcamSetup = false;
 
@@ -45,15 +46,30 @@ export function uploadAllowed() {
 
 export async function webcam() {
   const video = sel`#webcamvideo`;
-
+  const bgvideo = sel`#bgvideo`
   if(webcamSetup) {
     return video;
   }
   try {
     const stream =
-      await navigator.mediaDevices.getUserMedia({audio: false, video: true});
+      await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {facingMode: 'environment'}
+      });
+
     video.srcObject = stream;
+    bgvideo.srcObject = stream;
+
+    while (video.videoHeight === 0 || video.videoWidth === 0) {
+      status('waiting for video to initialise...');
+      await new Promise(res => requestAnimationFrame(res));
+    }
+
+    video.width = video.videoWidth;
+    video.height = video.videoHeight;
+
     webcamSetup = true;
+
   } catch (exn) {
     status(`Error in accessing webcam: ${exn.toString()}`);
     throw exn;
