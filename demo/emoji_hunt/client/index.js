@@ -136,11 +136,11 @@ async function main() {
 
   ui.status('trying to connect to federated learning server...');
 
-  //await client.connect(SERVER_URL);
+  await client.connect(SERVER_URL);
 
-  //const hyperparams = client.hyperparams();
+  const hyperparams = client.hyperparams();
 
-  //optimizer.setLearningRate(hyperparams['learningRate']);
+  optimizer.setLearningRate(hyperparams['learningRate']);
 
   let isTraining = false;
 
@@ -200,9 +200,6 @@ async function main() {
       ui.findMe(`find me a ${lookingFor.name}, ${lookingFor.emoji}`)
     };
 
-    //const forVis = tf.tidy(() => preprocess(webcam).squeeze().add(1.0).mul(0.5));
-    //await tf.toPixels(forVis, document.getElementById('debugCanvas'))
-    //forVis.dispose();
     const preds = tf.tidy(() => {
       return model.predict(preprocess(webcam));
     });
