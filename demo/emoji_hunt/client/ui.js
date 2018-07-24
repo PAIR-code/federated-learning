@@ -15,6 +15,8 @@
  * =============================================================================
  */
 
+import { nextFrame } from '@tensorflow/tfjs';
+
 function sel(str) {
   return document.querySelector(String.raw(...arguments));
 }
@@ -60,7 +62,7 @@ export async function webcam() {
 
     while (video.videoHeight === 0 || video.videoWidth === 0) {
       status('waiting for video to initialise...');
-      await new Promise(res => requestAnimationFrame(res));
+      await nextFrame();
     }
 
     video.width = video.videoWidth;
