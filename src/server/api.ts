@@ -16,11 +16,14 @@
  */
 
 import './fetch_polyfill';
+
 import * as tf from '@tensorflow/tfjs';
 import * as io from 'socket.io';
 
 // tslint:disable-next-line:max-line-length
-import {deserializeVars, DownloadMsg, Events, federated, FederatedModel, log, SerializedVariable, serializeVars, stackSerialized, UploadMsg} from './common';
+import {deserializeVars, Events, federated, FederatedModel, log, ModelMsg, SerializedVariable, serializeVars, stackSerialized} from './common';
+
+type UpdateCallback = (version: string) => void;
 
 export class ServerAPI {
   model: FederatedModel;
@@ -30,6 +33,7 @@ export class ServerAPI {
   numClients = 0;
   updating = false;
   updates: SerializedVariable[][] = [];
+  updateCallbacks: UpdateCallback[] = [];
   aggregation = 'mean';
 
   constructor(
@@ -56,7 +60,7 @@ export class ServerAPI {
 
       socket.emit(Events.Download, await this.downloadMsg());
 
-      socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
+      socket.on(Events.Upload, async (msg: ModelMsg, ack) => {
         ack(true);
         if (msg.modelVersion === this.modelVersion && !this.updating) {
           this.updates.push(msg.vars);
@@ -69,7 +73,11 @@ export class ServerAPI {
     });
   }
 
-  async downloadMsg(): Promise<DownloadMsg> {
+  onUpdate(callback: UpdateCallback) {
+    this.updateCallbacks.push(callback);
+  }
+
+  async downloadMsg(): Promise<ModelMsg> {
     const vars = await serializeVars(this.model.getVars());
     return {
       vars,
@@ -101,5 +109,6 @@ export class ServerAPI {
     log(`finished update at ${new Date().getTime().toString()}`);
 
     this.model.save(`file://${this.modelDir}/${this.modelVersion}`);
+    this.updateCallbacks.forEach(c => c(this.modelVersion));
   }
 }

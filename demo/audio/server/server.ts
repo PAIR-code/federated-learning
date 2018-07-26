@@ -15,6 +15,8 @@
  * =============================================================================
  */
 
+import * as tf from '@tensorflow/tfjs';
+import {version} from '@tensorflow/tfjs-node';
 import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
@@ -28,20 +30,11 @@ import * as io from 'socket.io';
 import * as uuid from 'uuid/v4';
 
 import {labelNames, loadAudioTransferLearningModel} from './model';
+import * as npy from './npy';
 
-const rootDir = path.resolve(__dirname + '/data');
-const dataDir = path.join(rootDir, 'data');
-const fileDir = path.join(rootDir, 'files');
-const modelDir = path.join(rootDir, 'models');
-const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
-[rootDir, modelDir, fileDir, dataDir].forEach(mkdir);
-for (let i = 0; i < labelNames.length; i++) {
-  mkdir(path.join(fileDir, labelNames[i]));
-}
-
+// Setup express app using either HTTP or HTTPS, depending on environment
+// variables
 const app = express();
-
-// Use either HTTP or HTTPS, depending on environment variables
 let httpServer;
 let port;
 if (process.env.SSL_KEY && process.env.SSL_CERT) {
@@ -66,13 +59,24 @@ if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
   app.use(basicAuth({users, challenge: true}));
 }
 
+// Setup file uploading
 app.use(fileUpload());
-
 // tslint:disable-next-line:no-any
 app.use((req: any, res: any, next: any) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
 });
+
+// Create directories
+const rootDir = path.resolve(__dirname + '/data');
+const dataDir = path.join(rootDir, 'data');
+const fileDir = path.join(rootDir, 'files');
+const modelDir = path.join(rootDir, 'models');
+const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
+[rootDir, modelDir, fileDir, dataDir].forEach(mkdir);
+for (let i = 0; i < labelNames.length; i++) {
+  mkdir(path.join(fileDir, labelNames[i]));
+}
 
 const dataResults = [];
 const existingData = fs.readdirSync(dataDir);
@@ -80,6 +84,21 @@ existingData.forEach(fn => {
   const json = fs.readFileSync(`${dataDir}/${fn}`).toString();
   dataResults.push(JSON.parse(json));
 });
+
+function parseNpyFile(name): tf.Tensor {
+  const buff = fs.readFileSync(path.resolve(__dirname + '/' + name));
+  const arrayBuff =
+      buff.buffer.slice(buff.byteOffset, buff.byteOffset + buff.byteLength);
+  return npy.parse(arrayBuff);
+}
+const validInputs = parseNpyFile('validation-inputs.npy');
+const validLabels = tf.tidy(
+    () => tf.oneHot(parseNpyFile('validation-labels.npy') as tf.Tensor1D, 14));
+const validResultPath = `${rootDir}/validation.json`;
+let validResults = {};
+if (fs.existsSync(validResultPath)) {
+  validResults = JSON.parse(fs.readFileSync(validResultPath).toString());
+}
 
 // tslint:disable-next-line:no-any
 app.post('/data', (req: any, res: any) => {
@@ -95,7 +114,7 @@ app.post('/data', (req: any, res: any) => {
   const filename = path.join(labelDir, `${fileId}.${extension}`);
   file.mv(filename);           // save raw file
   dataResults.push(req.body);  // save metadata
-  fs.writeFile(`${dataDir}/${fileId}.json`, JSON.stringify(req.body), log);
+  fs.writeFile(`${dataDir}/${fileId}.json`, JSON.stringify(req.body), () => {});
   res.send('File uploaded!');
 });
 
@@ -103,6 +122,11 @@ app.post('/data', (req: any, res: any) => {
 app.get('/data', (req: any, res: any) => {
   res.send(dataResults);
 });
+
+// tslint:disable-next-line:no-any
+app.get('/validation', (req: any, res: any) => {
+  res.send(validResults);
+})
 
 app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
@@ -121,6 +145,24 @@ if (existingModels.length) {
 loadAudioTransferLearningModel(url).then(model => {
   const api = new ServerAPI(model, modelVersion, modelDir, sockServer);
   log(`ServerAPI started up at v${api.modelVersion}`);
+
+  const updateResults = (modelVersion) => {
+    if (!validResults[modelVersion]) {
+      const results = tf.tidy(() => {
+        const r = model.evaluate(validInputs, validLabels);
+        return [r[0].dataSync()[0], r[1].dataSync()[0]];
+      });
+      validResults[modelVersion] = {
+        'Cross-Entropy': results[0],
+        'Accuracy': results[1]
+      };
+      fs.writeFile(validResultPath, JSON.stringify(validResults), () => {});
+    }
+  };
+
+  api.onUpdate(updateResults);
+
+  updateResults(modelVersion);
 
   httpServer.listen(port, () => {
     console.log(`listening on ${port}`);

@@ -36,7 +36,11 @@ export async function loadAudioTransferLearningModel(url) {
     model.layers[i].trainable = false;  // freeze conv layers
   }
 
-  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+  model.compile({
+    'optimizer': 'sgd',
+    loss: 'categoricalCrossentropy',
+    'metrics': ['accuracy']
+  });
 
   return model;
 }

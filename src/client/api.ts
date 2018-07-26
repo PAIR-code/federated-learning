@@ -20,13 +20,13 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import {DataMsg, DownloadMsg, Events, UploadMsg, FederatedModel, deserializeVar, log, SerializedVariable, serializeVar, serializeVars, federated} from './common';
+import {ModelMsg, Events, FederatedModel, deserializeVar, log, SerializedVariable, serializeVars, federated} from './common';
 import {Model} from '@tensorflow/tfjs';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
 
-export type DownloadCallback = (msg: DownloadMsg) => void;
+export type DownloadCallback = (msg: ModelMsg) => void;
 
 /**
  * Federated Learning Client API library.
@@ -44,7 +44,7 @@ export type DownloadCallback = (msg: DownloadMsg) => void;
  * The client->server sync must be triggered manually with uploadVars
  */
 export class ClientAPI {
-  private msg: DownloadMsg;
+  private msg: ModelMsg;
   private model: FederatedModel;
   private socket: SocketIOClient.Socket;
   private downloadCallbacks: DownloadCallback[];
@@ -88,7 +88,7 @@ export class ClientAPI {
     this.setVars(msg.vars);
     this.downloadCallbacks.forEach(cb => cb(msg));
 
-    this.socket.on(Events.Download, (msg: DownloadMsg) => {
+    this.socket.on(Events.Download, (msg: ModelMsg) => {
       this.msg = msg;
       this.setVars(msg.vars);
       this.downloadCallbacks.forEach(cb => cb(msg));
@@ -101,37 +101,6 @@ export class ClientAPI {
   public dispose(): void {
     this.socket.disconnect();
     log('disconnected');
-  }
-
-  /**
-   * TODO: remove this method, move functionality to specific demos
-   *
-   * Upload x and y tensors to the server (for debugging/training)
-   * @return A promise that resolves when the server has recieved the data
-   */
-  public async uploadData(
-      input: tf.Tensor, target: tf.Tensor, output?: tf.Tensor,
-      // tslint:disable-next-line:no-any
-      metadata?: any): Promise<{}> {
-    const msg: DataMsg = {
-      input: await serializeVar(input),
-      target: await serializeVar(target),
-      output: output ? await serializeVar(output) : null,
-      modelVersion: this.msg.modelVersion,
-      timestamp: new Date().getTime().toString(),
-      metadata
-    };
-    const prom = new Promise((resolve, reject) => {
-      const rejectTimer =
-          setTimeout(() => reject(`uploadData timed out`), UPLOAD_TIMEOUT);
-
-      this.socket.emit(Events.Data, msg, () => {
-        clearTimeout(rejectTimer);
-        resolve();
-        log('uploadData');
-      });
-    });
-    return prom;
   }
 
   /**
@@ -163,7 +132,7 @@ export class ClientAPI {
    * Upload the current values of the tracked variables to the server
    * @return A promise that resolves when the server has recieved the variables
    */
-  private async uploadVars(msg: UploadMsg): Promise<{}> {
+  private async uploadVars(msg: ModelMsg): Promise<{}> {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
           setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
@@ -181,9 +150,9 @@ export class ClientAPI {
     });
   }
 
-  private async connectTo(serverURL: string): Promise<DownloadMsg> {
+  private async connectTo(serverURL: string): Promise<ModelMsg> {
     this.socket = socketio(serverURL);
-    return fromEvent<DownloadMsg>(
+    return fromEvent<ModelMsg>(
         this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 }
