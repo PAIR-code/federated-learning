@@ -16,7 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import * as uuid from 'uuid/v4';
+import uuid from 'uuid/v4';
 import MediaStreamRecorder from 'msr';
 import {ClientAPI} from 'federated-learning-client';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
