@@ -51,6 +51,8 @@ const lossFns = {
 async function setup() {
   const dataRes = await fetch(serverURL + '/data', fetchOptions);
   const data = await dataRes.json();
+  const validRes = await fetch(serverURL + '/validation', fetchOptions);
+  const valid = await validRes.json();
   const dataByVersionByClient = {};
 
   for (let i = 0; i < data.length; i++) {
@@ -81,6 +83,19 @@ async function setup() {
         color: 'rgba(0,0,255,1)',
         width: 5,
         dash: 'dashdot'
+      }
+    }
+
+    const validationLine = {
+      x: [],
+      y: [],
+      name: 'Validation',
+      mode: 'lines+markers',
+      type: 'scatter',
+      marker: { size: 20 },
+      line: {
+        color: 'rgba(255,0,0,1)',
+        width: 5,
       }
     }
 
@@ -125,10 +140,16 @@ async function setup() {
       meanClientLine.x.push(i+1);
       meanClientLine.y.push(versionMean);
       meanClientLine.text.push(`${clients.length} clients`);
+
+      if (valid[v]) {
+        validationLine.x.push(i+1);
+        validationLine.y.push(valid[v][lossFn]);
+      }
     }
 
     const clients = Object.keys(clientScatters);
-    const plots = clients.map(c => clientScatters[c]).concat([meanClientLine]);
+    const plots = clients.map(c => clientScatters[c]).concat(
+      [validationLine, meanClientLine]);
 
     Plotly.newPlot('results', plots, {
       autosize: true,

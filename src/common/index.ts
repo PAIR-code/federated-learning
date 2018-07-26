@@ -240,28 +240,11 @@ export function federated(model: FederatedDynamicModel|FederatedModel|
 export enum Events {
   Download = 'downloadVars',
   Upload = 'uploadVars',
-  Data = 'uploadData',
-  ListModels = 'listModels'
 }
 
-export type UploadMsg = {
+export type ModelMsg = {
   modelVersion: string,
   vars: SerializedVariable[]
-};
-
-export type DownloadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[]
-};
-
-export type DataMsg = {
-  input: SerializedVariable,
-  target: SerializedVariable,
-  output?: SerializedVariable,
-  modelVersion?: string,
-  timestamp?: string,
-  // tslint:disable-next-line no-any
-  metadata?: any
 };
 
 let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;
