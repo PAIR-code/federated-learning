@@ -16,7 +16,6 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {version} from '@tensorflow/tfjs-node';
 import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
@@ -49,6 +48,9 @@ if (process.env.SSL_KEY && process.env.SSL_CERT) {
   port = process.env.PORT || 3000;
 }
 
+// Load tfjs-node (below other code, so clang-format doesn't move it)
+import '@tensorflow/tfjs-node';
+
 // Set up websockets
 const sockServer = io(httpServer);
 
@@ -59,7 +61,7 @@ if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
   app.use(basicAuth({users, challenge: true}));
 }
 
-// Setup file uploading
+// Setup file uploading (to save .wav files)
 app.use(fileUpload());
 // tslint:disable-next-line:no-any
 app.use((req: any, res: any, next: any) => {
@@ -78,6 +80,7 @@ for (let i = 0; i < labelNames.length; i++) {
   mkdir(path.join(fileDir, labelNames[i]));
 }
 
+// Load metadata about our data / client-side accuracy
 const dataResults = [];
 const existingData = fs.readdirSync(dataDir);
 existingData.forEach(fn => {
@@ -85,6 +88,7 @@ existingData.forEach(fn => {
   dataResults.push(JSON.parse(json));
 });
 
+// Load validation sets + data about validation accuracy
 function parseNpyFile(name): tf.Tensor {
   const buff = fs.readFileSync(path.resolve(__dirname + '/' + name));
   const arrayBuff =
@@ -99,6 +103,8 @@ let validResults = {};
 if (fs.existsSync(validResultPath)) {
   validResults = JSON.parse(fs.readFileSync(validResultPath).toString());
 }
+
+// Setup endpoints to track client and validation accuracy for visualization
 
 // tslint:disable-next-line:no-any
 app.post('/data', (req: any, res: any) => {
@@ -128,10 +134,10 @@ app.get('/validation', (req: any, res: any) => {
   res.send(validResults);
 })
 
+// Expose the client as a set of static files
 app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
-verbose(true);
-
+// Either load our model from the internet or our data directory
 let url =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 let modelVersion = new Date().getTime().toString();
@@ -143,9 +149,11 @@ if (existingModels.length) {
 }
 
 loadAudioTransferLearningModel(url).then(model => {
+  // Setup our federated learning API
   const api = new ServerAPI(model, modelVersion, modelDir, sockServer);
   log(`ServerAPI started up at v${api.modelVersion}`);
 
+  // Add a callback whenever the model is updated to compute validation accuracy
   const updateResults = (modelVersion) => {
     if (!validResults[modelVersion]) {
       const results = tf.tidy(() => {
@@ -159,11 +167,10 @@ loadAudioTransferLearningModel(url).then(model => {
       fs.writeFile(validResultPath, JSON.stringify(validResults), () => {});
     }
   };
-
   api.onUpdate(updateResults);
-
   updateResults(modelVersion);
 
+  // Finally start listening for clients
   httpServer.listen(port, () => {
     console.log(`listening on ${port}`);
   });

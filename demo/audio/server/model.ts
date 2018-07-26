@@ -16,6 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import {log} from 'federated-learning-server';
 
 export const labelNames = [
   'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
@@ -25,11 +26,11 @@ export const labelNames = [
 import '@tensorflow/tfjs-node';
 
 export async function loadAudioTransferLearningModel(url) {
+  log(`about to load model from ${url}`);
+
   // NOTE: have to temporarily pretend that this is a browser
   tf.ENV.set('IS_BROWSER', true);
-  console.log(`about to load model: ${url}`);
   const model = await tf.loadModel(url);
-  console.log('done');
   tf.ENV.set('IS_BROWSER', false);
 
   for (let i = 0; i < 9; ++i) {
