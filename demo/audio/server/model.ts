@@ -18,14 +18,16 @@
 import * as tf from '@tensorflow/tfjs';
 import {log} from 'federated-learning-server';
 
-export const labelNames = [
-  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
-  'zero', 'left', 'right', 'go', 'stop'
-];
+// export const labelNames = [
+//  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+//  'zero', 'left', 'right', 'go', 'stop'
+//];
+
+export const labelNames = ['accio', 'expelliarmus', 'lumos', 'nox'];
 
 import '@tensorflow/tfjs-node';
 
-export async function loadAudioTransferLearningModel(url) {
+export async function loadAudioTransferLearningModel(url: string) {
   log(`about to load model from ${url}`);
 
   // NOTE: have to temporarily pretend that this is a browser
@@ -37,11 +39,27 @@ export async function loadAudioTransferLearningModel(url) {
     model.layers[i].trainable = false;  // freeze conv layers
   }
 
-  model.compile({
-    'optimizer': 'sgd',
-    loss: 'categoricalCrossentropy',
-    'metrics': ['accuracy']
-  });
-
-  return model;
+  if (url.indexOf('http') >= 0) {
+    const cutoffTensor = model.layers[9].output;
+    const newDenseLayer1 = tf.layers.dense({units: 50, activation: 'relu'});
+    const newDenseLayer2 =
+        tf.layers.dense({units: labelNames.length, activation: 'softmax'});
+    const newOutputTensor =
+        newDenseLayer2.apply(newDenseLayer1.apply(cutoffTensor));
+    const transferModel = tf.model(
+        {inputs: model.inputs, outputs: newOutputTensor as tf.SymbolicTensor});
+    transferModel.compile({
+      loss: 'categoricalCrossentropy',
+      optimizer: 'sgd',
+      metrics: ['accuracy']
+    });
+    return transferModel;
+  } else {
+    model.compile({
+      'optimizer': 'sgd',
+      loss: 'categoricalCrossentropy',
+      'metrics': ['accuracy']
+    });
+    return model;
+  }
 }

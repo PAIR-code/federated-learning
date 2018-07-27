@@ -44,6 +44,7 @@ export type DownloadCallback = (msg: ModelMsg) => void;
  * The client->server sync must be triggered manually with uploadVars
  */
 export class ClientAPI {
+  private minExamples: number;
   private msg: ModelMsg;
   private model: FederatedModel;
   private socket: SocketIOClient.Socket;
@@ -54,11 +55,12 @@ export class ClientAPI {
    * `model` updates from the server.
    * @param model - model to use with federated learning
    */
-  constructor(model: FederatedModel|Model) {
+  constructor(model: FederatedModel|Model, minExamples?: number) {
     this.model = federated(model);
     this.downloadCallbacks = [msg => {
       log('download', 'modelVersion:', msg.modelVersion);
     }];
+    this.minExamples = minExamples || 1;
   }
 
   /**
@@ -116,6 +118,7 @@ export class ClientAPI {
    * @param ys Training labels
    */
   public async federatedUpdate(xs: tf.Tensor, ys: tf.Tensor): Promise<void> {
+    console.log(this.minExamples);
     // save original model ID (in case it changes during training/serialization)
     const modelVersion = this.msg.modelVersion;
     // fit the model to the new data

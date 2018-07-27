@@ -59,6 +59,12 @@
   dependencies:
     seedrandom "~2.4.3"
 
+"@tensorflow/tfjs-core@^0.9.0":
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-core/-/tfjs-core-0.9.1.tgz#c36763068a5b8ec99c60fd161dc58dd3fb97001b"
+  dependencies:
+    seedrandom "~2.4.3"
+
 "@tensorflow/tfjs-layers@0.7.0":
   version "0.7.0"
   resolved "https://registry.yarnpkg.com/@tensorflow/tfjs-layers/-/tfjs-layers-0.7.0.tgz#6bee18a220ece102a56be785cd1c67028f968a63"
@@ -3991,6 +3997,12 @@ tar@^4:
     mkdirp "^0.5.0"
     safe-buffer "^5.1.2"
     yallist "^3.0.2"
+
+tfjs-npy@^0.0.3:
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/tfjs-npy/-/tfjs-npy-0.0.3.tgz#fcc36ad5bde8d875255ba715b7a52d2ecff2330f"
+  dependencies:
+    "@tensorflow/tfjs-core" "^0.9.0"
 
 through2@^2.0.0, through2@~2.0.3:
   version "2.0.3"

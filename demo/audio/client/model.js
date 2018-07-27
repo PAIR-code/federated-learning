@@ -16,6 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import {labelNames} from './labels';
 
 const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
@@ -27,8 +28,19 @@ export async function loadAudioTransferLearningModel() {
     model.layers[i].trainable = false;  // freeze conv layers
   }
 
+  const cutoffTensor = model.layers[9].output;
+  const k = labelNames.length;
+  const newDenseLayer1 = tf.layers.dense({units: 50, activation: 'relu'});
+  const newDenseLayer2 = tf.layers.dense({units: k, activation: 'softmax'});
+  const newOutputTensor =
+      newDenseLayer2.apply(newDenseLayer1.apply(cutoffTensor));
+  const transferModel = tf.model(
+      {inputs: model.inputs, outputs: newOutputTensor});
   const optimizer = tf.train.sgd(0.001);
-  model.compile({'optimizer': optimizer, loss: 'categoricalCrossentropy'});
-
-  return model;
+  transferModel.compile({
+    loss: 'categoricalCrossentropy',
+    optimizer: optimizer,
+    metrics: ['accuracy']
+  });
+  return transferModel;
 }
