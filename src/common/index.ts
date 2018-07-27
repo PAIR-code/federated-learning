@@ -16,8 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-// tslint:disable-next-line:max-line-length
-import {Model, ModelFitConfig, Optimizer, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {Model, Optimizer, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
 export type SerializedVariable = {
@@ -144,30 +143,64 @@ export interface FederatedModel {
    */
   setVars(vals: Tensor[]): void;
 
+  setHyperparams(hps: HyperparamsMsg): void;
+
   // tslint:disable-next-line:no-any
   save(handlerOrURL: any, config?: any): Promise<void>;
 }
+
+export type HyperparamsMsg = {
+  batchSize?: number,          // client-side batch size (not very important)
+  learningRate?: number,       // client-side step size (always important)
+  epochs?: number,             // client-side number of steps (important)
+  examplesPerUpdate?: number,  // client-side min examples (important)
+  updatesPerVersion?: number   // server-size min updates (important)
+};
+
+export const DEFAULT_HYPERPARAMS: HyperparamsMsg = {
+  examplesPerUpdate: 5,
+  updatesPerVersion: 10,
+  learningRate: 0.001,
+  batchSize: 32,
+  epochs: 5
+};
 
 /**
  * Implementation of `FederatedModel` designed to wrap a `tf.Model`.
  */
 export class FederatedTfModel implements FederatedModel {
   private model: Model;
-  private config: ModelFitConfig;
+  private hyperparams: HyperparamsMsg;
+  private optimizer: tf.SGDOptimizer;
 
   /**
    * Construct a new `FederatedModel` wrapping a `tf.Model`.
    *
    * @param model An instance of `tf.Model` that has already been `compile`d.
-   * @param config Optional `tf.ModelFitConfig` for training.
+   * @param hyperparams Optional hyperparameters for training.
    */
-  constructor(model: Model, config?: ModelFitConfig) {
+  constructor(model: Model, hyperparams?: HyperparamsMsg) {
     this.model = model;
-    this.config = config || {epochs: 10, batchSize: 32};
+    this.hyperparams =
+        Object.assign(Object.create(DEFAULT_HYPERPARAMS), hyperparams || {});
+    this.optimizer = tf.train.sgd(this.hyperparams.learningRate);
+    this.model.compile({
+      optimizer: this.optimizer,
+      loss: 'categoricalCrossentropy',  // TODO: bad assumption
+      metrics: ['accuracy']             // TODO: bad assumption
+    });
   }
 
   async fit(x: Tensor, y: Tensor): Promise<void> {
-    await this.model.fit(x, y, this.config);
+    await this.model.fit(x, y, {
+      epochs: this.hyperparams.epochs,
+      batchSize: this.hyperparams.batchSize
+    });
+  }
+
+  setHyperparams(hps: HyperparamsMsg) {
+    this.hyperparams = Object.assign(this.hyperparams, hps);
+    this.optimizer.setLearningRate(this.hyperparams.learningRate);
   }
 
   getVars(): VarList {
@@ -220,6 +253,8 @@ export class FederatedDynamicModel implements FederatedModel {
     }
   }
 
+  setHyperparams(hps: HyperparamsMsg): void {}
+
   // tslint:disable-next-line:no-any
   async save(handler: any, config?: any) {
     return new Promise<void>(() => {
@@ -228,10 +263,11 @@ export class FederatedDynamicModel implements FederatedModel {
   }
 }
 
-export function federated(model: FederatedDynamicModel|FederatedModel|
-                          Model): FederatedModel {
+export function federated(
+    model: FederatedDynamicModel|FederatedModel|Model,
+    hyperparams?: HyperparamsMsg): FederatedModel {
   if (model instanceof Model) {
-    return new FederatedTfModel(model);
+    return new FederatedTfModel(model, hyperparams);
   } else {
     return model;
   }
@@ -243,8 +279,13 @@ export enum Events {
 }
 
 export type ModelMsg = {
-  modelVersion: string,
+  version: string,
   vars: SerializedVariable[]
+};
+
+export type DownloadMsg = {
+  model: ModelMsg,
+  hyperparams: HyperparamsMsg
 };
 
 let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;

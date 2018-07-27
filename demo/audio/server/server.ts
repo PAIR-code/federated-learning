@@ -19,8 +19,8 @@ import * as tf from '@tensorflow/tfjs';
 import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
-import {ServerAPI} from 'federated-learning-server';
-import {log, verbose} from 'federated-learning-server';
+import {HyperparamsMsg, ServerAPI} from 'federated-learning-server';
+import {log} from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
@@ -95,9 +95,10 @@ function parseNpyFile(name): tf.Tensor {
       buff.buffer.slice(buff.byteOffset, buff.byteOffset + buff.byteLength);
   return npy.parse(arrayBuff);
 }
-const validInputs = parseNpyFile('validation-inputs.npy');
+const validInputs = parseNpyFile('hp-validation-inputs.npy');
 const validLabels = tf.tidy(
-    () => tf.oneHot(parseNpyFile('validation-labels.npy') as tf.Tensor1D, 14));
+    () =>
+        tf.oneHot(parseNpyFile('hp-validation-labels.npy') as tf.Tensor1D, 4));
 const validResultPath = `${rootDir}/validation.json`;
 let validResults = {};
 if (fs.existsSync(validResultPath)) {
@@ -149,14 +150,21 @@ if (existingModels.length) {
   url = `file://${modelDir}/${modelVersion}/model.json`;
 }
 
+const hyperparams: HyperparamsMsg = {
+  examplesPerUpdate: 4,
+  epochs: 10,
+  updatesPerVersion: 5
+};
+
 loadAudioTransferLearningModel(url).then(model => {
   // Setup our federated learning API
-  const api = new ServerAPI(model, modelVersion, modelDir, sockServer);
+  const api =
+      new ServerAPI(model, modelVersion, modelDir, sockServer, hyperparams);
   log(`ServerAPI started up at v${api.modelVersion}`);
 
   // Add a callback whenever the model is updated to compute validation accuracy
   const updateResults = (modelVersion) => {
-    if (validResults[modelVersion]) {
+    if (!validResults[modelVersion]) {
       const results = tf.tidy(() => {
         const r = model.evaluate(validInputs, validLabels);
         return [r[0].dataSync()[0], r[1].dataSync()[0]];

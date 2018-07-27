@@ -24,19 +24,17 @@ const audioTransferLearningModelURL =
 export async function loadAudioTransferLearningModel() {
   const model = await tf.loadModel(audioTransferLearningModelURL);
 
-  for (let i = 0; i < 9; ++i) {
+  for (let i = 0; i < model.layers.length; ++i) {
     model.layers[i].trainable = false;  // freeze conv layers
   }
 
-  const cutoffTensor = model.layers[9].output;
+  const cutoffTensor = model.layers[10].output;
   const k = labelNames.length;
-  const newDenseLayer1 = tf.layers.dense({units: 50, activation: 'relu'});
-  const newDenseLayer2 = tf.layers.dense({units: k, activation: 'softmax'});
-  const newOutputTensor =
-      newDenseLayer2.apply(newDenseLayer1.apply(cutoffTensor));
+  const newDenseLayer = tf.layers.dense({units: k, activation: 'softmax'});
+  const newOutputTensor = newDenseLayer.apply(cutoffTensor);
   const transferModel = tf.model(
       {inputs: model.inputs, outputs: newOutputTensor});
-  const optimizer = tf.train.sgd(0.001);
+  const optimizer = tf.train.sgd(0.01);
   transferModel.compile({
     loss: 'categoricalCrossentropy',
     optimizer: optimizer,

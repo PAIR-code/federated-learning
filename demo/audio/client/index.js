@@ -23,7 +23,7 @@ import {ClientAPI} from 'federated-learning-client';
 import {plotSpectrogram, plotSpectrum} from './spectral_plots';
 import {loadAudioTransferLearningModel} from './model';
 import {FrequencyListener} from './frequency_listener';
-import {getNextLabel, labelNames} from './labels';
+import {labelNames} from './labels';
 
 const recordFieldset = document.getElementById('spells');
 labelNames.forEach(name => {
@@ -34,6 +34,8 @@ labelNames.forEach(name => {
   button.innerText = name;
   recordFieldset.appendChild(button);
 });
+const lastPrediction = document.createElement('div');
+recordFieldset.appendChild(lastPrediction);
 
 const htmlEl = document.getElementsByTagName('html')[0];
 const spectrumCanvas = document.getElementById('spectrum-canvas');
@@ -63,17 +65,34 @@ if (URLSearchParams) {
   }
 }
 
-function setStatus(txt) {
-  statusBar.innerHTML = txt;
+function setStatus(statusHTML) {
+  statusBar.innerHTML = statusHTML;
+}
+
+function setReadyStatus(clientAPI) {
+  let html = 'Ready to listen!';
+  const need = clientAPI.numExamplesPerUpdate() - clientAPI.numExamples();
+  html += ` Need <span class='status-number'>${need}</span> more before training.`
+  const trained = clientAPI.numUpdates();
+  if (trained) {
+    html += ` You've trained <span class='status-number'>${trained}</span> 🧙`;
+  }
+  setStatus(html);
 }
 
 loadAudioTransferLearningModel().then(async (model) => {
   const clientAPI = new ClientAPI(model, 5);
+  window.model = model;
+  window.api = clientAPI;
+
   clientAPI.onDownload((msg) => {
     console.log(`new model: ${modelVersion.innerText} -> ${msg.modelVersion}`);
-    modelVersion.innerText = `v${msg.modelVersion}`;
+    modelVersion.innerText = `version #${clientAPI.numVersions()}`;
   });
+  const t1 = new Date().getTime();
   await clientAPI.connect(serverURL);
+  const t2 = new Date().getTime();
+  console.log(`download took ${t2-t1}ms`)
 
   setStatus('Waiting for microphone&hellip;');
   const stream =
@@ -81,6 +100,7 @@ loadAudioTransferLearningModel().then(async (model) => {
 
   setupUI(stream, model, clientAPI);
 });
+
 
 function setupUI(stream, model, clientAPI) {
   const inputShape = model.inputs[0].shape;
@@ -142,12 +162,13 @@ function setupUI(stream, model, clientAPI) {
   listener.listen();
 
   // Create our record button
-  setStatus('Ready to listen!');
+  setReadyStatus(clientAPI);
   recordButtons.forEach(b => b.removeAttribute('disabled'));
 
   // When we click it, record for 1 second
   recordButtons.forEach(button => {
     button.addEventListener('click', () => {
+      lastPrediction.innerHTML = '';
       recordButtons.forEach(b => b.setAttribute('disabled', 'disabled'));
       yTrue = labelNames.indexOf(button.getAttribute('value'));
       button.classList.add('active');
@@ -166,7 +187,7 @@ function setupUI(stream, model, clientAPI) {
     resultRow = document.createElement('tr');
     for (let i = 0; i < 4; i++)
       resultRow.appendChild(document.createElement('td'));
-    labeledExamples.appendChild(resultRow);
+    labeledExamples.prepend(resultRow);
     resultRow.children[2].innerText = labelNames[yTrue];
 
     // Compute input tensor
@@ -201,6 +222,9 @@ function setupUI(stream, model, clientAPI) {
     resultRow.children[3].innerText = labelNames[yPred];
     if (yTrue != yPred) {
       resultRow.children[3].className = 'incorrect-prediction';
+      lastPrediction.innerHTML = `You tried to cast <span class='last-prediction'>${labelNames[yTrue]}</span>, but your wand performed <span class='last-prediction'>${labelNames[yPred]}</span>!`;
+    } else {
+      lastPrediction.innerHTML = `You successfully cast <span class='last-prediction'>${labelNames[yPred]}</span>!`;
     }
 
     switch (labelNames[yPred]) {
@@ -217,6 +241,7 @@ function setupUI(stream, model, clientAPI) {
         htmlEl.classList.remove('accio');
     }
 
+
     // Plot probabilities
     Plotly.newPlot('probs', [{x: labelNames, y: probs, type: 'bar'}], {
       autosize: false,
@@ -231,11 +256,12 @@ function setupUI(stream, model, clientAPI) {
       tf.dispose([x, y, p]);
 
       // re-allow recording
-      setStatus('Ready to listen!');
       recordButtons.forEach(b => {
         b.removeAttribute('disabled');
         b.classList.remove('active');
       });
+
+      setReadyStatus(clientAPI);
       console.log('...done!');
     };
 
