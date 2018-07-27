@@ -20,30 +20,36 @@ limitations under the License.
     <link rel="stylesheet" type="text/css" href="index.css">
   </head>
   <body>
-    <div class='left-col'>
-      <fieldset>
-        <legend>Hi!</legend>
-        <span id='intro-text'></span>
-        <h1 id='suggested-label'></h1>
-        <button id='record-button' disabled>Connecting to server&hellip;</button>
+    <div class='header'>
+      <h1>Federated Hogwarts</h1>
+      <nav>
+        <ul>
+          <li><a href='https://js.tensorflow.org/' target='_blank'>TensorflowJS</a></li>
+          <li><a href='https://ai.googleblog.com/2017/04/federated-learning-collaborative.html' target='_blank'>Federated Learning</a></li>
+          <li><a href='https://github.com/PAIR-code/federated-learning' target='_blank'>Demo Code</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class='container'>
+      <fieldset id='spells'>
+        <legend>Spells</legend>
+        <div id='status'>Connecting to server&hellip;</div>
       </fieldset>
       <fieldset class='spectrum'>
         <legend>Audio</legend>
         <div class='chart'>
           <label>Spectrum</label>
-          <canvas id="spectrum-canvas" height="90" width="740"></canvas>
+          <canvas id="spectrum-canvas" height="90" width="617"></canvas>
         </div>
       </fieldset>
       <fieldset>
-        <legend>Model (version <span id='model-version'>pending&hellip;</span>)</legend>
+        <legend>Model (<span id='model-version'>version pending&hellip;</span>)</legend>
         <div id='model'>
           Waiting for input&hellip;
         </div>
       </fieldset>
-    </div>
-    <div class='right-col'>
       <fieldset>
-        <legend>Labeled Examples</legend>
+        <legend>Priori Incantatem</legend>
         <table id='example-table'>
           <thead><tr><th>audio</th><th>image</th><th>label</th><th>prediction</th></tr></thead>
           <tbody id='labeled-examples'></tbody>

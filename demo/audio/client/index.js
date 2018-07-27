@@ -25,19 +25,31 @@ import {loadAudioTransferLearningModel} from './model';
 import {FrequencyListener} from './frequency_listener';
 import {getNextLabel, labelNames} from './labels';
 
+const recordFieldset = document.getElementById('spells');
+labelNames.forEach(name => {
+  const button = document.createElement('button');
+  button.classList.add('record-button');
+  button.setAttribute('value', name);
+  button.setAttribute('disabled', 'disabled');
+  button.innerText = name;
+  recordFieldset.appendChild(button);
+});
+
 const htmlEl = document.getElementsByTagName('html')[0];
 const spectrumCanvas = document.getElementById('spectrum-canvas');
 const modelDiv = document.getElementById('model');
-const recordButton = document.getElementById('record-button');
 const modelVersion = document.getElementById('model-version');
+const statusBar = document.getElementById('status');
+const recordButtons = Array.from(
+    document.getElementsByClassName('record-button'));
 const labeledExamples = document.getElementById('labeled-examples');
 const waitingTemplate = `Waiting for input&hellip;`;
 const modelTemplate = `
-  <div class='chart'>
+  <div class='chart model-input'>
     <label>Input</label>
     <canvas id="spectrogram-canvas" height="180" width="270"></canvas>
   </div>
-  <div class='chart'>
+  <div class='chart model-output'>
     <label>Output</label>
     <div id='probs'></div>
   </div>
@@ -51,15 +63,19 @@ if (URLSearchParams) {
   }
 }
 
+function setStatus(txt) {
+  statusBar.innerHTML = txt;
+}
+
 loadAudioTransferLearningModel().then(async (model) => {
   const clientAPI = new ClientAPI(model, 5);
   clientAPI.onDownload((msg) => {
     console.log(`new model: ${modelVersion.innerText} -> ${msg.modelVersion}`);
-    modelVersion.innerText = msg.modelVersion;
+    modelVersion.innerText = `v${msg.modelVersion}`;
   });
   await clientAPI.connect(serverURL);
 
-  recordButton.innerHTML = 'Waiting for microphone&hellip;';
+  setStatus('Waiting for microphone&hellip;');
   const stream =
       await navigator.mediaDevices.getUserMedia({audio: true, video: false});
 
@@ -71,7 +87,7 @@ function setupUI(stream, model, clientAPI) {
   const numFrames = inputShape[1];
   const fftLength = inputShape[2];
   let resultRow;
-  let yTrue = getNextLabel();
+  let yTrue;// = getNextLabel();
   let yPred;
   let probs;
   let xNpy;
@@ -126,17 +142,21 @@ function setupUI(stream, model, clientAPI) {
   listener.listen();
 
   // Create our record button
-  recordButton.innerHTML = 'Record';
-  recordButton.removeAttribute('disabled');
+  setStatus('Ready to listen!');
+  recordButtons.forEach(b => b.removeAttribute('disabled'));
 
   // When we click it, record for 1 second
-  recordButton.addEventListener('click', () => {
-    recordButton.innerHTML = 'Saving&hellip;';
-    recordButton.setAttribute('disabled', 'disabled');
-    modelDiv.innerHTML = waitingTemplate;
-    recordButton.innerHTML = 'Listening&hellip;';
-    recorder.start(1100);
-    setTimeout(finishRecording, 1000);
+  recordButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      recordButtons.forEach(b => b.setAttribute('disabled', 'disabled'));
+      yTrue = labelNames.indexOf(button.getAttribute('value'));
+      button.classList.add('active');
+      console.log(yTrue);
+      modelDiv.innerHTML = waitingTemplate;
+      setStatus('Listening&hellip;');
+      recorder.start(1100);
+      setTimeout(finishRecording, 1000);
+    });
   });
 
   // When we're done recording,
@@ -163,7 +183,6 @@ function setupUI(stream, model, clientAPI) {
 
     // Stop separate .wav recording
     recorder.stop();
-    x.print();
 
     // Plot spectrograms
     const mainSpectrogram = document.getElementById('spectrogram-canvas');
@@ -201,7 +220,7 @@ function setupUI(stream, model, clientAPI) {
     // Plot probabilities
     Plotly.newPlot('probs', [{x: labelNames, y: probs, type: 'bar'}], {
       autosize: false,
-      width: Math.min(270*1.5, document.getElementById('model').clientWidth),
+      width: Math.min(270*1.25, document.getElementById('model').clientWidth),
       height: 180,
       margin: {l: 30, r: 5, b: 30, t: 5, pad: 0},
     });
@@ -211,18 +230,18 @@ function setupUI(stream, model, clientAPI) {
       // dispose of tensors
       tf.dispose([x, y, p]);
 
-      // decide what label to request next
-      yTrue = getNextLabel();
-
       // re-allow recording
-      recordButton.innerText = 'Record';
-      recordButton.removeAttribute('disabled');
+      setStatus('Ready to listen!');
+      recordButtons.forEach(b => {
+        b.removeAttribute('disabled');
+        b.classList.remove('active');
+      });
       console.log('...done!');
     };
 
     // ...after we train
     console.log('fitting model...');
-    recordButton.innerHTML = 'Fitting Model&hellip;'
+    setStatus('Fitting Model&hellip;')
     clientAPI.federatedUpdate(x, y).catch(console.log).finally(cleanup);
   }
 }
