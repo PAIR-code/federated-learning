@@ -111,15 +111,16 @@ app.post('/data', (req: any, res: any) => {
   if (!req.files) {
     return res.status(400).send('Must upload a file');
   }
-  const file = req.files.file;
-  const fileParts = file.name.split('.');
-  const labelName = fileParts[0];
-  const extension = fileParts[1];
+  const wavFile = req.files.wav;
+  const npyFile = req.files.npy;
+  const labelName = wavFile.name.split('.')[0];
   const labelDir = path.join(fileDir, labelName);
   const fileId = uuid();
-  const filename = path.join(labelDir, `${fileId}.${extension}`);
-  file.mv(filename);           // save raw file
-  dataResults.push(req.body);  // save metadata
+  const filename = path.join(labelDir, fileId);
+
+  wavFile.mv(`${filename}.wav`);  // save raw file
+  npyFile.mv(`${filename}.npy`);  // save browser-processed version
+  dataResults.push(req.body);     // save metadata
   fs.writeFile(`${dataDir}/${fileId}.json`, JSON.stringify(req.body), () => {});
   res.send('File uploaded!');
 });
@@ -155,7 +156,7 @@ loadAudioTransferLearningModel(url).then(model => {
 
   // Add a callback whenever the model is updated to compute validation accuracy
   const updateResults = (modelVersion) => {
-    if (!validResults[modelVersion]) {
+    if (validResults[modelVersion]) {
       const results = tf.tidy(() => {
         const r = model.evaluate(validInputs, validLabels);
         return [r[0].dataSync()[0], r[1].dataSync()[0]];

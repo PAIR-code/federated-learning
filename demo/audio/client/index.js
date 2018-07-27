@@ -16,6 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import * as npy from './npy';
 import uuid from 'uuid/v4';
 import MediaStreamRecorder from 'msr';
 import {ClientAPI} from 'federated-learning-client';
@@ -24,6 +25,7 @@ import {loadAudioTransferLearningModel} from './model';
 import {FrequencyListener} from './frequency_listener';
 import {getNextLabel, labelNames} from './labels';
 
+const htmlEl = document.getElementsByTagName('html')[0];
 const spectrumCanvas = document.getElementById('spectrum-canvas');
 const modelDiv = document.getElementById('model');
 const recordButton = document.getElementById('record-button');
@@ -50,7 +52,7 @@ if (URLSearchParams) {
 }
 
 loadAudioTransferLearningModel().then(async (model) => {
-  const clientAPI = new ClientAPI(model);
+  const clientAPI = new ClientAPI(model, 5);
   clientAPI.onDownload((msg) => {
     console.log(`new model: ${modelVersion.innerText} -> ${msg.modelVersion}`);
     modelVersion.innerText = msg.modelVersion;
@@ -72,6 +74,7 @@ function setupUI(stream, model, clientAPI) {
   let yTrue = getNextLabel();
   let yPred;
   let probs;
+  let xNpy;
 
   if (!getCookie('federated-learner-uuid')) {
     setCookie('federated-learner-uuid', uuid());
@@ -82,9 +85,9 @@ function setupUI(stream, model, clientAPI) {
   // Create a recorder to save the raw .wav file
   const recorder = new MediaStreamRecorder(stream);
   recorder.mimeType = 'audio/wav';
-  recorder.ondataavailable = blob => {
+  recorder.ondataavailable = wavBlob => {
     // create audio element with recording
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(wavBlob);
     const audioControls = document.createElement('audio');
     const audioSource = document.createElement('source');
     audioControls.setAttribute('controls', 'controls');
@@ -93,12 +96,17 @@ function setupUI(stream, model, clientAPI) {
     audioControls.appendChild(audioSource);
     resultRow.children[0].appendChild(audioControls);
 
+    const fn = labelNames[yTrue];
+    const npyBlob = new Blob([new Uint8Array(xNpy)]);
+    const wavFile =
+        new File([wavBlob], `${fn}.wav`, {type: 'audio/wav'});
+    const npyFile =
+        new File([npyBlob], `${fn}.npy`, {type: 'application/octet-stream'});
     // send .wav file to server
-    const file =
-        new File([blob], `${labelNames[yTrue]}.wav`, {type: 'audio/wav'});
     const req = new XMLHttpRequest();
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('wav', wavFile);
+    formData.append('npy', npyFile);
     formData.append('clientId', clientId);
     formData.append('modelVersion', clientAPI.modelVersion());
     formData.append('timestamp', new Date().getTime().toString());
@@ -144,6 +152,7 @@ function setupUI(stream, model, clientAPI) {
     // Compute input tensor
     const freqData = listener.getFrequencyData();
     const x = getInputTensorFromFrequencyData(freqData, numFrames, fftLength);
+    xNpy = npy.serialize(x);
 
     // Compute predictions
     const p = model.predict(x);
@@ -154,6 +163,7 @@ function setupUI(stream, model, clientAPI) {
 
     // Stop separate .wav recording
     recorder.stop();
+    x.print();
 
     // Plot spectrograms
     const mainSpectrogram = document.getElementById('spectrogram-canvas');
@@ -174,10 +184,24 @@ function setupUI(stream, model, clientAPI) {
       resultRow.children[3].className = 'incorrect-prediction';
     }
 
+    switch (labelNames[yPred]) {
+      case 'nox':
+        htmlEl.classList.add('nox');
+        break;
+      case 'lumos':
+        htmlEl.classList.remove('nox');
+        break;
+      case 'accio':
+        htmlEl.classList.add('accio');
+        break;
+      case 'expelliarmus':
+        htmlEl.classList.remove('accio');
+    }
+
     // Plot probabilities
     Plotly.newPlot('probs', [{x: labelNames, y: probs, type: 'bar'}], {
       autosize: false,
-      width: Math.min(480, document.getElementById('model').clientWidth),
+      width: Math.min(270*1.5, document.getElementById('model').clientWidth),
       height: 180,
       margin: {l: 30, r: 5, b: 30, t: 5, pad: 0},
     });

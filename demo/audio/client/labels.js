@@ -37,20 +37,24 @@ const suggestedLabel = document.getElementById('suggested-label');
 const introText = document.getElementById('intro-text');
 
 // Ask user to provide audio for all labels, but in a random order
-const randomLabels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+/// const randomLabels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+const randomLabels = [0, 1, 2, 3];//, 3, 4];//, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 tf.util.shuffle(randomLabels);
 
 let labelIdx = 0;
 let numAsked = 0;
 
+//export const labelNames = [
+//  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+//  'zero', 'left', 'right', 'go', 'stop'
+//];
 export const labelNames = [
-  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
-  'zero', 'left', 'right', 'go', 'stop'
+  'accio', 'expelliarmus', 'lumos', 'nox'
 ];
 
 export function getNextLabel() {
   const label = randomLabels[labelIdx];
-  suggestedLabel.innerText = labelNames[label];
+  suggestedLabel.innerText = '"' + labelNames[label] + '"';
   if (numAsked == 0) {
     introText.innerText = firstPrompt;
   } else {

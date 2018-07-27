@@ -15,17 +15,43 @@
  * =============================================================================
  */
 
-body {
-  font-family: monospace;
+@font-face {
+  font-family: harryp;
+  src: url(harryp.ttf);
 }
+
+html.accio {
+  cursor: url(wand.png) 0 0, auto;
+}
+
 button:not(:disabled) {
   cursor: pointer;
 }
+
+html.accio button:not(:disabled) {
+  cursor: url(wand-active.png) 0 0, pointer;
+}
+
+html {
+  color: #222;
+  transition: all 1000ms linear;
+}
+html.nox {
+  background-color: #222;
+  color: #aaa;
+}
+
+body {
+  font-family: harryp;
+  font-size: 32px;
+}
+
 #record-button {
-  font-family: monospace;
+  font-family: harryp;
   margin-top: 5px;
   background-color: lightgreen;
-  font-size: x-large;
+  color: #222;
+  font-size: 48px;
 }
 #results {
   max-width: 1600px;
@@ -61,36 +87,6 @@ button:not(:disabled) {
     display: none;
   }
 }
-#probs {
-  margin-top: 1em;
-}
-#label-radios {
-  list-style: none;
-  padding-left: 32px;
-}
-#label-radios li {
-  display: inline;
-}
-#label-radios label {
-  cursor: pointer;
-  position: relative;
-  font-family: "Open Sans", verdana, arial, sans-serif;
-  padding: 0 7px;
-  padding-bottom: 16px;
-  border: 1px solid #ccc;
-  font-size: 12px;
-  fill: rgb(68, 68, 68);
-}
-#label-radios label:hover {
-  background: #e8e8e8;
-}
-#label-radios input {
-  position: absolute;
-  margin: 0;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-}
 #example-table {
   width: 100%;
 }
@@ -109,7 +105,12 @@ button:not(:disabled) {
   font-weight: bold;
 }
 audio {
-  width: 250px;
+  max-width: 250px;
+}
+@media (max-width: 600px) {
+  audio {
+    max-width: 100px;
+  }
 }
 fieldset {
   position: relative;
