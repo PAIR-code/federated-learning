@@ -20,17 +20,28 @@ limitations under the License.
     <link rel="stylesheet" type="text/css" href="index.css">
   </head>
   <body>
-    <label>
-      Showing
-      <select id='performance-metric'>
-        <option value='Accuracy'>Accuracy</option>
-        <option value='Cross-Entropy'>Cross-Entropy</option>
-      </select>
-      by federated client over time:
-    </label>
-    <div id='results'>
+    <div class='header'>
+      <h1>Federated Hogwarts</h1>
+      <nav>
+        <ul>
+          <li><a href='https://js.tensorflow.org/' target='_blank'>TensorflowJS</a></li>
+          <li><a href='https://ai.googleblog.com/2017/04/federated-learning-collaborative.html' target='_blank'>Federated Learning</a></li>
+          <li><a href='https://github.com/PAIR-code/federated-learning' target='_blank'>Demo Code</a></li>
+        </ul>
+      </nav>
     </div>
-
+    <div class='results container'>
+      <label>
+        Showing
+        <select id='performance-metric'>
+          <option value='Accuracy'>Accuracy</option>
+          <option value='Cross-Entropy'>Cross-Entropy</option>
+        </select>
+        by federated client over time:
+      </label>
+      <div id='results'>
+      </div>
+    </div>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="results.js"></script>
   </body>

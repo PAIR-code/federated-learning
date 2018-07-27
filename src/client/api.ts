@@ -20,13 +20,17 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import {ModelMsg, Events, FederatedModel, deserializeVar, log, SerializedVariable, serializeVars, federated} from './common';
+import {ModelMsg, DownloadMsg, Events, FederatedModel, deserializeVar, log, SerializedVariable, serializeVars, federated} from './common';
 import {Model} from '@tensorflow/tfjs';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
 
-export type DownloadCallback = (msg: ModelMsg) => void;
+type CounterObj = {
+  [key: string]: number
+};
+
+export type DownloadCallback = (msg: DownloadMsg) => void;
 
 /**
  * Federated Learning Client API library.
@@ -44,30 +48,35 @@ export type DownloadCallback = (msg: ModelMsg) => void;
  * The client->server sync must be triggered manually with uploadVars
  */
 export class ClientAPI {
-  private minExamples: number;
-  private msg: ModelMsg;
+  private msg: DownloadMsg;
   private model: FederatedModel;
   private socket: SocketIOClient.Socket;
   private downloadCallbacks: DownloadCallback[];
+  private x: tf.Tensor;
+  private y: tf.Tensor;
+  private versionUpdateCounts: CounterObj;
 
   /**
    * Construct a client API for federated learning that will push and pull
    * `model` updates from the server.
    * @param model - model to use with federated learning
    */
-  constructor(model: FederatedModel|Model, minExamples?: number) {
+  constructor(model: FederatedModel|Model) {
     this.model = federated(model);
     this.downloadCallbacks = [msg => {
-      log('download', 'modelVersion:', msg.modelVersion);
+      log('download', 'modelVersion:', msg.model.version);
     }];
-    this.minExamples = minExamples || 1;
+    // TODO: set x and y to empty tf.Tensors (with correct shape)
+    this.x = null;
+    this.y = null;
+    this.versionUpdateCounts = {};
   }
 
   /**
    * @return The version of the model we're currently training
    */
   public modelVersion(): string {
-    return this.msg.modelVersion;
+    return this.msg.model.version;
   }
 
   /**
@@ -87,12 +96,16 @@ export class ClientAPI {
   public async connect(serverURL: string): Promise<void> {
     const msg = await this.connectTo(serverURL);
     this.msg = msg;
-    this.setVars(msg.vars);
+    this.setVars(msg.model.vars);
+    this.model.setHyperparams(msg.hyperparams);
+    this.versionUpdateCounts[msg.model.version] = 0;
     this.downloadCallbacks.forEach(cb => cb(msg));
 
-    this.socket.on(Events.Download, (msg: ModelMsg) => {
+    this.socket.on(Events.Download, (msg: DownloadMsg) => {
       this.msg = msg;
-      this.setVars(msg.vars);
+      this.setVars(msg.model.vars);
+      this.model.setHyperparams(msg.hyperparams);
+      this.versionUpdateCounts[msg.model.version] = 0;
       this.downloadCallbacks.forEach(cb => cb(msg));
     });
   }
@@ -114,21 +127,66 @@ export class ClientAPI {
    * are too few examples, and only doing training/uploading after reaching a
    * configurable threshold (disposing of the copies afterwards).
    *
-   * @param xs Training inputs
-   * @param ys Training labels
+   * @param x Training inputs
+   * @param y Training labels
    */
-  public async federatedUpdate(xs: tf.Tensor, ys: tf.Tensor): Promise<void> {
-    console.log(this.minExamples);
-    // save original model ID (in case it changes during training/serialization)
-    const modelVersion = this.msg.modelVersion;
-    // fit the model to the new data
-    await this.model.fit(xs, ys);
-    // serialize the new weights -- in the future we could add noise here
-    const newVars = await serializeVars(this.model.getVars());
-    // revert our model back to its original weights
-    this.setVars(this.msg.vars);
-    // upload the updates to the server
-    await this.uploadVars({modelVersion, vars: newVars});
+  public async federatedUpdate(x: tf.Tensor, y: tf.Tensor): Promise<void> {
+    // TODO: reshape x and y if missing batch dimension (based on model shape)
+    // TODO: save leftover examples if training w/ more than minimum
+    let xNew, yNew;
+    if (this.x) {
+      xNew = tf.concat([this.x, x]);
+      yNew = tf.concat([this.y, y]);
+      tf.dispose([this.x, this.y]);
+    } else {
+      xNew = x.clone();
+      yNew = y.clone();
+    }
+
+    if (xNew.shape[0] >= this.msg.hyperparams.examplesPerUpdate) {
+      // save original ID (in case it changes during training/serialization)
+      const modelVersion = this.modelVersion();
+      // fit the model to the new data
+      await this.model.fit(xNew, yNew);
+      // serialize the new weights -- in the future we could add noise here
+      const newVars = await serializeVars(this.model.getVars());
+      // revert our model back to its original weights
+      this.setVars(this.msg.model.vars);
+      // upload the updates to the server
+      await this.uploadVars({version: modelVersion, vars: newVars});
+      // we're done with this data
+      tf.dispose([xNew, yNew]);
+      this.x = null;
+      this.y = null;
+      this.versionUpdateCounts[modelVersion] += 1;
+    } else {
+      this.x = xNew;
+      this.y = yNew;
+    }
+  }
+
+  public numUpdates(): number {
+    let numTotal = 0;
+    Object.keys(this.versionUpdateCounts).forEach(k => {
+      numTotal += this.versionUpdateCounts[k];
+    });
+    return numTotal;
+  }
+
+  public numVersions(): number {
+    return Object.keys(this.versionUpdateCounts).length;
+  }
+
+  public numExamples(): number {
+    if (this.x) {
+      return this.x.shape[0];
+    } else {
+      return 0;
+    }
+  }
+
+  public numExamplesPerUpdate(): number {
+    return this.msg.hyperparams.examplesPerUpdate;
   }
 
   /**
@@ -153,9 +211,9 @@ export class ClientAPI {
     });
   }
 
-  private async connectTo(serverURL: string): Promise<ModelMsg> {
+  private async connectTo(serverURL: string): Promise<DownloadMsg> {
     this.socket = socketio(serverURL);
-    return fromEvent<ModelMsg>(
+    return fromEvent<DownloadMsg>(
         this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 }

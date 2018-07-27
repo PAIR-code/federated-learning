@@ -35,17 +35,16 @@ export async function loadAudioTransferLearningModel(url: string) {
   const model = await tf.loadModel(url);
   tf.ENV.set('IS_BROWSER', false);
 
-  for (let i = 0; i < 9; ++i) {
-    model.layers[i].trainable = false;  // freeze conv layers
-  }
+  let final;
 
   if (url.indexOf('http') >= 0) {
-    const cutoffTensor = model.layers[9].output;
-    const newDenseLayer1 = tf.layers.dense({units: 50, activation: 'relu'});
-    const newDenseLayer2 =
-        tf.layers.dense({units: labelNames.length, activation: 'softmax'});
-    const newOutputTensor =
-        newDenseLayer2.apply(newDenseLayer1.apply(cutoffTensor));
+    for (let i = 0; i < model.layers.length; ++i) {
+      model.layers[i].trainable = false;  // freeze conv layers
+    }
+    const cutoffTensor = model.layers[10].output;
+    const k = labelNames.length;
+    const newDenseLayer = tf.layers.dense({units: k, activation: 'softmax'});
+    const newOutputTensor = newDenseLayer.apply(cutoffTensor);
     const transferModel = tf.model(
         {inputs: model.inputs, outputs: newOutputTensor as tf.SymbolicTensor});
     transferModel.compile({
@@ -53,13 +52,15 @@ export async function loadAudioTransferLearningModel(url: string) {
       optimizer: 'sgd',
       metrics: ['accuracy']
     });
-    return transferModel;
+    final = transferModel;
   } else {
     model.compile({
       'optimizer': 'sgd',
       loss: 'categoricalCrossentropy',
       'metrics': ['accuracy']
     });
-    return model;
+    final = model;
   }
+  log(`final # trainable weights: ${final.trainableWeights.length}`);
+  return final;
 }
