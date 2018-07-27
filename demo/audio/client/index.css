@@ -20,8 +20,48 @@
   src: url(harryp.ttf);
 }
 
+.header {
+  background-color:black;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 60px;
+  width: 100%;
+  border-bottom: 1px solid #ccc;
+}
+
+.header h1 {
+  float: left;
+  margin: 5px;
+  color: yellow;
+}
+
+.header nav {
+  display: inline-block;
+}
+
+.header nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 60px;
+}
+
+.header nav li {
+  float: left;
+  margin-left: 1em;
+  line-height: 60px;
+}
+
+.header nav li a {
+  color: yellow;
+}
+
 html.accio {
   cursor: url(wand.png) 0 0, auto;
+}
+html.accio.nox {
+  cursor: url(wand-active.png) 0 0, auto;
 }
 
 button:not(:disabled) {
@@ -34,24 +74,40 @@ html.accio button:not(:disabled) {
 
 html {
   color: #222;
-  transition: all 1000ms linear;
+  background-color: white;
+  transition: all 2000ms ease-in-out;
 }
 html.nox {
   background-color: #222;
   color: #aaa;
 }
+.container {
+  width: 666px;
+  margin: 0 auto;
+  margin-top: 80px;
+}
 
 body {
   font-family: harryp;
+  font-size: 24px;
+}
+legend {
   font-size: 32px;
 }
+#model-version {
+  font-size: 24px;
+}
 
-#record-button {
+.record-button {
   font-family: harryp;
   margin-top: 5px;
   background-color: lightgreen;
   color: #222;
   font-size: 48px;
+  padding: 0 10px;
+}
+.record-button.active {
+  background-color: darkgoldenrod;
 }
 #results {
   max-width: 1600px;
@@ -70,30 +126,13 @@ body {
 .chart canvas {
   border: 1px solid #ccc;
 }
-.left-col {
-  display: inline-block;
-  width: 800px;
-}
-.right-col {
-  display: inline-block;
-  vertical-align: top;
-  width: 400px;
-}
-@media (max-width: 600px) {
-  .left-col, .right-col {
-    width: 100%;
-  }
-  .spectrum {
-    display: none;
-  }
-}
 #example-table {
   width: 100%;
 }
 #example-table tbody tr {
   border-top: 1px solid;
 }
-#example-table tbody td {
+#example-table td {
   padding-right: 1em;
 }
 #example-table th {
@@ -107,11 +146,6 @@ body {
 audio {
   max-width: 250px;
 }
-@media (max-width: 600px) {
-  audio {
-    max-width: 100px;
-  }
-}
 fieldset {
   position: relative;
 }
@@ -119,4 +153,23 @@ fieldset {
   position: absolute;
   right: 1em;
   bottom: 1em;
+}
+
+@media (max-width: 665px) {
+  .spectrum, .header nav, .model-input {
+    display: none;
+  }
+  .container {
+    width: 100%;
+  }
+  .header h1 {
+    width: 100%;
+    text-align: center;
+  }
+  audio {
+    max-width: 100px;
+  }
+  #example-table td, #example-table th {
+    padding-right: 0;
+  }
 }
