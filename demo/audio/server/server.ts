@@ -81,8 +81,8 @@ for (let i = 0; i < labelNames.length; i++) {
 }
 
 // Load metadata about our data / client-side accuracy
-const metadata = fs.readdirSync(metaDir).map(file => 
-  JSON.parse(fs.readFileSync(`${metaDir}/${file}`).toString()));
+const metadata = fs.readdirSync(metaDir).map(
+    file => JSON.parse(fs.readFileSync(`${metaDir}/${file}`).toString()));
 
 // Load validation sets + data about validation accuracy
 function parseNpyFile(name): tf.Tensor {
@@ -103,8 +103,8 @@ const validLabels = tf.tidy(
 app.post('/data', (req: any, res: any) => {
   const reqId = uuid();
 
-  dataResults.push(req.body);     // save metadata
-  writeFile(`${dataDir}/${reqId}.json`, JSON.stringify(req.body));
+  metadata.push(req.body);  // save metadata
+  writeFile(`${metaDir}/${reqId}.json`, JSON.stringify(req.body));
 
   if (req.files) {
     req.files.forEach(file => {
@@ -119,36 +119,19 @@ app.post('/data', (req: any, res: any) => {
 });
 
 // tslint:disable-next-line:no-any
-app.get('/metrics', async (req: any, res: any) => {
-  const versions = await readdir(modelDir);
-  const metrics = Promise.all(
-    versions.map(async (v) => {
-      file = await readFile(`${modelDir}/${v}/metrics.json`);
-      return JSON.parse(file.toString());
-    })
-  );
-  res.send(metrics);
+app.get('/metadata', async (req: any, res: any) => {
+  res.send(metadata);
 });
 
 // tslint:disable-next-line:no-any
 app.get('/validation', (req: any, res: any) => {
-  res.send(validResults);
+  res.send(validation);
 })
 
 // Expose the client as a set of static files
 app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
 // Either load our model from the internet or our data directory
-let url =
-    
-url = 'file://manual/model.json';
-//let modelVersion = new Date().getTime().toString();
-//const existingModels = fs.readdirSync(modelDir);
-//existingModels.sort();
-//if (existingModels.length) {
-  //modelVersion = existingModels[existingModels.length - 1];
-  //url = `file://${modelDir}/${modelVersion}/model.json`;
-//}
 
 const hyperparams: HyperparamsMsg = {
   examplesPerUpdate: 4,
@@ -156,7 +139,23 @@ const hyperparams: HyperparamsMsg = {
   updatesPerVersion: 5
 };
 
-const federatedModel = new ServerTfModel(modelDir, loadAudioTransferLearningModel);
+const initialModelUrl =
+    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+
+async function loadInitialModel(): Promise<tf.Model> {
+  const model = await tf.loadModel(initialModelUrl);
+  for (let i = 0; i < model.layers.length; ++i) {
+    model.layers[i].trainable = false;  // freeze everything
+  }
+  const transferLayer = model.layers[10].output;
+  const newDenseLayer = tf.layers.dense({units: 4, activation: 'softmax'});
+  const newOutputs = newDenseLayer.apply(transferLayer) as tf.SymbolicTensor;
+  return tf.model({inputs: model.inputs, outputs: newOutputs});
+}
+
+
+const federatedModel =
+    new ServerTfModel(modelDir, loadInitialModel, compileModel);
 
 loadAudioTransferLearningModel(url).then(model => {
   // Setup our federated learning API
