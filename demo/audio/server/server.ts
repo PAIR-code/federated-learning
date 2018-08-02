@@ -71,22 +71,18 @@ app.use((req: any, res: any, next: any) => {
 
 // Create directories
 const rootDir = path.resolve(__dirname + '/data');
-const dataDir = path.join(rootDir, 'data');
+const metaDir = path.join(rootDir, 'metadata');
 const fileDir = path.join(rootDir, 'files');
 const modelDir = path.join(rootDir, 'models');
 const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
-[rootDir, modelDir, fileDir, dataDir].forEach(mkdir);
+[rootDir, modelDir, fileDir, metaDir].forEach(mkdir);
 for (let i = 0; i < labelNames.length; i++) {
   mkdir(path.join(fileDir, labelNames[i]));
 }
 
 // Load metadata about our data / client-side accuracy
-const dataResults = [];
-const existingData = fs.readdirSync(dataDir);
-existingData.forEach(fn => {
-  const json = fs.readFileSync(`${dataDir}/${fn}`).toString();
-  dataResults.push(JSON.parse(json));
-});
+const metadata = fs.readdirSync(metaDir).map(file => 
+  JSON.parse(fs.readFileSync(`${metaDir}/${file}`).toString()));
 
 // Load validation sets + data about validation accuracy
 function parseNpyFile(name): tf.Tensor {
@@ -95,40 +91,43 @@ function parseNpyFile(name): tf.Tensor {
       buff.buffer.slice(buff.byteOffset, buff.byteOffset + buff.byteLength);
   return npy.parse(arrayBuff);
 }
+
 const validInputs = parseNpyFile('hp-validation-inputs.npy');
 const validLabels = tf.tidy(
     () =>
         tf.oneHot(parseNpyFile('hp-validation-labels.npy') as tf.Tensor1D, 4));
-const validResultPath = `${rootDir}/validation.json`;
-let validResults = {};
-if (fs.existsSync(validResultPath)) {
-  validResults = JSON.parse(fs.readFileSync(validResultPath).toString());
-}
 
 // Setup endpoints to track client and validation accuracy for visualization
 
 // tslint:disable-next-line:no-any
 app.post('/data', (req: any, res: any) => {
-  if (!req.files) {
-    return res.status(400).send('Must upload a file');
-  }
-  const wavFile = req.files.wav;
-  const npyFile = req.files.npy;
-  const labelName = wavFile.name.split('.')[0];
-  const labelDir = path.join(fileDir, labelName);
-  const fileId = uuid();
-  const filename = path.join(labelDir, fileId);
+  const reqId = uuid();
 
-  wavFile.mv(`${filename}.wav`);  // save raw file
-  npyFile.mv(`${filename}.npy`);  // save browser-processed version
   dataResults.push(req.body);     // save metadata
-  fs.writeFile(`${dataDir}/${fileId}.json`, JSON.stringify(req.body), () => {});
-  res.send('File uploaded!');
+  writeFile(`${dataDir}/${reqId}.json`, JSON.stringify(req.body));
+
+  if (req.files) {
+    req.files.forEach(file => {
+      const fileParts = file.name.split('.');
+      const labelName = fileParts[0];
+      const extension = fileParts[fileParts.length - 1];
+      file.mv(`${fileDir}/${labelName}/${reqId}.${extension}`);
+    });
+  }
+
+  res.send(200);
 });
 
 // tslint:disable-next-line:no-any
-app.get('/data', (req: any, res: any) => {
-  res.send(dataResults);
+app.get('/metrics', async (req: any, res: any) => {
+  const versions = await readdir(modelDir);
+  const metrics = Promise.all(
+    versions.map(async (v) => {
+      file = await readFile(`${modelDir}/${v}/metrics.json`);
+      return JSON.parse(file.toString());
+    })
+  );
+  res.send(metrics);
 });
 
 // tslint:disable-next-line:no-any
@@ -141,14 +140,15 @@ app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
 // Either load our model from the internet or our data directory
 let url =
-    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
-let modelVersion = new Date().getTime().toString();
-const existingModels = fs.readdirSync(modelDir);
-existingModels.sort();
-if (existingModels.length) {
-  modelVersion = existingModels[existingModels.length - 1];
-  url = `file://${modelDir}/${modelVersion}/model.json`;
-}
+    
+url = 'file://manual/model.json';
+//let modelVersion = new Date().getTime().toString();
+//const existingModels = fs.readdirSync(modelDir);
+//existingModels.sort();
+//if (existingModels.length) {
+  //modelVersion = existingModels[existingModels.length - 1];
+  //url = `file://${modelDir}/${modelVersion}/model.json`;
+//}
 
 const hyperparams: HyperparamsMsg = {
   examplesPerUpdate: 4,
@@ -156,20 +156,24 @@ const hyperparams: HyperparamsMsg = {
   updatesPerVersion: 5
 };
 
+const federatedModel = new ServerTfModel(modelDir, loadAudioTransferLearningModel);
+
 loadAudioTransferLearningModel(url).then(model => {
   // Setup our federated learning API
-  const api =
-      new ServerAPI(model, modelVersion, modelDir, sockServer, hyperparams);
+  const api = new ServerAPI(sockServer, federatedModel, {
+    clientHyperparams: hyperparams,
+    validationData: [validInputs, validLabels]
+  });
   log(`ServerAPI started up at v${api.modelVersion}`);
 
   // Add a callback whenever the model is updated to compute validation accuracy
-  const updateResults = (modelVersion) => {
-    if (!validResults[modelVersion]) {
+  const updateResults = (fed) => {
+    if (!validResults[fed.version]) {
       const results = tf.tidy(() => {
         const r = model.evaluate(validInputs, validLabels);
         return [r[0].dataSync()[0], r[1].dataSync()[0]];
       });
-      validResults[modelVersion] = {
+      validResults[fed.version] = {
         'Cross-Entropy': results[0],
         'Accuracy': results[1]
       };

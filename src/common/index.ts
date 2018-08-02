@@ -149,7 +149,7 @@ export interface FederatedModel {
   save(handlerOrURL: any, config?: any): Promise<void>;
 }
 
-export type HyperparamsMsg = {
+export type Hyperparams = {
   batchSize?: number,          // client-side batch size (not very important)
   learningRate?: number,       // client-side step size (always important)
   epochs?: number,             // client-side number of steps (important)
@@ -157,13 +157,18 @@ export type HyperparamsMsg = {
   updatesPerVersion?: number   // server-size min updates (important)
 };
 
-export const DEFAULT_HYPERPARAMS: HyperparamsMsg = {
+export const DEFAULT_HYPERPARAMS: Hyperparams = {
   examplesPerUpdate: 5,
   updatesPerVersion: 10,
   learningRate: 0.001,
   batchSize: 32,
   epochs: 5
 };
+
+export function federatedHyperparams(hps?: Hyperparams) : Hyperparams {
+  const defaults = Object.create(DEFAULT_HYPERPARAMS);
+  return Object.assign(defaults, hps || {});
+}
 
 /**
  * Implementation of `FederatedModel` designed to wrap a `tf.Model`.
@@ -216,6 +221,76 @@ export class FederatedTfModel implements FederatedModel {
   // tslint:disable-next-line:no-any
   async save(handler: any, config?: any) {
     this.model.save(handler, config);
+  }
+}
+
+type ModelCallback = async () => tf.Model;
+
+export class ServerTfModel {
+  saveDir: string;
+  version: string;
+  getInit: ModelCallback;
+  model: tf.Model;
+
+  constructor(saveDir: string, initialModel?: string|tf.Model|ModelCallback) {
+    this.saveDir = saveDir;
+    this.metrics = {};
+    if (initialModel instanceof ModelCallback) {
+      this.getInit = initialModel;
+    } else if (initialModel instanceof string) {
+      this.getInit = async () => await tf.loadModel(initialModel);
+    } else if (initialModel instanceof tf.Model) {
+      this.getInit = async () => initialModel;
+    }
+  }
+
+  async setup() {
+    const last = await this.last();
+    if (last) {
+      await this.load(lastModel);
+    } else if (initial) {
+      this.model = await this.getInit();
+      await this.save();
+    } else {
+      throw new Error('no initial model provided');
+    }
+    await this.setupMetrics();
+  }
+
+  async list() {
+    const models = await readdir(this.saveDir);
+    models.sort();
+    return models;
+  }
+
+  async last() {
+    const models = await this.list();
+    if (models.length) {
+      return models[models.length - 1];
+    }
+  }
+
+  async save() {
+    const version = new Date().getTime().toString();
+    this.version = version;
+    const url = `file://${this.saveDir}/${version}`;
+    this.model.save(url);
+  }
+
+  async load(version: string) {
+    const url = `file://${this.saveDir}/${version}/model.json`;
+    this.version = version;
+    this.model = await tf.loadModel(url);
+  }
+
+  getVars(): VarList {
+    return this.model.trainableWeights.map((v) => v.read());
+  }
+
+  setVars(vals: tf.Tensor[]) {
+    for (let i = 0; i < vals.length; i++) {
+      this.model.trainableWeights[i].write(vals[i]);
+    }
   }
 }
 
