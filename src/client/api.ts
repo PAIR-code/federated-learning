@@ -146,10 +146,20 @@ export class ClientAPI {
     if (xNew.shape[0] >= this.msg.hyperparams.examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
+      const initEvals = this.model.evaluate(xNew, yNew);
       // fit the model to the new data
       await this.model.fit(xNew, yNew);
       // serialize the new weights -- in the future we could add noise here
-      const newVars = await serializeVars(this.model.getVars());
+      const stdDev = this.hyperparams.weightStddev;
+      const newVars = await serializeVars(tf.tidy(() => {
+        return this.model.getVars().map(v => {
+          if (stdDev) {
+            return v + tf.randomNormal(v.shape, 0, stdDev);
+          } else {
+            return v;
+          }
+        });
+      }));
       // revert our model back to its original weights
       this.setVars(this.msg.model.vars);
       // upload the updates to the server

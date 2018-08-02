@@ -25,35 +25,76 @@ import {DEFAULT_HYPERPARAMS, deserializeVars, DownloadMsg, Events, federated, Fe
 
 type UpdateCallback = (version: string) => void;
 
+export class MetricsRecorder {
+  metrics = {};
+
+  addMetrics(m, v) {
+  }
+
+  getMetrics() {
+  }
+}
+
+export class InMemoryUpdateStore {
+  saveDir: string;
+  updates = [];
+  metrics = {};
+
+  push(msg) {
+    this.updates.push(msg.weights);
+    this.metrics[msg.version]['clientSide'].push(msg.metrics);
+  }
+
+  weights() {
+    return deserializeVars(stackSerialized(this.updates));
+  }
+
+  metrics() {
+  }
+
+  async registerNew(model) {
+    const v = model.version;
+    this.metrics[v] = {
+      validation: null,
+      clientSide: []
+    };
+
+  }
+
+
+}
+
 export class ServerAPI {
-  model: FederatedModel;
-  hyperparams: HyperparamsMsg;
-  currentModel: DownloadMsg;
+  model: FederatedServerModel;
+  hyperparams: Hyperparams;
+  downloadMsg: DownloadMsg;
   server: io.Server;
-  modelDir: string;
-  modelVersion: string;
   numClients = 0;
-  updating = false;
   updates: SerializedVariable[][] = [];
-  updateCallbacks: UpdateCallback[] = [];
+  clientMetrics = {}
+  validMetrics
+  updating = false;
   aggregation = 'mean';
+  updateCallbacks: UpdateCallback[] = [];
+  updatesPerVersion: number;
 
   constructor(
-      model: FederatedModel|tf.Model, modelVersion: string, modelDir: string,
-      server: io.Server, hyperparams?: HyperparamsMsg,
-      private exitOnClientExit = false) {
-    this.model = federated(model, hyperparams);
-    this.modelDir = modelDir;
-    this.modelVersion = modelVersion;
+    server: io.Server, 
+    model: FederatedServerModel|tf.Model,
+    hyperparams?: HyperparamsMsg,
+    updatesPerVersion?: number,
+    private exitOnClientExit = false) {
+
     this.server = server;
-    this.hyperparams =
-        Object.assign(Object.create(DEFAULT_HYPERPARAMS), hyperparams || {});
-    this.currentModel = null;
-    this.downloadMsg().then(msg => this.currentModel = msg);
+    this.model = federatedServer(model);
+    this.hyperparams = federatedHyperparams(hyperparams);
+    this.updatesPerVersion = updatesPerVersion || 10;
+    this.downloadMsg = null;
+    this.computeDownloadMsg().then(msg => this.downloadMsg = msg);
 
     this.server.on('connection', async (socket: io.Socket) => {
-      if (!this.currentModel) {
-        this.currentModel = await this.downloadMsg();
+      if (!this.downloadMsg) {
+        this.downloadMsg = await this.computeDownloadMsg();
       }
 
       this.numClients++;
@@ -68,15 +109,17 @@ export class ServerAPI {
         }
       });
 
-      socket.emit(Events.Download, this.currentModel);
+      socket.emit(Events.Download, this.downloadMsg);
 
-      socket.on(Events.Upload, async (modelMsg: ModelMsg, ack) => {
+      socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
         ack(true);
-        if (modelMsg.version === this.modelVersion && !this.updating) {
-          this.updates.push(modelMsg.vars);
-          if (this.updates.length >= this.hyperparams.updatesPerVersion) {
+        if (msg.version === this.model.version && !this.updating) {
+          this.updateStore.push(msg);
+          //this.metrics.push(msg.metrics);
+          //this.updates.push(msg.weights);
+          if (this.updateStore.shouldUpdate()) {
             await this.updateModel();
-            this.server.sockets.emit(Events.Download, this.currentModel);
+            this.server.sockets.emit(Events.Download, this.downloadMsg);
           }
         }
       });
@@ -87,12 +130,11 @@ export class ServerAPI {
     this.updateCallbacks.push(callback);
   }
 
-  async downloadMsg(): Promise<DownloadMsg> {
-    const vars = await serializeVars(this.model.getVars());
+  async computeDownloadMsg(): Promise<DownloadMsg> {
     return {
       model: {
-        vars,
-        version: this.modelVersion,
+        vars: await serializeVars(this.model.getVars()),
+        version: this.model.version,
       },
       hyperparams: this.hyperparams
     };
@@ -104,8 +146,6 @@ export class ServerAPI {
   // TOOD: consider only updating once we achieve a certain number of _clients_
   async updateModel() {
     this.updating = true;
-    const t1 = new Date().getTime();
-    log(`starting update at ${t1}`);
 
     const newWeights = tf.tidy(() => {
       const stacked = stackSerialized(this.updates);
@@ -118,18 +158,10 @@ export class ServerAPI {
     });
 
     this.model.setVars(newWeights);
-    this.modelVersion = new Date().getTime().toString();
-    this.currentModel = await this.downloadMsg();
+    this.model.save();
+    this.downloadMsg = await this.computeDownloadMsg();
     this.updates = [];
     this.updating = false;
-    const t2 = new Date().getTime();
-    log(`finished update at ${t2} (took ${t2 - t1}ms)`);
-
-    this.model.save(`file://${this.modelDir}/${this.modelVersion}`);
-    const t3 = new Date().getTime();
-    log(`saving took ${t3 - t2}ms`);
-    this.updateCallbacks.forEach(c => c(this.modelVersion));
-    const t4 = new Date().getTime();
-    log(`callbacks took ${t4 - t3}ms`);
+    this.updateCallbacks.forEach(c => c(this.model));
   }
 }
