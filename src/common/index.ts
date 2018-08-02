@@ -19,6 +19,8 @@ import * as tf from '@tensorflow/tfjs';
 import {Model, Optimizer, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
 import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
 
+export type VarList = Array<Tensor|Variable|LayerVariable>;
+
 export type SerializedVariable = {
   dtype: tf.DataType,
   shape: number[],
@@ -34,8 +36,7 @@ export async function serializeVar(variable: tf.Tensor):
   return {dtype: variable.dtype, shape: variable.shape.slice(), data: copy};
 }
 
-export async function serializeVars(
-    vars: Array<Variable|LayerVariable|Tensor>) {
+export async function serializeVars(vars: VarList) {
   const varsP: Array<Promise<SerializedVariable>> = [];
   vars.forEach((value, key) => {
     // tslint:disable-next-line:no-any
@@ -109,8 +110,6 @@ const dtypeToTypedArrayCtor = {
   'bool': Uint8Array
 };
 
-export type VarList = Array<Tensor|Variable|LayerVariable>;
-
 /**
  * Basic interface that users need to implement to perform federated learning.
  *
@@ -165,7 +164,7 @@ export const DEFAULT_HYPERPARAMS: Hyperparams = {
   epochs: 5
 };
 
-export function federatedHyperparams(hps?: Hyperparams) : Hyperparams {
+export function federatedHyperparams(hps?: Hyperparams): Hyperparams {
   const defaults = Object.create(DEFAULT_HYPERPARAMS);
   return Object.assign(defaults, hps || {});
 }
@@ -224,7 +223,7 @@ export class FederatedTfModel implements FederatedModel {
   }
 }
 
-type ModelCallback = async () => tf.Model;
+type ModelCallback = () => Promise<tf.Model>;
 
 export class ServerTfModel {
   saveDir: string;
@@ -247,8 +246,8 @@ export class ServerTfModel {
   async setup() {
     const last = await this.last();
     if (last) {
-      await this.load(lastModel);
-    } else if (initial) {
+      await this.load(last);
+    } else if (this.getInit) {
       this.model = await this.getInit();
       await this.save();
     } else {

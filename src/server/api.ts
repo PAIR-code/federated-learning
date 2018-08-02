@@ -21,18 +21,16 @@ import * as tf from '@tensorflow/tfjs';
 import * as io from 'socket.io';
 
 // tslint:disable-next-line:max-line-length
-import {DEFAULT_HYPERPARAMS, deserializeVars, DownloadMsg, Events, federated, FederatedModel, HyperparamsMsg, log, ModelMsg, SerializedVariable, serializeVars, stackSerialized} from './common';
+import {DEFAULT_HYPERPARAMS, deserializeVars, DownloadMsg, Events, federated, FederatedModel, Hyperparams, HyperparamsMsg, log, ModelMsg, SerializedVariable, serializeVars, stackSerialized} from './common';
 
 type UpdateCallback = (version: string) => void;
 
 export class MetricsRecorder {
   metrics = {};
 
-  addMetrics(m, v) {
-  }
+  addMetrics(m, v) {}
 
-  getMetrics() {
-  }
+  getMetrics() {}
 }
 
 export class InMemoryUpdateStore {
@@ -49,20 +47,20 @@ export class InMemoryUpdateStore {
     return deserializeVars(stackSerialized(this.updates));
   }
 
-  metrics() {
-  }
+  metrics() {}
 
   async registerNew(model) {
     const v = model.version;
-    this.metrics[v] = {
-      validation: null,
-      clientSide: []
-    };
-
+    this.metrics[v] = {validation: null, clientSide: []};
   }
-
-
 }
+
+type FederatedServerConfig = {
+  clientHyperparams?: Hyperparams,
+  updatesPerVersion?: number,
+  exitOnClientExit?: boolean,
+  validationData?: [tf.Tensor|tf.Tensor[], tf.Tensor|tf.Tensor[]]
+};
 
 export class ServerAPI {
   model: FederatedServerModel;
@@ -71,20 +69,15 @@ export class ServerAPI {
   server: io.Server;
   numClients = 0;
   updates: SerializedVariable[][] = [];
-  clientMetrics = {}
-  validMetrics
+  clientMetrics = {} validMetrics
   updating = false;
   aggregation = 'mean';
   updateCallbacks: UpdateCallback[] = [];
   updatesPerVersion: number;
 
   constructor(
-    server: io.Server, 
-    model: FederatedServerModel|tf.Model,
-    hyperparams?: HyperparamsMsg,
-    updatesPerVersion?: number,
-    private exitOnClientExit = false) {
-
+      server: io.Server, model: FederatedServerModel|tf.Model,
+      config: FederatedServerConfig) {
     this.server = server;
     this.model = federatedServer(model);
     this.hyperparams = federatedHyperparams(hyperparams);
@@ -114,9 +107,9 @@ export class ServerAPI {
       socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
         ack(true);
         if (msg.version === this.model.version && !this.updating) {
-          this.updateStore.push(msg);
-          //this.metrics.push(msg.metrics);
-          //this.updates.push(msg.weights);
+          this.updates.push(msg.weights);
+          // this.metrics.push(msg.metrics);
+          // this.updates.push(msg.weights);
           if (this.updateStore.shouldUpdate()) {
             await this.updateModel();
             this.server.sockets.emit(Events.Download, this.downloadMsg);
