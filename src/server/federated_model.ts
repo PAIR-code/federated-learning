@@ -17,28 +17,20 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
-import {promisify} from 'util';
-import {VarList} from './common';
+import { promisify } from 'util';
+import { VarList, AsyncTfModel, fetchModel } from './common';
 
 const readdir = promisify(fs.readdir);
-
-type ModelCallback = () => Promise<tf.Model>;
 
 export class ServerTfModel {
   saveDir: string;
   version: string;
-  getInit: ModelCallback;
+  getInit: AsyncTfModel;
   model: tf.Model;
 
-  constructor(saveDir: string, initialModel?: string|tf.Model|ModelCallback) {
+  constructor(saveDir: string, initialModel?: AsyncTfModel) {
     this.saveDir = saveDir;
-    if (typeof initialModel === 'string') {
-      this.getInit = async () => await tf.loadModel(initialModel);
-    } else if (initialModel instanceof tf.Model) {
-      this.getInit = async () => initialModel;
-    } else {
-      this.getInit = initialModel;
-    }
+    this.getInit = initialModel;
   }
 
   async setup() {
@@ -46,7 +38,7 @@ export class ServerTfModel {
     if (last) {
       await this.load(last);
     } else if (this.getInit) {
-      this.model = await this.getInit();
+      this.model = await fetchModel(this.getInit);
       await this.save();
     } else {
       throw new Error('no initial model provided or found');

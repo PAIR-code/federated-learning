@@ -16,10 +16,22 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Model, Optimizer, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
-import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
+import { Model, Optimizer, Scalar, Tensor, Variable } from '@tensorflow/tfjs';
+import { LayerVariable } from '@tensorflow/tfjs-layers/dist/variables';
 
-export type VarList = Array<Tensor|Variable|LayerVariable>;
+export type VarList = Array<Tensor | Variable | LayerVariable>;
+export type TfModelCallback = () => Promise<tf.Model>;
+export type AsyncTfModel = string | tf.Model | ModelCallback;
+
+export async function fetchModel(asyncModel: AsyncTfModel): Promise<tf.Model> {
+  if (typeof asyncModel === 'string') {
+    return await tf.loadModel(asyncModel);
+  } else if (asyncModel instanceof tf.Model) {
+    return asyncModel;
+  } else {
+    return await asyncModel();
+  }
+}
 
 export type SerializedVariable = {
   dtype: tf.DataType,
@@ -28,12 +40,12 @@ export type SerializedVariable = {
 };
 
 export async function serializeVar(variable: tf.Tensor):
-    Promise<SerializedVariable> {
+  Promise<SerializedVariable> {
   const data = await variable.data();
   // small TypedArrays are views into a larger buffer
   const copy =
-      data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-  return {dtype: variable.dtype, shape: variable.shape.slice(), data: copy};
+    data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+  return { dtype: variable.dtype, shape: variable.shape.slice(), data: copy };
 }
 
 export async function serializeVars(vars: VarList) {
@@ -69,7 +81,7 @@ export function stackSerialized(vars: SerializedVariable[][]) {
       dtype: singleVar.dtype,
       shape: [updateCount].concat(singleVar.shape),
       data: stackedVar.buffer.slice(
-          stackedVar.byteOffset, stackedVar.byteOffset + stackedVar.byteLength)
+        stackedVar.byteOffset, stackedVar.byteOffset + stackedVar.byteLength)
     });
   }
 
@@ -81,7 +93,7 @@ export function deserializeVars(vars: SerializedVariable[]) {
 }
 
 export function serializedToArray(serialized: SerializedVariable) {
-  const {dtype, shape, data: dataBuffer} = serialized;
+  const { dtype, shape, data: dataBuffer } = serialized;
   let data;
   // Because socket.io will deserialise JS ArrayBuffers into Nodejs Buffers
   if (dataBuffer instanceof ArrayBuffer) {
@@ -91,8 +103,8 @@ export function serializedToArray(serialized: SerializedVariable) {
     // tslint:disable-next-line no-any
     const dataAsBuffer = dataBuffer as any as Buffer;
     data = dataAsBuffer.buffer.slice(
-        dataAsBuffer.byteOffset,
-        dataAsBuffer.byteOffset + dataAsBuffer.byteLength);
+      dataAsBuffer.byteOffset,
+      dataAsBuffer.byteOffset + dataAsBuffer.byteLength);
   }
   const numel = shape.reduce((x, y) => x * y, 1);
   const ctor = dtypeToTypedArrayCtor[dtype];
@@ -186,7 +198,7 @@ export class FederatedTfModel implements FederatedModel {
   constructor(model: Model, hyperparams?: HyperparamsMsg) {
     this.model = model;
     this.hyperparams =
-        Object.assign(Object.create(DEFAULT_HYPERPARAMS), hyperparams || {});
+      Object.assign(Object.create(DEFAULT_HYPERPARAMS), hyperparams || {});
     this.optimizer = tf.train.sgd(this.hyperparams.learningRate);
     this.model.compile({
       optimizer: this.optimizer,
@@ -231,7 +243,7 @@ export class ServerTfModel {
   getInit: ModelCallback;
   model: tf.Model;
 
-  constructor(saveDir: string, initialModel?: string|tf.Model|ModelCallback) {
+  constructor(saveDir: string, initialModel?: string | tf.Model | ModelCallback) {
     this.saveDir = saveDir;
     this.metrics = {};
     if (initialModel instanceof ModelCallback) {
@@ -307,8 +319,8 @@ export class FederatedDynamicModel implements FederatedModel {
    * @param optimizer Optimizer to optimize the model with when fit is called
    */
   constructor(
-      public vars: Variable[], public loss: (xs: Tensor, ys: Tensor) => Scalar,
-      public optimizer: Optimizer) {}
+    public vars: Variable[], public loss: (xs: Tensor, ys: Tensor) => Scalar,
+    public optimizer: Optimizer) { }
 
   async fit(x: Tensor, y: Tensor): Promise<void> {
     const lossVal = this.optimizer.minimize(() => this.loss(x, y));
@@ -327,7 +339,7 @@ export class FederatedDynamicModel implements FederatedModel {
     }
   }
 
-  setHyperparams(hps: HyperparamsMsg): void {}
+  setHyperparams(hps: HyperparamsMsg): void { }
 
   // tslint:disable-next-line:no-any
   async save(handler: any, config?: any) {
@@ -338,8 +350,8 @@ export class FederatedDynamicModel implements FederatedModel {
 }
 
 export function federated(
-    model: FederatedDynamicModel|FederatedModel|Model,
-    hyperparams?: HyperparamsMsg): FederatedModel {
+  model: FederatedDynamicModel | FederatedModel | Model,
+  hyperparams?: HyperparamsMsg): FederatedModel {
   if (model instanceof Model) {
     return new FederatedTfModel(model, hyperparams);
   } else {

@@ -7,38 +7,39 @@ On the server side:
 ```js
 import * as express from 'express';
 import * as http from 'http';
-import * as federated from 'tfjs-federated-server';
+import * as federated from 'tfjs-federated-learning-server';
 
-const app = express();
-const server = http.createServer(app);
+const expressApp = express();
+const httpServer = http.createServer(expressApp);
+const server = federated.Server(httpServer, 'https://initial.com/model.json');
 
-const api = federated.ServerAPI(
-  server,
-  'https://www.example.com/initial-model.json'
-);
-
-api.setup().then(() => {
-  server.listen(PORT);
+server.setup().then(() => {
+  httpServer.listen(PORT);
 })
 ```
 
 On the client side:
 
 ```js
-import * as federated from 'tfjs-federated-client';
+import * as federated from 'tfjs-federated-learning-client';
 
-const api = federated.ClientAPI(
-  SERVER_URL,
-  'https://www.example.com/initial-model.json'
-);
+const client = federated.Client(SERVER_URL, 'https://initial.com/model.json');
 
-api.setup().then(() => {
-  console.log(api.model.predict(INPUTS));
-  api.federatedFit(INPUTS, LABELS);
+client.setup().then(() => {
+  // make predictions!
+  const yhat = client.predict(x);
+
+  // train!
+  client.fit(x, y);
+
+  // listen for updates!
+  client.onUpdate(() => {
+    console.log(client.modelVersion);
+  });
 });
 ```
 
-## Advanced
+## Advanced Usage
 
-See [server docs]()
+See separate [server](./src/server/README.md) and [client](./src/client/README.md) docs.
 
