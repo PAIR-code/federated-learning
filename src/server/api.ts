@@ -19,71 +19,56 @@ import './fetch_polyfill';
 
 import * as tf from '@tensorflow/tfjs';
 import * as io from 'socket.io';
+import * as path from 'path';
 
 // tslint:disable-next-line:max-line-length
-import {DEFAULT_HYPERPARAMS, deserializeVars, DownloadMsg, Events, federated, FederatedModel, Hyperparams, HyperparamsMsg, log, ModelMsg, SerializedVariable, serializeVars, stackSerialized} from './common';
+import { deserializeVars, DownloadMsg, Events, log, SerializedVariable, serializeVars, stackSerialized, FederatedServerModel, isFederatedServerModel, clientHyperparams, ClientHyperparams, VersionCallback, ModelMsg } from './common';
+import { FederatedServerTfModel } from './federated_model';
+import { ModelCompileConfig } from '@tensorflow/tfjs';
 
-type UpdateCallback = (version: string) => void;
-
-export class MetricsRecorder {
-  metrics = {};
-
-  addMetrics(m, v) {}
-
-  getMetrics() {}
-}
-
-export class InMemoryUpdateStore {
-  saveDir: string;
-  updates = [];
-  metrics = {};
-
-  push(msg) {
-    this.updates.push(msg.weights);
-    this.metrics[msg.version]['clientSide'].push(msg.metrics);
-  }
-
-  weights() {
-    return deserializeVars(stackSerialized(this.updates));
-  }
-
-  metrics() {}
-
-  async registerNew(model) {
-    const v = model.version;
-    this.metrics[v] = {validation: null, clientSide: []};
-  }
-}
-
-type FederatedServerConfig = {
-  clientHyperparams?: Hyperparams,
+export type FederatedServerConfig = {
+  clientHyperparams?: ClientHyperparams,
   updatesPerVersion?: number,
-  exitOnClientExit?: boolean,
-  validationData?: [tf.Tensor|tf.Tensor[], tf.Tensor|tf.Tensor[]]
+  modelDir?: string,
+  modelCompileConfig?: ModelCompileConfig
 };
 
 export class ServerAPI {
   model: FederatedServerModel;
-  hyperparams: Hyperparams;
+  clientHyperparams: ClientHyperparams;
   downloadMsg: DownloadMsg;
   server: io.Server;
   numClients = 0;
   updates: SerializedVariable[][] = [];
-  clientMetrics = {} validMetrics
   updating = false;
   aggregation = 'mean';
-  updateCallbacks: UpdateCallback[] = [];
+  versionCallbacks: VersionCallback[];;
   updatesPerVersion: number;
 
   constructor(
-      server: io.Server, model: FederatedServerModel|tf.Model,
-      config: FederatedServerConfig) {
+    server: io.Server, model: FederatedServerModel | tf.Model,
+    config: FederatedServerConfig) {
     this.server = server;
-    this.model = federatedServer(model);
-    this.hyperparams = federatedHyperparams(hyperparams);
-    this.updatesPerVersion = updatesPerVersion || 10;
+    if (isFederatedServerModel(model)) {
+      this.model = model;
+    } else {
+      const modelDir = config.modelDir || path.resolve(`${__dirname}/federated-server-models`);
+      this.model = new FederatedServerTfModel(modelDir, model, config.modelCompileConfig);
+    }
+    this.updatesPerVersion = config.updatesPerVersion || 10;
+    this.clientHyperparams = clientHyperparams(config.clientHyperparams);
     this.downloadMsg = null;
-    this.computeDownloadMsg().then(msg => this.downloadMsg = msg);
+    this.versionCallbacks = [
+      (model, v1, v2) => {
+        log(`updated model: ${v1} -> ${v2}`);
+      }
+    ];
+  }
+
+  async setup() {
+    await this.model.setup();
+    this.downloadMsg = await this.computeDownloadMsg();
+    this.versionCallbacks.forEach(c => c(this.model, null, this.model.version));
 
     this.server.on('connection', async (socket: io.Socket) => {
       if (!this.downloadMsg) {
@@ -96,21 +81,16 @@ export class ServerAPI {
       socket.on('disconnect', () => {
         this.numClients--;
         log(`disconnection: ${this.numClients} clients`);
-        if (this.exitOnClientExit && this.numClients <= 0) {
-          this.server.close();
-          process.exit(0);
-        }
       });
 
       socket.emit(Events.Download, this.downloadMsg);
 
-      socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
+      socket.on(Events.Upload, async (msg: ModelMsg, ack) => {
         ack(true);
         if (msg.version === this.model.version && !this.updating) {
-          this.updates.push(msg.weights);
-          // this.metrics.push(msg.metrics);
-          // this.updates.push(msg.weights);
-          if (this.updateStore.shouldUpdate()) {
+          log(`new update from ${socket.client.id}`);
+          this.updates.push(msg.vars);
+          if (this.updates.length >= this.updatesPerVersion) {
             await this.updateModel();
             this.server.sockets.emit(Events.Download, this.downloadMsg);
           }
@@ -119,8 +99,8 @@ export class ServerAPI {
     });
   }
 
-  onUpdate(callback: UpdateCallback) {
-    this.updateCallbacks.push(callback);
+  onNewVersion(callback: VersionCallback) {
+    this.versionCallbacks.push(callback);
   }
 
   async computeDownloadMsg(): Promise<DownloadMsg> {
@@ -129,7 +109,7 @@ export class ServerAPI {
         vars: await serializeVars(this.model.getVars()),
         version: this.model.version,
       },
-      hyperparams: this.hyperparams
+      hyperparams: this.clientHyperparams
     };
   }
 
@@ -139,6 +119,7 @@ export class ServerAPI {
   // TOOD: consider only updating once we achieve a certain number of _clients_
   async updateModel() {
     this.updating = true;
+    const oldVersion = this.model.version;
 
     const newWeights = tf.tidy(() => {
       const stacked = stackSerialized(this.updates);
@@ -152,9 +133,10 @@ export class ServerAPI {
 
     this.model.setVars(newWeights);
     this.model.save();
+    const newVersion = this.model.version;
     this.downloadMsg = await this.computeDownloadMsg();
     this.updates = [];
     this.updating = false;
-    this.updateCallbacks.forEach(c => c(this.model));
+    this.versionCallbacks.forEach(c => c(this.model, oldVersion, newVersion));
   }
 }
