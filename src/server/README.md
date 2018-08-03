@@ -47,10 +47,8 @@ Note that by default, different `tf.Model` versions will be saved as files in su
 ```js
 federated.Server(httpServer, model, {
   // These hyperparams only affect the server
-  serverHyperparams: {
-    updatesPerVersion: 20, // server merges every 20 client weight updates
-    weightAggregator: 'mean' // how to merge weights (only mean supported now)
-  },
+  updatesPerVersion: 20, // server merges every 20 client weight updates
+  weightAggregator: 'mean' // how to merge weights (only mean supported now)
   // These get broadcast to clients
   clientHyperparams: {
     examplesPerUpdate: 10, // client computes weight updates every 10 examples
@@ -66,8 +64,16 @@ Many of these hyperparameters matter a great deal for the efficiency and privacy
 
 ### TODO
 
+General:
+- save and expose client-side performance metrics
+
+Robustness:
 - `median` and `trimmed-mean` aggregations (for [Byzantine-robustness](https://arxiv.org/abs/1803.01498))
 - client authentication (e.g. gmail account + captcha)
-- smoothing to limit individual clients' weight contributions (to prevent model from overfitting to most active clients and create preconditions for Byzantine-robust learning if some clients are adversarial)
-- discard updates that increase validation loss, or subtract their projections onto the direction of increasing validation loss
-- save and expose client-side performance metrics
+- smoothing to limit individual clients' weight contributions (to prevent model from overfitting to most active clients and also create preconditions for Byzantine-robust learning if some clients are adversarial)
+- create virtual server-side clients who minimize train loss
+- discard client updates that increase server-side train loss (or subtract updates' projections onto the direction of increasing train loss)
+
+Privacy:
+- determine how to set hyperparameters such that each version of the model is differentially private to individual clients' updates (i.e. prevent sensitive information from leaking from client->server->client)
+- consider implementing [secure aggregation](https://eprint.iacr.org/2017/281) (i.e. prevent sensitive information from leaking from client->server)

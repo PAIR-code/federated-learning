@@ -18,30 +18,27 @@
 import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
 import { promisify } from 'util';
-import { VarList, AsyncTfModel, fetchModel } from './common';
+import { AsyncTfModel, FederatedTfModel, FederatedServerModel } from './common';
+import { ModelCompileConfig } from '@tensorflow/tfjs';
 
 const readdir = promisify(fs.readdir);
 
-export class ServerTfModel {
+export class FederatedServerTfModel extends FederatedTfModel implements FederatedServerModel {
   saveDir: string;
   version: string;
-  getInit: AsyncTfModel;
-  model: tf.Model;
 
-  constructor(saveDir: string, initialModel?: AsyncTfModel) {
+  constructor(saveDir: string, initialModel?: AsyncTfModel, compileConfig?: ModelCompileConfig) {
+    super(initialModel, compileConfig);
     this.saveDir = saveDir;
-    this.getInit = initialModel;
   }
 
   async setup() {
     const last = await this.last();
     if (last) {
       await this.load(last);
-    } else if (this.getInit) {
-      this.model = await fetchModel(this.getInit);
-      await this.save();
     } else {
-      throw new Error('no initial model provided or found');
+      await this.fetchInitial();
+      await this.save();
     }
   }
 
@@ -71,15 +68,6 @@ export class ServerTfModel {
     const url = `file://${this.saveDir}/${version}/model.json`;
     this.version = version;
     this.model = await tf.loadModel(url);
-  }
-
-  getVars(): VarList {
-    return this.model.trainableWeights.map((v) => v.read());
-  }
-
-  setVars(vals: tf.Tensor[]) {
-    for (let i = 0; i < vals.length; i++) {
-      this.model.trainableWeights[i].write(vals[i]);
-    }
+    this.model.compile(this.compileConfig);
   }
 }

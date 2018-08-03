@@ -16,12 +16,30 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import { Model, Optimizer, Scalar, Tensor, Variable } from '@tensorflow/tfjs';
+import { Model, Scalar, Tensor, Variable, ModelCompileConfig } from '@tensorflow/tfjs';
 import { LayerVariable } from '@tensorflow/tfjs-layers/dist/variables';
 
 export type VarList = Array<Tensor | Variable | LayerVariable>;
+
 export type TfModelCallback = () => Promise<tf.Model>;
-export type AsyncTfModel = string | tf.Model | ModelCallback;
+
+export type AsyncTfModel = string | tf.Model | TfModelCallback;
+
+type Tensors = Tensor | Tensor[];
+
+export type SerializedVariable = {
+  dtype: tf.DataType,
+  shape: number[],
+  data: ArrayBuffer
+};
+
+export type FitConfig = {
+  learningRate: number,
+  epochs: number,
+  batchSize: number
+};
+
+export type VersionCallback = (model: FederatedModel, oldVersion: string, newVersion: string) => void;
 
 export async function fetchModel(asyncModel: AsyncTfModel): Promise<tf.Model> {
   if (typeof asyncModel === 'string') {
@@ -33,11 +51,147 @@ export async function fetchModel(asyncModel: AsyncTfModel): Promise<tf.Model> {
   }
 }
 
-export type SerializedVariable = {
-  dtype: tf.DataType,
-  shape: number[],
-  data: ArrayBuffer
-};
+export interface FederatedModel {
+  /**
+   * Trains the model to better predict the given targets.
+   *
+   * @param x `tf.Tensor` of training input data.
+   * @param y `tf.Tensor` of training target data.
+   * @param config optional fit configuration.
+   *
+   * @return A `Promise` resolved when training is done.
+   */
+  fit(x: Tensors, y: Tensors, config?: FitConfig): Promise<void>;
+
+  /**
+   * Makes predictions on input data.
+   *
+   * @param x `tf.Tensor` of input data.
+   *
+   * @return A `Promise` of model ouputs
+   */
+  predict(x: Tensors): Promise<Tensors>;
+
+  /**
+   * Evaluates performance on data.
+   *
+   * @param x `tf.Tensor` of input data.
+   * @param y `tf.Tensor` of target data.
+   *
+   * @return A `Promise` of evaluation metrics.
+   */
+  evaluate(x: Tensors, y: Tensors): Promise<Tensors>;
+
+  /**
+   * Gets the model's variables.
+   *
+   * @return A list of `tf.Variable`s or LayerVariables representing the model's
+   * trainable weights.
+   */
+  getVars(): VarList;
+
+  /**
+   * Sets the model's variables to given values.
+   *
+   * @param vals An array of `tf.Tensor`s representing updated model weights
+   */
+  setVars(vals: Tensor[]): void;
+}
+
+export class FederatedTfModel implements FederatedModel {
+  optimizer: tf.SGDOptimizer;
+  model: tf.Model;
+  compileConfig: ModelCompileConfig;
+  private _initialModel: AsyncTfModel;
+
+  constructor(initialModel?: AsyncTfModel, compileConfig?: ModelCompileConfig) {
+    this._initialModel = initialModel;
+    this.optimizer = tf.train.sgd(0.001); // we override this later
+    this.compileConfig = {
+      loss: compileConfig.loss || 'categoricalCrossEntropy',
+      metrics: compileConfig.metrics || ['accuracy'],
+      optimizer: this.optimizer
+    };
+  }
+
+  async fetchInitial() {
+    if (this._initialModel) {
+      this.model = await fetchModel(this._initialModel);
+      this.model.compile(this.compileConfig);
+    } else {
+      throw new Error('no initial model provided!');
+    }
+  }
+
+  async fit(x: Tensors, y: Tensors, config?: FitConfig) {
+    if (config.learningRate) {
+      this.optimizer.setLearningRate(config.learningRate);
+    }
+    await this.model.fit(x, y, {
+      epochs: config.epochs,
+      batchSize: config.batchSize
+    });
+  }
+
+  async predict(x: Tensors) {
+    return this.model.predict(x);
+  }
+
+  async evaluate(x: Tensors, y: Tensors) {
+    return this.model.evaluate(x, y);
+  }
+
+  getVars(): VarList {
+    return this.model.trainableWeights.map((v) => v.read());
+  }
+
+  setVars(vals: tf.Tensor[]) {
+    for (let i = 0; i < vals.length; i++) {
+      this.model.trainableWeights[i].write(vals[i]);
+    }
+  }
+}
+
+// Federated server models need to implement a few additional methods
+export interface FederatedServerModel extends FederatedModel {
+  version: string;
+
+  /**
+   * Initialize the model
+   */
+  setup(): Promise<void>;
+
+  /**
+   * Return a list of versions that can be `load`ed
+   */
+  list(): Promise<string[]>;
+
+  /**
+   * Return the most recent `load`able version
+   */
+  last(): Promise<string>;
+
+  /**
+   * Save the current model and update `version`.
+   */
+  save(): Promise<void>;
+
+  /**
+   * Load the specified version of the model.
+   *
+   * @param version identifier of the model
+   */
+  load(version: string): Promise<void>;
+}
+
+export function isFederatedServerModel(model: any): model is FederatedServerModel {
+  return model.list && model.last && model.save && model.load;
+}
+
+// Federated client models do not
+export interface FederatedClientModel extends FederatedModel { }
+
+export class FederatedClientTfModel extends FederatedTfModel implements FederatedClientModel { }
 
 export async function serializeVar(variable: tf.Tensor):
   Promise<SerializedVariable> {
@@ -122,187 +276,23 @@ const dtypeToTypedArrayCtor = {
   'bool': Uint8Array
 };
 
-/**
- * Basic interface that users need to implement to perform federated learning.
- *
- * Any model that implements `fit`, `getVars` and `setVars` can be passed into
- * a `ClientAPI` and `ServerAPI` to do federated learning.
- */
-export interface FederatedModel {
-  /**
-   * Trains the model to better predict the given targets.
-   *
-   * @param x `tf.Tensor` of training input data.
-   * @param y `tf.Tensor` of training target data.
-   *
-   * @return A `Promise` resolved when training is done.
-   */
-  fit(x: Tensor, y: Tensor): Promise<void>;
-
-  /**
-   * Gets the model's variables.
-   *
-   * @return A list of `tf.Variable`s or LayerVariables representing the model's
-   * trainable weights.
-   */
-  getVars(): VarList;
-
-  /**
-   * Sets the model's variables to given values.
-   *
-   * @param vals An array of `tf.Tensor`s representing updated model weights
-   */
-  setVars(vals: Tensor[]): void;
-
-  setHyperparams(hps: HyperparamsMsg): void;
-
-  // tslint:disable-next-line:no-any
-  save(handlerOrURL: any, config?: any): Promise<void>;
-}
-
-export type Hyperparams = {
+export type ClientHyperparams = {
   batchSize?: number,          // client-side batch size (not very important)
   learningRate?: number,       // client-side step size (always important)
   epochs?: number,             // client-side number of steps (important)
   examplesPerUpdate?: number,  // client-side min examples (important)
-  updatesPerVersion?: number   // server-size min updates (important)
 };
 
-export const DEFAULT_HYPERPARAMS: Hyperparams = {
+export const DEFAULT_HYPERPARAMS: ClientHyperparams = {
   examplesPerUpdate: 5,
-  updatesPerVersion: 10,
   learningRate: 0.001,
   batchSize: 32,
   epochs: 5
 };
 
-export function federatedHyperparams(hps?: Hyperparams): Hyperparams {
+export function clientHyperparams(hps?: ClientHyperparams): ClientHyperparams {
   const defaults = Object.create(DEFAULT_HYPERPARAMS);
   return Object.assign(defaults, hps || {});
-}
-
-/**
- * Implementation of `FederatedModel` designed to wrap a `tf.Model`.
- */
-export class FederatedTfModel implements FederatedModel {
-  private model: Model;
-  private hyperparams: HyperparamsMsg;
-  private optimizer: tf.SGDOptimizer;
-
-  /**
-   * Construct a new `FederatedModel` wrapping a `tf.Model`.
-   *
-   * @param model An instance of `tf.Model` that has already been `compile`d.
-   * @param hyperparams Optional hyperparameters for training.
-   */
-  constructor(model: Model, hyperparams?: HyperparamsMsg) {
-    this.model = model;
-    this.hyperparams =
-      Object.assign(Object.create(DEFAULT_HYPERPARAMS), hyperparams || {});
-    this.optimizer = tf.train.sgd(this.hyperparams.learningRate);
-    this.model.compile({
-      optimizer: this.optimizer,
-      loss: 'categoricalCrossentropy',  // TODO: bad assumption
-      metrics: ['accuracy']             // TODO: bad assumption
-    });
-  }
-
-  async fit(x: Tensor, y: Tensor): Promise<void> {
-    await this.model.fit(x, y, {
-      epochs: this.hyperparams.epochs,
-      batchSize: this.hyperparams.batchSize
-    });
-  }
-
-  setHyperparams(hps: HyperparamsMsg) {
-    this.hyperparams = Object.assign(this.hyperparams, hps);
-    this.optimizer.setLearningRate(this.hyperparams.learningRate);
-  }
-
-  getVars(): VarList {
-    return this.model.trainableWeights.map((v) => v.read());
-  }
-
-  setVars(vals: Tensor[]) {
-    for (let i = 0; i < vals.length; i++) {
-      this.model.trainableWeights[i].write(vals[i]);
-    }
-  }
-
-  // tslint:disable-next-line:no-any
-  async save(handler: any, config?: any) {
-    this.model.save(handler, config);
-  }
-}
-
-type ModelCallback = () => Promise<tf.Model>;
-
-export class ServerTfModel {
-  saveDir: string;
-  version: string;
-  getInit: ModelCallback;
-  model: tf.Model;
-
-  constructor(saveDir: string, initialModel?: string | tf.Model | ModelCallback) {
-    this.saveDir = saveDir;
-    this.metrics = {};
-    if (initialModel instanceof ModelCallback) {
-      this.getInit = initialModel;
-    } else if (initialModel instanceof string) {
-      this.getInit = async () => await tf.loadModel(initialModel);
-    } else if (initialModel instanceof tf.Model) {
-      this.getInit = async () => initialModel;
-    }
-  }
-
-  async setup() {
-    const last = await this.last();
-    if (last) {
-      await this.load(last);
-    } else if (this.getInit) {
-      this.model = await this.getInit();
-      await this.save();
-    } else {
-      throw new Error('no initial model provided');
-    }
-    await this.setupMetrics();
-  }
-
-  async list() {
-    const models = await readdir(this.saveDir);
-    models.sort();
-    return models;
-  }
-
-  async last() {
-    const models = await this.list();
-    if (models.length) {
-      return models[models.length - 1];
-    }
-  }
-
-  async save() {
-    const version = new Date().getTime().toString();
-    this.version = version;
-    const url = `file://${this.saveDir}/${version}`;
-    this.model.save(url);
-  }
-
-  async load(version: string) {
-    const url = `file://${this.saveDir}/${version}/model.json`;
-    this.version = version;
-    this.model = await tf.loadModel(url);
-  }
-
-  getVars(): VarList {
-    return this.model.trainableWeights.map((v) => v.read());
-  }
-
-  setVars(vals: tf.Tensor[]) {
-    for (let i = 0; i < vals.length; i++) {
-      this.model.trainableWeights[i].write(vals[i]);
-    }
-  }
 }
 
 /**
@@ -319,10 +309,16 @@ export class FederatedDynamicModel implements FederatedModel {
    * @param optimizer Optimizer to optimize the model with when fit is called
    */
   constructor(
-    public vars: Variable[], public loss: (xs: Tensor, ys: Tensor) => Scalar,
-    public optimizer: Optimizer) { }
+    public vars: Variable[],
+    public evaluate: (xs: Tensors, ys: Tensors) => Promise<Tensors>,
+    public predict: (xs: Tensors) => Promise<Tensors>,
+    public loss: (xs: Tensors, ys: Tensors) => Scalar,
+    public optimizer: tf.SGDOptimizer) { }
 
-  async fit(x: Tensor, y: Tensor): Promise<void> {
+  async fit(x: Tensors, y: Tensors, config?: FitConfig): Promise<void> {
+    if (config.learningRate) {
+      this.optimizer.setLearningRate(config.learningRate);
+    }
     const lossVal = this.optimizer.minimize(() => this.loss(x, y));
     if (lossVal) {
       lossVal.dispose();
@@ -338,25 +334,6 @@ export class FederatedDynamicModel implements FederatedModel {
       this.vars[i].assign(vals[i]);
     }
   }
-
-  setHyperparams(hps: HyperparamsMsg): void { }
-
-  // tslint:disable-next-line:no-any
-  async save(handler: any, config?: any) {
-    return new Promise<void>(() => {
-      throw new Error('not implemented');
-    });
-  }
-}
-
-export function federated(
-  model: FederatedDynamicModel | FederatedModel | Model,
-  hyperparams?: HyperparamsMsg): FederatedModel {
-  if (model instanceof Model) {
-    return new FederatedTfModel(model, hyperparams);
-  } else {
-    return model;
-  }
 }
 
 export enum Events {
@@ -371,7 +348,7 @@ export type ModelMsg = {
 
 export type DownloadMsg = {
   model: ModelMsg,
-  hyperparams: HyperparamsMsg
+  hyperparams: ClientHyperparams
 };
 
 let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;
