@@ -1,45 +1,51 @@
-Federated learning experiment using TensorFlow.js
+# Federated Learning in TensorFlow.js
+
+This is the parent repository for an (experimental and probably only demo-ready) implementation of [Federated Learning](https://ai.googleblog.com/2017/04/federated-learning-collaborative.html) in [Tensorflow.js](https://js.tensorflow.org/).
 
 ## Basic Usage
 
-On the server side:
+On the server (NodeJS) side:
 
 ```js
-import * as express from 'express';
 import * as http from 'http';
 import * as federated from 'tfjs-federated-learning-server';
 
-const expressApp = express();
-const httpServer = http.createServer(expressApp);
-const server = federated.Server(httpServer, 'https://initial.com/model.json');
+const INITIAL_MODEL = 'file:///initial/model.json';
+const httpServer = http.createServer();
+const fedServer = federated.Server(httpServer, INITIAL_MODEL);
 
-server.setup().then(() => {
-  httpServer.listen(PORT);
+fedServer.onNewVersion((model, oldVersion, newVersion) => {
+  console.log(`updated model from ${oldVersion} to ${newVersion}`);
+});
+
+fedServer.setup().then(() => {
+  httpServer.listen(8080);
 })
 ```
 
-On the client side:
+On the client (browser) side:
 
 ```js
 import * as federated from 'tfjs-federated-learning-client';
 
-const client = federated.Client(SERVER_URL, 'https://initial.com/model.json');
+const SERVER_URL = 'https://federated.learning.server';
+const client = federated.Client(SERVER_URL);
 
-client.setup().then(() => {
+client.onNewVersion((model, oldVersion, newVersion) => {
+  console.log(`updated model from ${oldVersion} to ${newVersion}`);
+});
+
+client.setup().then((model) => {
   // make predictions!
-  const yhat = client.predict(x);
-
-  // train!
-  client.fit(x, y);
-
-  // listen for updates!
-  client.onUpdate(() => {
-    console.log(client.modelVersion);
+  model.predict(x).then((yhat) => {
+    yhat.print();
   });
+
+  // train (and asynchronously update the server)!
+  model.fit(x, y);
 });
 ```
 
 ## Advanced Usage
 
-See separate [server](./src/server/README.md) and [client](./src/client/README.md) docs.
-
+See specific [server](./src/server/README.md) and [client](./src/client/README.md) docs.
