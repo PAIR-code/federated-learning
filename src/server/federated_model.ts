@@ -15,19 +15,21 @@
  * =============================================================================
  */
 
+import './fetch_polyfill';
+
 import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
 import { promisify } from 'util';
-import { AsyncTfModel, FederatedTfModel, FederatedServerModel } from './common';
-import { ModelCompileConfig } from '@tensorflow/tfjs';
+import { AsyncTfModel, FederatedTfModel, FederatedServerModel, CompileConfig } from './common';
 
 const readdir = promisify(fs.readdir);
 
 export class FederatedServerTfModel extends FederatedTfModel implements FederatedServerModel {
+  isFederatedServerModel = true;
   saveDir: string;
   version: string;
 
-  constructor(saveDir: string, initialModel?: AsyncTfModel, compileConfig?: ModelCompileConfig) {
+  constructor(saveDir: string, initialModel?: AsyncTfModel, compileConfig?: CompileConfig) {
     super(initialModel, compileConfig);
     this.saveDir = saveDir;
   }
@@ -37,7 +39,9 @@ export class FederatedServerTfModel extends FederatedTfModel implements Federate
     if (last) {
       await this.load(last);
     } else {
+      tf.ENV.set('IS_BROWSER', true);
       await this.fetchInitial();
+      tf.ENV.set('IS_BROWSER', false);
       await this.save();
     }
   }
