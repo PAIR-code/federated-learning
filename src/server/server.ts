@@ -22,14 +22,28 @@ import * as https from 'https';
 import * as path from 'path';
 
 // tslint:disable-next-line:max-line-length
-import { CompileConfig, deserializeVars, DownloadMsg, Events, log, SerializedVariable, serializeVars, stackSerialized, FederatedServerModel, isFederatedServerModel, clientHyperparams, ClientHyperparams, VersionCallback, ModelMsg, AsyncTfModel } from './common';
+import { CompileConfig, deserializeVars, DownloadMsg, Events, SerializedVariable, serializeVars, stackSerialized, FederatedServerModel, isFederatedServerModel, clientHyperparams, ClientHyperparams, VersionCallback, ModelMsg, AsyncTfModel } from './common';
 import { FederatedServerTfModel } from './models';
+
+let LOGGING_ENABLED = (!!process.env.VERBOSE) || false;
+
+export function verbose(enabled: boolean) {
+  LOGGING_ENABLED = enabled;
+}
+
+// tslint:disable-next-line:no-any
+export function log(...args: any[]) {
+  if (LOGGING_ENABLED) {
+    console.log('Federated Server:', ...args);
+  }
+}
 
 export type FederatedServerConfig = {
   clientHyperparams?: ClientHyperparams,
   updatesPerVersion?: number,
   modelDir?: string,
-  modelCompileConfig?: CompileConfig
+  modelCompileConfig?: CompileConfig,
+  verbose?: boolean
 };
 
 export class Server {
@@ -54,6 +68,9 @@ export class Server {
       const modelDir = config.modelDir || path.resolve(`${__dirname}/federated-server-models`);
       const compileConfig = config.modelCompileConfig || {};
       this.model = new FederatedServerTfModel(modelDir, model, compileConfig);
+    }
+    if (config.verbose) {
+      verbose(config.verbose);
     }
     this.updatesPerVersion = config.updatesPerVersion || 10;
     this.clientHyperparams = clientHyperparams(config.clientHyperparams);

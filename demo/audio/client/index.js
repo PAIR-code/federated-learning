@@ -41,23 +41,26 @@ client.onNewVersion(() => {
 });
 
 client.setup().then(async () => {
+  let yTrue, yPred, probs, xNpy, metrics;
+
+  // Get microphone access
   ui.setStatus('Waiting for microphone&hellip;');
   const stream =
       await navigator.mediaDevices.getUserMedia({audio: true, video: false});
 
-  const numFrames = client.inputShape()[0];
-  const fftLength = client.inputShape()[1];
-  let yTrue;
-  let yPred;
-  let probs;
-  let xNpy;
-  let metrics;
-
+  // Assign client a persistent ID
   if (!getCookie('federated-learner-uuid')) {
     setCookie('federated-learner-uuid', uuid());
   }
-
   const clientId = getCookie('federated-learner-uuid');
+
+  // On each audio frame, update our rotating buffer with the latest FFT data
+  // from our analyser. For fun, also update the spectrum plot
+  const numFrames = client.inputShape()[0];
+  const fftLength = client.inputShape()[1];
+  const listener = FrequencyListener(stream, numFrames, fftLength);
+  listener.onEachFrame(freqData => ui.plotSpectrum(freqData, fftLength));
+  listener.listen();
 
   // Create a recorder to save the raw .wav file
   const recorder = new MediaStreamRecorder(stream);
@@ -90,23 +93,13 @@ client.setup().then(async () => {
     req.send(formData);
   };
 
-  // On each audio frame, update our rotating buffer with the latest FFT data
-  // from our analyser. For fun, also update the spectrum plot
-  const listener = FrequencyListener(stream, numFrames, fftLength);
-  listener.onEachFrame(freqData => ui.plotSpectrum(freqData, fftLength));
-  listener.listen();
-
   // Setup record buttons
   ui.setReadyStatus(client);
-  ui.recordButtons.forEach(button => {
-    button.removeAttribute('disabled');
-    button.addEventListener('click', () => {
-      ui.startListening(button);
-      yTrue = labelNames.indexOf(button.getAttribute('value'));
-      recorder.start(1100);
-      setTimeout(finishRecording, 1000);
-    });
-  });
+  ui.onRecordButton(labelName => {
+    yTrue = labelNames.indexOf(labelName);
+    recorder.start(1100);
+    setTimeout(finishRecording, 1000);
+  })
 
   // When we're done recording,
   function finishRecording() {
@@ -144,7 +137,6 @@ client.setup().then(async () => {
     ui.setStatus('Fitting Model&hellip;');
     client.fit(x, y).catch(console.log).finally(() => {
       tf.dispose([x, y, p]);
-      ui.reallowRecording();
       ui.setReadyStatus(client);
     });
   }
