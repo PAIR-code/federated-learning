@@ -25,6 +25,8 @@ import {loadAudioTransferLearningModel} from './model';
 import {FrequencyListener} from './frequency_listener';
 import {labelNames} from './labels';
 
+window.tf = tf;
+
 const recordFieldset = document.getElementById('spells');
 labelNames.forEach(name => {
   const button = document.createElement('button');
@@ -81,18 +83,20 @@ function setReadyStatus(clientAPI) {
 }
 
 loadAudioTransferLearningModel().then(async (model) => {
-  const clientAPI = new ClientAPI(model, 5);
-  window.model = model;
-  window.api = clientAPI;
+  const clientAPI = new ClientAPI(serverURL, model);
 
-  clientAPI.onDownload((msg) => {
-    console.log(`new model: ${modelVersion.innerText} -> ${msg.modelVersion}`);
+  clientAPI.onNewVersion((model, oldVersion, newVersion) => {
+    console.log(`${oldVersion} -> ${newVersion}`);
     modelVersion.innerText = `version #${clientAPI.numVersions()}`;
   });
+
   const t1 = new Date().getTime();
-  await clientAPI.connect(serverURL);
+  await clientAPI.setup();
   const t2 = new Date().getTime();
-  console.log(`download took ${t2-t1}ms`)
+  console.log(`download took ${t2-t1}ms`);
+
+  window.api = clientAPI;
+  window.model = clientAPI.model;
 
   setStatus('Waiting for microphone&hellip;');
   const stream =
@@ -100,7 +104,6 @@ loadAudioTransferLearningModel().then(async (model) => {
 
   setupUI(stream, model, clientAPI);
 });
-
 
 function setupUI(stream, model, clientAPI) {
   const inputShape = model.inputs[0].shape;
@@ -111,6 +114,7 @@ function setupUI(stream, model, clientAPI) {
   let yPred;
   let probs;
   let xNpy;
+  let metrics;
 
   if (!getCookie('federated-learner-uuid')) {
     setCookie('federated-learner-uuid', uuid());
@@ -149,6 +153,7 @@ function setupUI(stream, model, clientAPI) {
     formData.append('predictedLabel', yPred);
     formData.append('trueLabel', yTrue);
     formData.append('modelOutput', probs);
+    formData.append('metrics', JSON.stringify(metrics));
     req.open('POST', serverURL + '/data');
     req.send(formData);
   };
@@ -181,7 +186,7 @@ function setupUI(stream, model, clientAPI) {
   });
 
   // When we're done recording,
-  function finishRecording() {
+  async function finishRecording() {
     // Setup results html
     modelDiv.innerHTML = modelTemplate;
     resultRow = document.createElement('tr');
@@ -195,12 +200,18 @@ function setupUI(stream, model, clientAPI) {
     const x = getInputTensorFromFrequencyData(freqData, numFrames, fftLength);
     xNpy = npy.serialize(x);
 
+    // Compute label tensor
+    const onehotY = new Array(labelNames.length).fill(0);
+    onehotY[yTrue] = 1;
+    const y = tf.tensor2d([onehotY]);
+
     // Compute predictions
     const p = model.predict(x);
     tf.tidy(() => {
       yPred = tf.argMax(p, 1).dataSync()[0];
       probs = p.dataSync();
     });
+    metrics = await clientAPI.model.evaluate(x, y);
 
     // Stop separate .wav recording
     recorder.stop();
@@ -213,11 +224,6 @@ function setupUI(stream, model, clientAPI) {
     plotSpectrogram(mainSpectrogram, freqData, fftLength);
     plotSpectrogram(miniSpectrogram, freqData, fftLength);
     resultRow.children[1].appendChild(miniSpectrogram);
-
-    // Compute label tensor
-    const onehotY = new Array(labelNames.length).fill(0);
-    onehotY[yTrue] = 1;
-    const y = tf.tensor2d([onehotY]);
 
     resultRow.children[3].innerText = labelNames[yPred];
     if (yTrue != yPred) {

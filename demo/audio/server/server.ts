@@ -19,18 +19,18 @@ import * as tf from '@tensorflow/tfjs';
 import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
-import { HyperparamsMsg, ServerAPI } from 'federated-learning-server';
+import { ServerAPI } from 'federated-learning-server';
 import { log } from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
-import * as io from 'socket.io';
 import * as uuid from 'uuid/v4';
-import { Request, Response } from 'express';
-
+import { Request, Response, NextFunction } from 'express';
+import { promisify } from 'util';
 import { labelNames } from './model';
 import * as npy from './npy';
+import fetch from 'node-fetch';
 
 const writeFile = promisify(fs.writeFile);
 
@@ -65,8 +65,7 @@ if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
 // Setup file uploading (to save .wav files)
 app.use(fileUpload());
 
-// tslint:disable-next-line:no-any
-app.use((req: any, res: any, next: any) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
 });
@@ -90,17 +89,6 @@ fs.readdirSync(modelDir).forEach(v => {
   }
 });
 
-// Load validation set
-function parseNpyFile(name): tf.Tensor {
-  const buff = fs.readFileSync(path.resolve(__dirname + '/' + name));
-  const arrayBuff =
-    buff.buffer.slice(buff.byteOffset, buff.byteOffset + buff.byteLength);
-  return npy.parse(arrayBuff);
-}
-const validInputs = parseNpyFile('valid-inputs.npy');
-const validLabels = tf.tidy(
-  () => tf.oneHot(parseNpyFile('valid-labels.npy') as tf.Tensor1D, 4));
-
 // Setup endpoints to track client and validation accuracy for visualization
 app.post('/data', (req: Request, res: Response) => {
   // Record metrics
@@ -109,18 +97,19 @@ app.post('/data', (req: Request, res: Response) => {
   if (!metrics[version]['clients'][clientId]) {
     metrics[version]['clients'][clientId] = [];
   }
-  metrics[version]['clients'][clientId].push(JSON.parse(req.metrics));
+  console.log(req.body);
+  metrics[version]['clients'][clientId].push(JSON.parse(req.body.metrics));
 
   // Save files + metadata for later analysis (dont't do this in real life)
   const reqId = `${clientId}_${uuid()}`;
-  const wavFile = req.files.wav;
-  const npyFile = req.files.npy;
+  const wavFile = req.files.wav as fileUpload.UploadedFile;
+  const npyFile = req.files.npy as fileUpload.UploadedFile;
   const labelName = wavFile.name.split('.')[0];
-  wavFile.mv(`${fileDir}/${labelName}/${reqId}.wav`);
-  npyFile.mv(`${fileDir}/${labelName}/${reqId}.npy`);
+  wavFile.mv(`${fileDir}/${labelName}/${reqId}.wav`, () => { });
+  npyFile.mv(`${fileDir}/${labelName}/${reqId}.npy`, () => { });
   writeFile(`${fileDir}/${labelName}/${reqId}.json`, JSON.stringify(req.body));
 
-  res.send(200);
+  res.sendStatus(200);
 });
 
 // Expose in-memory metrics
@@ -133,6 +122,16 @@ app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
 const initialModelUrl =
   'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+const validInputUrl =
+  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-inputs.npy';
+const validLabelUrl =
+  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-labels.npy';
+
+async function loadNpyUrl(url): Promise<tf.Tensor> {
+  const res = await fetch(url);
+  const arr = await res.arrayBuffer();
+  return npy.parse(arr);
+}
 
 async function loadInitialModel(): Promise<tf.Model> {
   const model = await tf.loadModel(initialModelUrl);
@@ -147,41 +146,46 @@ async function loadInitialModel(): Promise<tf.Model> {
 
 const fedServer = new ServerAPI(httpServer, loadInitialModel, {
   modelDir,
+  updatesPerVersion: 5,
   clientHyperparams: {
     examplesPerUpdate: 4,
     epochs: 10,
     learningRate: 0.001,
-    noiseStddev: 0.0001
-  },
-  serverHyperparams: {
-    updatesPerVersion: 5
+    weightNoiseStddev: 0.0001
   },
   modelCompileConfig: {
-    optimizer: 'sgd',
-    loss: 'categoricalCrossEntropy',
+    loss: 'categoricalCrossentropy',
     metrics: ['accuracy']
   }
 });
 
-fedServer.onNewVersion((model, oldVersion, newVersion) => {
-  // Save old metrics to disk, now that we're done with them
-  if (metrics[oldVersion]) {
-    writeFile(metricsPath(oldVersion), JSON.stringify(metrics[oldVersion]));
-  }
-  // Create space for the new model's metrics
-  if (!metrics[newVersion]) {
-    metrics[newVersion] = { validation: null, clients: {} }
-  }
-  // Compute validation accuracy
-  const newValMetrics = tf.tidy(() => {
-    return model.evaluate(validInputs, validLabels).map(r => r.dataSync()[0]);
-  });
-  metrics[newVersion].validation = newValMetrics;
-  log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
-});
+async function setup() {
+  const validInputs = await loadNpyUrl(validInputUrl);
+  const validLabelsFlat = await loadNpyUrl(validLabelUrl);
+  const validLabels = tf.oneHot(validLabelsFlat as tf.Tensor1D, 4);
+  tf.dispose(validLabelsFlat);
 
-fedServer.setup().then(() => {
+  fedServer.onNewVersion((model, oldVersion, newVersion) => {
+    // Save old metrics to disk, now that we're done with them
+    if (metrics[oldVersion]) {
+      writeFile(metricsPath(oldVersion), JSON.stringify(metrics[oldVersion]));
+    }
+    // Create space for the new model's metrics
+    if (!metrics[newVersion]) {
+      metrics[newVersion] = { validation: null, clients: {} }
+    }
+    // Compute validation accuracy
+    model.evaluate(validInputs, validLabels).then(newValMetrics => {
+      metrics[newVersion].validation = newValMetrics;
+      log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
+    })
+  });
+
+  await fedServer.setup();
+
   httpServer.listen(port, () => {
     console.log(`listening on ${port}`);
   });
-});
+}
+
+setup();

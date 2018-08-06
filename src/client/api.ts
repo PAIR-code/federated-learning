@@ -20,8 +20,7 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import {ModelMsg, DownloadMsg, Events, FederatedModel, deserializeVar, log, SerializedVariable, serializeVars, federated} from './common';
-import {Model} from '@tensorflow/tfjs';
+import { CompileConfig, VersionCallback, ModelMsg, DownloadMsg, Events, deserializeVar, log, SerializedVariable, serializeVars, FederatedClientModel, isFederatedClientModel, FederatedClientTfModel, AsyncTfModel } from './common';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
@@ -30,7 +29,36 @@ type CounterObj = {
   [key: string]: number
 };
 
-export type DownloadCallback = (msg: DownloadMsg) => void;
+export type FederatedClientConfig = {
+  modelCompileConfig?: CompileConfig
+};
+
+function concat(a: tf.Tensor, b: tf.Tensor) {
+  if (a.shape[0] === 0) {
+    return b.clone();
+  } else if (b.shape[0] === 0) {
+    return a.clone();
+  } else {
+    return a.concat(b);
+  }
+}
+
+function slice(a: tf.Tensor, begin: number, size?: number) {
+  if (begin >= a.shape[0]) {
+    return tf.tensor([], [0].concat(a.shape.slice(1)));
+  } else {
+    return a.slice(begin, size);
+  }
+}
+
+function addRows(existing: tf.Tensor, newEls: tf.Tensor, unitShape: number[]) {
+  if (tf.util.arraysEqual(newEls.shape, unitShape)) {
+    return tf.tidy(() => concat(existing, tf.expandDims(newEls)));
+  } else { // batch dimension
+    tf.util.assertShapesMatch(newEls.shape.slice(1), unitShape);
+    return tf.tidy(() => concat(existing, newEls));
+  }
+}
 
 /**
  * Federated Learning Client API library.
@@ -49,26 +77,33 @@ export type DownloadCallback = (msg: DownloadMsg) => void;
  */
 export class ClientAPI {
   private msg: DownloadMsg;
-  private model: FederatedModel;
+  private model: FederatedClientModel;
   private socket: SocketIOClient.Socket;
-  private downloadCallbacks: DownloadCallback[];
+  private versionCallbacks: VersionCallback[];
   private x: tf.Tensor;
   private y: tf.Tensor;
   private versionUpdateCounts: CounterObj;
+  private serverUrl: string;
 
   /**
    * Construct a client API for federated learning that will push and pull
    * `model` updates from the server.
    * @param model - model to use with federated learning
    */
-  constructor(model: FederatedModel|Model) {
-    this.model = federated(model);
-    this.downloadCallbacks = [msg => {
-      log('download', 'modelVersion:', msg.model.version);
-    }];
-    // TODO: set x and y to empty tf.Tensors (with correct shape)
-    this.x = null;
-    this.y = null;
+  constructor(serverUrl: string, model: FederatedClientModel | AsyncTfModel,
+    config?: FederatedClientConfig) {
+    this.serverUrl = serverUrl;
+    if (isFederatedClientModel(model)) {
+      this.model = model;
+    } else {
+      const compileConfig = (config || {}).modelCompileConfig || {};
+      this.model = new FederatedClientTfModel(model, compileConfig);
+    }
+    this.versionCallbacks = [
+      (model, v1, v2) => {
+        log(`updated model: ${v1} -> ${v2}`);
+      }
+    ];
     this.versionUpdateCounts = {};
   }
 
@@ -83,8 +118,8 @@ export class ClientAPI {
    * Register a new callback to be invoked whenever the client downloads new
    * weights from the server.
    */
-  public onDownload(callback: DownloadCallback): void {
-    this.downloadCallbacks.push(callback);
+  onNewVersion(callback: VersionCallback) {
+    this.versionCallbacks.push(callback);
   }
 
   /**
@@ -93,20 +128,24 @@ export class ClientAPI {
    * @return A promise that resolves when the connection has been established
    * and variables set to their inital values.
    */
-  public async connect(serverURL: string): Promise<void> {
-    const msg = await this.connectTo(serverURL);
-    this.msg = msg;
-    this.setVars(msg.model.vars);
-    this.model.setHyperparams(msg.hyperparams);
-    this.versionUpdateCounts[msg.model.version] = 0;
-    this.downloadCallbacks.forEach(cb => cb(msg));
+  public async setup(): Promise<void> {
+    await this.model.setup();
+    this.x = tf.tensor([], [0].concat(this.model.inputShape()));
+    this.y = tf.tensor([], [0].concat(this.model.outputShape()));
+    this.msg = await this.connectTo(this.serverUrl);
+    this.setVars(this.msg.model.vars);
+    const newVersion = this.modelVersion();
+    this.versionUpdateCounts[newVersion] = 0;
+    this.versionCallbacks.forEach(cb => cb(this.model, null, newVersion));
 
     this.socket.on(Events.Download, (msg: DownloadMsg) => {
+      const oldVersion = this.modelVersion();
+      const newVersion = msg.model.version;
       this.msg = msg;
       this.setVars(msg.model.vars);
-      this.model.setHyperparams(msg.hyperparams);
-      this.versionUpdateCounts[msg.model.version] = 0;
-      this.downloadCallbacks.forEach(cb => cb(msg));
+      this.versionUpdateCounts[newVersion] = 0;
+      this.versionCallbacks.forEach(
+        cb => cb(this.model, oldVersion, newVersion));
     });
   }
 
@@ -123,55 +162,70 @@ export class ClientAPI {
    * then revert back to the original weights (so subsequent updates are
    * relative to the same model).
    *
-   * TODO: consider having this method save copies of `xs` and `ys` when there
-   * are too few examples, and only doing training/uploading after reaching a
+   * Note: this method will save copies of `x` and `y` when there
+   * are too few examples and only train/upload after reaching a
    * configurable threshold (disposing of the copies afterwards).
    *
    * @param x Training inputs
    * @param y Training labels
    */
   public async federatedUpdate(x: tf.Tensor, y: tf.Tensor): Promise<void> {
-    // TODO: reshape x and y if missing batch dimension (based on model shape)
-    // TODO: save leftover examples if training w/ more than minimum
-    let xNew, yNew;
-    if (this.x) {
-      xNew = tf.concat([this.x, x]);
-      yNew = tf.concat([this.y, y]);
-      tf.dispose([this.x, this.y]);
-    } else {
-      xNew = x.clone();
-      yNew = y.clone();
-    }
+    // incorporate examples into our stored `x` and `y`
+    const xNew = addRows(this.x, x, this.model.inputShape());
+    const yNew = addRows(this.y, y, this.model.outputShape());
+    tf.dispose([this.x, this.y]);
+    this.x = xNew;
+    this.y = yNew;
 
-    if (xNew.shape[0] >= this.msg.hyperparams.examplesPerUpdate) {
+    // repeatedly, for as many iterations as we have batches of examples:
+    const examplesPerUpdate = this.msg.hyperparams.examplesPerUpdate;
+    while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
-      const initEvals = this.model.evaluate(xNew, yNew);
-      // fit the model to the new data
-      await this.model.fit(xNew, yNew);
-      // serialize the new weights -- in the future we could add noise here
-      const stdDev = this.hyperparams.weightStddev;
-      const newVars = await serializeVars(tf.tidy(() => {
-        return this.model.getVars().map(v => {
-          if (stdDev) {
-            return v + tf.randomNormal(v.shape, 0, stdDev);
-          } else {
-            return v;
-          }
+
+      // grab the right number of examples
+      const xTrain = slice(this.x, 0, examplesPerUpdate);
+      const yTrain = slice(this.y, 0, examplesPerUpdate);
+      const fitConfig = {
+        epochs: this.msg.hyperparams.epochs,
+        batchSize: this.msg.hyperparams.batchSize,
+        learningRate: this.msg.hyperparams.learningRate
+      };
+
+      // fit the model for the specified # of steps
+      await this.model.fit(xTrain, yTrain, fitConfig);
+
+      // serialize, possibly adding noise
+      const stdDev = this.msg.hyperparams.weightNoiseStddev;
+      let newVars;
+      if (stdDev) {
+        const newTensors = tf.tidy(() => {
+          return this.model.getVars().map(v => {
+            return v.add(tf.randomNormal(v.shape, 0, stdDev));
+          });
         });
-      }));
+        newVars = await serializeVars(newTensors);
+        tf.dispose(newTensors);
+      } else {
+        newVars = await serializeVars(this.model.getVars());
+      }
+
       // revert our model back to its original weights
       this.setVars(this.msg.model.vars);
+
       // upload the updates to the server
-      await this.uploadVars({version: modelVersion, vars: newVars});
-      // we're done with this data
-      tf.dispose([xNew, yNew]);
-      this.x = null;
-      this.y = null;
+      await this.uploadVars({ version: modelVersion, vars: newVars });
       this.versionUpdateCounts[modelVersion] += 1;
-    } else {
-      this.x = xNew;
-      this.y = yNew;
+
+      // dispose of the examples we saw
+      // TODO: consider storing some examples longer-term and reusing them for
+      // updates for multiple versions, if session is long-lived.
+      tf.dispose([xTrain, yTrain]);
+      const xRest = slice(this.x, examplesPerUpdate);
+      const yRest = slice(this.y, examplesPerUpdate);
+      tf.dispose([this.x, this.y]);
+      this.x = xRest;
+      this.y = yRest;
     }
   }
 
@@ -206,7 +260,7 @@ export class ClientAPI {
   private async uploadVars(msg: ModelMsg): Promise<{}> {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
-          setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
+        setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
       this.socket.emit(Events.Upload, msg, () => {
         clearTimeout(rejectTimer);
         resolve();
@@ -224,22 +278,22 @@ export class ClientAPI {
   private async connectTo(serverURL: string): Promise<DownloadMsg> {
     this.socket = socketio(serverURL);
     return fromEvent<DownloadMsg>(
-        this.socket, Events.Download, CONNECTION_TIMEOUT);
+      this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 }
 
 async function fromEvent<T>(
-    emitter: SocketIOClient.Socket, eventName: string,
-    timeout: number): Promise<T> {
+  emitter: SocketIOClient.Socket, eventName: string,
+  timeout: number): Promise<T> {
   return new Promise((resolve, reject) => {
-           const rejectTimer = setTimeout(
-               () => reject(`${eventName} event timed out`), timeout);
-           const listener = (evtArgs: T) => {
-             emitter.removeListener(eventName, listener);
-             clearTimeout(rejectTimer);
+    const rejectTimer = setTimeout(
+      () => reject(`${eventName} event timed out`), timeout);
+    const listener = (evtArgs: T) => {
+      emitter.removeListener(eventName, listener);
+      clearTimeout(rejectTimer);
 
-             resolve(evtArgs);
-           };
-           emitter.on(eventName, listener);
-         }) as Promise<T>;
+      resolve(evtArgs);
+    };
+    emitter.on(eventName, listener);
+  }) as Promise<T>;
 }

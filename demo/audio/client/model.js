@@ -32,13 +32,6 @@ export async function loadAudioTransferLearningModel() {
   const k = labelNames.length;
   const newDenseLayer = tf.layers.dense({units: k, activation: 'softmax'});
   const newOutputTensor = newDenseLayer.apply(cutoffTensor);
-  const transferModel = tf.model(
+  return tf.model(
       {inputs: model.inputs, outputs: newOutputTensor});
-  const optimizer = tf.train.sgd(0.01);
-  transferModel.compile({
-    loss: 'categoricalCrossentropy',
-    optimizer: optimizer,
-    metrics: ['accuracy']
-  });
-  return transferModel;
 }

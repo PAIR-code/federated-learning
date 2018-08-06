@@ -16,7 +16,6 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {log} from 'federated-learning-server';
 
 // export const labelNames = [
 //  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
@@ -28,8 +27,6 @@ export const labelNames = ['accio', 'expelliarmus', 'lumos', 'nox'];
 import '@tensorflow/tfjs-node';
 
 export async function loadAudioTransferLearningModel(url: string) {
-  log(`about to load model from ${url}`);
-
   // NOTE: have to temporarily pretend that this is a browser
   tf.ENV.set('IS_BROWSER', true);
   const model = await tf.loadModel(url);
@@ -43,10 +40,10 @@ export async function loadAudioTransferLearningModel(url: string) {
     }
     const cutoffTensor = model.layers[10].output;
     const k = labelNames.length;
-    const newDenseLayer = tf.layers.dense({units: k, activation: 'softmax'});
+    const newDenseLayer = tf.layers.dense({ units: k, activation: 'softmax' });
     const newOutputTensor = newDenseLayer.apply(cutoffTensor);
     const transferModel = tf.model(
-        {inputs: model.inputs, outputs: newOutputTensor as tf.SymbolicTensor});
+      { inputs: model.inputs, outputs: newOutputTensor as tf.SymbolicTensor });
     transferModel.compile({
       loss: 'categoricalCrossentropy',
       optimizer: 'sgd',
@@ -61,6 +58,5 @@ export async function loadAudioTransferLearningModel(url: string) {
     });
     final = model;
   }
-  log(`final # trainable weights: ${final.trainableWeights.length}`);
   return final;
 }
