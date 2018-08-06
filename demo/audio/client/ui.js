@@ -18,7 +18,7 @@
 import {labelNames} from './model';
 import * as spectralPlots from './spectral_plots';
 
-export const recordFieldset = document.getElementById('spells');
+const recordFieldset = document.getElementById('spells');
 labelNames.forEach(name => {
   const button = document.createElement('button');
   button.classList.add('record-button');
@@ -27,19 +27,19 @@ labelNames.forEach(name => {
   button.innerText = name;
   recordFieldset.appendChild(button);
 });
-export const lastPrediction = document.createElement('div');
+const lastPrediction = document.createElement('div');
 recordFieldset.appendChild(lastPrediction);
 
-export const htmlEl = document.getElementsByTagName('html')[0];
-export const spectrumCanvas = document.getElementById('spectrum-canvas');
-export const modelDiv = document.getElementById('model');
-export const modelVersion = document.getElementById('model-version');
-export const statusBar = document.getElementById('status');
-export const recordButtons = Array.from(
+const htmlEl = document.getElementsByTagName('html')[0];
+const spectrumCanvas = document.getElementById('spectrum-canvas');
+const modelDiv = document.getElementById('model');
+const modelVersion = document.getElementById('model-version');
+const statusBar = document.getElementById('status');
+const recordButtons = Array.from(
     document.getElementsByClassName('record-button'));
-export const labeledExamples = document.getElementById('labeled-examples');
-export const waitingTemplate = `Waiting for input&hellip;`;
-export const modelTemplate = `
+const labeledExamples = document.getElementById('labeled-examples');
+const waitingTemplate = `Waiting for input&hellip;`;
+const modelTemplate = `
   <div class='chart model-input'>
     <label>Input</label>
     <canvas id="spectrogram-canvas" height="180" width="270"></canvas>
@@ -50,11 +50,35 @@ export const modelTemplate = `
   </div>
 `;
 
+let resultRow;
+
+export function onRecordButton(callback) {
+  recordButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      button.classList.add('active');
+      lastPrediction.innerHTML = '';
+      recordButtons.forEach(b => b.setAttribute('disabled', 'disabled'));
+      modelDiv.innerHTML = waitingTemplate;
+      setStatus('Listening&hellip;');
+      callback(button.getAttribute('value'));
+    })
+  })
+}
+
 export function setStatus(statusHTML) {
   statusBar.innerHTML = statusHTML;
 }
 
+export function setVersion(version) {
+  modelVersion.innerText = `version #${version}`;
+}
+
 export function setReadyStatus(client) {
+  recordButtons.forEach(b => {
+    b.removeAttribute('disabled');
+    b.classList.remove('active');
+  });
+
   let html = 'Ready to listen!';
   const nx = client.numExamplesPerUpdate() - client.numExamples();
   html += ` Need <span class='status-number'>${nx}</span> more before training.`
@@ -64,27 +88,6 @@ export function setReadyStatus(client) {
   }
   setStatus(html);
 }
-
-export function setVersion(version) {
-  modelVersion.innerText = `version #${version}`;
-}
-
-export function startListening(button) {
-  button.classList.add('active');
-  lastPrediction.innerHTML = '';
-  recordButtons.forEach(b => b.setAttribute('disabled', 'disabled'));
-  modelDiv.innerHTML = waitingTemplate;
-  setStatus('Listening&hellip;');
-}
-
-export function reallowRecording() {
-  recordButtons.forEach(b => {
-    b.removeAttribute('disabled');
-    b.classList.remove('active');
-  });
-}
-
-let resultRow;
 
 export function setupResults() {
   modelDiv.innerHTML = modelTemplate;

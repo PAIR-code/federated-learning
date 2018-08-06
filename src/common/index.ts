@@ -403,16 +403,3 @@ export class FederatedDynamicModel implements FederatedModel {
     }
   }
 }
-
-let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;
-
-export function verbose(enabled: boolean) {
-  LOGGING_ENABLED = enabled;
-}
-
-// tslint:disable-next-line:no-any
-export function log(...args: any[]) {
-  if (LOGGING_ENABLED) {
-    console.error(...args);
-  }
-}
