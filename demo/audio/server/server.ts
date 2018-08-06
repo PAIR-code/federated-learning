@@ -20,7 +20,6 @@ import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
 import * as federated from 'federated-learning-server';
-import { log } from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
@@ -28,7 +27,6 @@ import * as path from 'path';
 import * as uuid from 'uuid/v4';
 import { Request, Response, NextFunction } from 'express';
 import { promisify } from 'util';
-import { labelNames } from './model';
 import * as npy from './npy';
 import fetch from 'node-fetch';
 
@@ -37,20 +35,19 @@ const writeFile = promisify(fs.writeFile);
 // Load tfjs-node (below other code, so clang-format doesn't move it)
 import '@tensorflow/tfjs-node';
 
-// Setup express app using either HTTP or HTTPS, depending on environment
-// variables
+// Setup express app using either HTTP or HTTPS, depending on environment vars
 const app = express();
-let httpServer;
+let webServer;
 let port;
 if (process.env.SSL_KEY && process.env.SSL_CERT) {
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY),
     cert: fs.readFileSync(process.env.SSL_CERT)
   };
-  httpServer = https.createServer(httpsOptions, app);
+  webServer = https.createServer(httpsOptions, app);
   port = process.env.PORT || 443;
 } else {
-  httpServer = http.createServer(app);
+  webServer = http.createServer(app);
   port = process.env.PORT || 3000;
 }
 
@@ -70,6 +67,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Create directories
+const labelNames = ['accio', 'expelliarmus', 'lumos', 'nox'];
 const rootDir = path.resolve(__dirname + '/data');
 const fileDir = path.join(rootDir, 'files');
 const modelDir = path.join(rootDir, 'models');
@@ -96,7 +94,6 @@ app.post('/data', (req: Request, res: Response) => {
   if (!metrics[version]['clients'][clientId]) {
     metrics[version]['clients'][clientId] = [];
   }
-  console.log(req.body);
   metrics[version]['clients'][clientId].push(JSON.parse(req.body.metrics));
 
   // Save files + metadata for later analysis (dont't do this in real life)
@@ -143,7 +140,7 @@ async function loadInitialModel(): Promise<tf.Model> {
   return tf.model({ inputs: model.inputs, outputs: newOutputs });
 }
 
-const fedServer = new federated.Server(httpServer, loadInitialModel, {
+const fedServer = new federated.Server(webServer, loadInitialModel, {
   modelDir,
   updatesPerVersion: 5,
   clientHyperparams: {
@@ -155,7 +152,8 @@ const fedServer = new federated.Server(httpServer, loadInitialModel, {
   modelCompileConfig: {
     loss: 'categoricalCrossentropy',
     metrics: ['accuracy']
-  }
+  },
+  verbose: true
 });
 
 async function setup() {
@@ -176,12 +174,12 @@ async function setup() {
     // Compute validation accuracy
     const newValMetrics = model.evaluate(validInputs, validLabels);
     metrics[newVersion].validation = newValMetrics;
-    log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
+    console.log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
   });
 
   await fedServer.setup();
 
-  httpServer.listen(port, () => {
+  webServer.listen(port, () => {
     console.log(`listening on ${port}`);
   });
 }
