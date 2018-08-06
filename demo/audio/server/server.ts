@@ -19,7 +19,7 @@ import * as tf from '@tensorflow/tfjs';
 import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
-import { ServerAPI } from 'federated-learning-server';
+import * as federated from 'federated-learning-server';
 import { log } from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
@@ -53,7 +53,6 @@ if (process.env.SSL_KEY && process.env.SSL_CERT) {
   httpServer = http.createServer(app);
   port = process.env.PORT || 3000;
 }
-
 
 // Optionally use basic auth
 if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
@@ -144,7 +143,7 @@ async function loadInitialModel(): Promise<tf.Model> {
   return tf.model({ inputs: model.inputs, outputs: newOutputs });
 }
 
-const fedServer = new ServerAPI(httpServer, loadInitialModel, {
+const fedServer = new federated.Server(httpServer, loadInitialModel, {
   modelDir,
   updatesPerVersion: 5,
   clientHyperparams: {
@@ -175,10 +174,9 @@ async function setup() {
       metrics[newVersion] = { validation: null, clients: {} }
     }
     // Compute validation accuracy
-    model.evaluate(validInputs, validLabels).then(newValMetrics => {
-      metrics[newVersion].validation = newValMetrics;
-      log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
-    })
+    const newValMetrics = model.evaluate(validInputs, validLabels);
+    metrics[newVersion].validation = newValMetrics;
+    log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
   });
 
   await fedServer.setup();

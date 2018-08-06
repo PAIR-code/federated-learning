@@ -26,8 +26,6 @@ export type TfModelCallback = () => Promise<tf.Model>;
 
 export type AsyncTfModel = string | tf.Model | TfModelCallback;
 
-type Tensors = Tensor | Tensor[];
-
 export type SerializedVariable = {
   dtype: tf.DataType,
   shape: number[],
@@ -104,16 +102,16 @@ export interface FederatedModel {
    *
    * @return A `Promise` resolved when training is done.
    */
-  fit(x: Tensors, y: Tensors, config?: FitConfig): Promise<void>;
+  fit(x: Tensor, y: Tensor, config?: FitConfig): Promise<void>;
 
   /**
    * Makes predictions on input data.
    *
    * @param x `tf.Tensor` of input data.
    *
-   * @return A `Promise` of model ouputs
+   * @return model ouputs
    */
-  predict(x: Tensors): Promise<Tensors>;
+  predict(x: Tensor): Tensor
 
   /**
    * Evaluates performance on data.
@@ -121,9 +119,9 @@ export interface FederatedModel {
    * @param x `tf.Tensor` of input data.
    * @param y `tf.Tensor` of target data.
    *
-   * @return A `Promise` of evaluation metrics.
+   * @return An array of evaluation metrics.
    */
-  evaluate(x: Tensors, y: Tensors): Promise<number[]>;
+  evaluate(x: Tensor, y: Tensor): number[];
 
   /**
    * Gets the model's variables.
@@ -187,11 +185,11 @@ export class FederatedTfModel implements FederatedModel {
     });
   }
 
-  async predict(x: Tensor) {
-    return this.model.predict(x);
+  predict(x: Tensor) {
+    return this.model.predict(x) as Tensor;
   }
 
-  async evaluate(x: Tensor, y: Tensor) {
+  evaluate(x: Tensor, y: Tensor) {
     return tf.tidy(() => {
       const results = this.model.evaluate(x, y);
       if (results instanceof Array) {
@@ -378,14 +376,14 @@ export class FederatedDynamicModel implements FederatedModel {
    */
   constructor(
     public vars: Variable[],
-    public evaluate: (xs: Tensors, ys: Tensors) => Promise<number[]>,
-    public predict: (xs: Tensors) => Promise<Tensors>,
-    public loss: (xs: Tensors, ys: Tensors) => Scalar,
+    public evaluate: (xs: Tensor, ys: Tensor) => number[],
+    public predict: (xs: Tensor) => Tensor,
+    public loss: (xs: Tensor, ys: Tensor) => Scalar,
     public inputShape: () => number[],
     public outputShape: () => number[],
     public optimizer: tf.SGDOptimizer) { }
 
-  async fit(x: Tensors, y: Tensors, config?: FitConfig): Promise<void> {
+  async fit(x: Tensor, y: Tensor, config?: FitConfig): Promise<void> {
     if (config.learningRate) {
       this.optimizer.setLearningRate(config.learningRate);
     }

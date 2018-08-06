@@ -40,16 +40,6 @@ if (URLSearchParams) {
   };
 }
 
-const lossFns = {
-  'Cross-Entropy': (d) => {
-    const probs = d.modelOutput.split(',').map(parseFloat);
-    return -Math.log(probs[parseInt(d.trueLabel)]);
-  },
-  'Accuracy': (d) => {
-    return d.predictedLabel === d.trueLabel ? 1 : 0;
-  }
-}
-
 async function setup() {
   const metricsRes = await fetch(serverURL + '/metrics', fetchOptions);
   const metrics = await metricsRes.json();

@@ -20,7 +20,7 @@ import * as socketProxy from 'socket.io-client';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 // tslint:disable-next-line:max-line-length
-import { CompileConfig, VersionCallback, ModelMsg, DownloadMsg, Events, deserializeVar, log, SerializedVariable, serializeVars, FederatedClientModel, isFederatedClientModel, FederatedClientTfModel, AsyncTfModel } from './common';
+import { CompileConfig, VersionCallback, ModelMsg, DownloadMsg, Events, deserializeVar, SerializedVariable, serializeVars, FederatedClientModel, isFederatedClientModel, FederatedClientTfModel, AsyncTfModel } from './common';
 
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
@@ -30,7 +30,8 @@ type CounterObj = {
 };
 
 export type FederatedClientConfig = {
-  modelCompileConfig?: CompileConfig
+  modelCompileConfig?: CompileConfig,
+  verbose?: boolean
 };
 
 function concat(a: tf.Tensor, b: tf.Tensor) {
@@ -75,7 +76,7 @@ function addRows(existing: tf.Tensor, newEls: tf.Tensor, unitShape: number[]) {
  * broadcasts weights.
  * The client->server sync must be triggered manually with uploadVars
  */
-export class ClientAPI {
+export class Client {
   private msg: DownloadMsg;
   private model: FederatedClientModel;
   private socket: SocketIOClient.Socket;
@@ -84,6 +85,7 @@ export class ClientAPI {
   private y: tf.Tensor;
   private versionUpdateCounts: CounterObj;
   private serverUrl: string;
+  private verbose: boolean;
 
   /**
    * Construct a client API for federated learning that will push and pull
@@ -101,10 +103,11 @@ export class ClientAPI {
     }
     this.versionCallbacks = [
       (model, v1, v2) => {
-        log(`updated model: ${v1} -> ${v2}`);
+        this.log(`Updated model: ${v1} -> ${v2}`);
       }
     ];
     this.versionUpdateCounts = {};
+    this.verbose = config.verbose;
   }
 
   /**
@@ -129,10 +132,14 @@ export class ClientAPI {
    * and variables set to their inital values.
    */
   public async setup(): Promise<void> {
-    await this.model.setup();
+    await this.time('Initial model setup', async () => {
+      await this.model.setup();
+    });
     this.x = tf.tensor([], [0].concat(this.model.inputShape()));
     this.y = tf.tensor([], [0].concat(this.model.outputShape()));
-    this.msg = await this.connectTo(this.serverUrl);
+    await this.time('Download weights from server', async () => {
+      this.msg = await this.connectTo(this.serverUrl);
+    });
     this.setVars(this.msg.model.vars);
     const newVersion = this.modelVersion();
     this.versionUpdateCounts[newVersion] = 0;
@@ -154,7 +161,7 @@ export class ClientAPI {
    */
   public dispose(): void {
     this.socket.disconnect();
-    log('disconnected');
+    this.log('Disconnected');
   }
 
   /**
@@ -169,7 +176,7 @@ export class ClientAPI {
    * @param x Training inputs
    * @param y Training labels
    */
-  public async federatedUpdate(x: tf.Tensor, y: tf.Tensor): Promise<void> {
+  public async fit(x: tf.Tensor, y: tf.Tensor): Promise<void> {
     // incorporate examples into our stored `x` and `y`
     const xNew = addRows(this.x, x, this.model.inputShape());
     const yNew = addRows(this.y, y, this.model.outputShape());
@@ -193,11 +200,13 @@ export class ClientAPI {
       };
 
       // fit the model for the specified # of steps
-      await this.model.fit(xTrain, yTrain, fitConfig);
+      await this.time('Fit model', async () => {
+        await this.model.fit(xTrain, yTrain, fitConfig);
+      });
 
       // serialize, possibly adding noise
       const stdDev = this.msg.hyperparams.weightNoiseStddev;
-      let newVars;
+      let newVars: SerializedVariable[];
       if (stdDev) {
         const newTensors = tf.tidy(() => {
           return this.model.getVars().map(v => {
@@ -214,7 +223,9 @@ export class ClientAPI {
       this.setVars(this.msg.model.vars);
 
       // upload the updates to the server
-      await this.uploadVars({ version: modelVersion, vars: newVars });
+      await this.time('Upload weights to server', async () => {
+        await this.uploadVars({ version: modelVersion, vars: newVars });
+      });
       this.versionUpdateCounts[modelVersion] += 1;
 
       // dispose of the examples we saw
@@ -227,6 +238,22 @@ export class ClientAPI {
       this.x = xRest;
       this.y = yRest;
     }
+  }
+
+  public evaluate(x: tf.Tensor, y: tf.Tensor): number[] {
+    return this.model.evaluate(x, y);
+  }
+
+  public predict(x: tf.Tensor): tf.Tensor {
+    return this.model.predict(x);
+  }
+
+  public inputShape(): number[] {
+    return this.model.inputShape();
+  }
+
+  public outputShape(): number[] {
+    return this.model.outputShape();
   }
 
   public numUpdates(): number {
@@ -279,6 +306,19 @@ export class ClientAPI {
     this.socket = socketio(serverURL);
     return fromEvent<DownloadMsg>(
       this.socket, Events.Download, CONNECTION_TIMEOUT);
+  }
+
+  private log(msg: string) {
+    if (this.verbose) {
+      console.log(`FederatedClient: ${msg}`);
+    }
+  }
+
+  private async time(msg: string, action: () => Promise<void>) {
+    const t1 = new Date().getTime();
+    await action();
+    const t2 = new Date().getTime();
+    this.log(`${msg} took ${t2 - t1}ms`)
   }
 }
 
