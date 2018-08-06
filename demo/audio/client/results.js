@@ -1,3 +1,5 @@
+import { max } from "@tensorflow/tfjs";
+
 /**
  * @license
  * Copyright 2018 Google LLC. All Rights Reserved.
@@ -49,26 +51,11 @@ const lossFns = {
 }
 
 async function setup() {
-  const dataRes = await fetch(serverURL + '/data', fetchOptions);
-  const data = await dataRes.json();
-  const validRes = await fetch(serverURL + '/validation', fetchOptions);
-  const valid = await validRes.json();
-  const dataByVersionByClient = {};
-
-  for (let i = 0; i < data.length; i++) {
-    const version = data[i].modelVersion;
-    const client = data[i].clientId
-    if (!dataByVersionByClient[version]) {
-      dataByVersionByClient[version] = {};
-    }
-    if (!dataByVersionByClient[version][client]) {
-      dataByVersionByClient[version][client] = [];
-    }
-    dataByVersionByClient[version][client].push(data[i]);
-  }
-
-  const versions = Object.keys(dataByVersionByClient);
+  const metricsRes = await fetch(serverURL + '/metrics', fetchOptions);
+  const metrics = await metricsRes.json();
+  const versions = Object.keys(metrics);
   versions.sort();
+  window.metrics = metrics;
 
   function redrawGraph(lossFn) {
     const meanClientLine = {
@@ -100,10 +87,11 @@ async function setup() {
     }
 
     const clientScatters = {};
+    let maxY = 0;
 
     for (let i = 0; i < versions.length; i++) {
       const v = versions[i];
-      const clients = Object.keys(dataByVersionByClient[v]);
+      const clients = Object.keys(metrics[v].clients);
       let versionMean = 0;
 
       for (let j = 0; j < clients.length; j++) {
@@ -127,23 +115,24 @@ async function setup() {
           }
         }
 
-        const dataValues = dataByVersionByClient[v][c];
+        const dataValues = metrics[v].clients[c];
         let clientMean = 0;
-        dataValues.forEach(d => {
-          clientMean += lossFns[lossFn](d) / dataValues.length;
-        });
+        dataValues.forEach(d => clientMean += d[lossFn] / dataValues.length);
         clientScatters[c].x.push(i+1);
         clientScatters[c].y.push(clientMean);
         clientScatters[c].text.push(`${dataValues.length} examples`);
         versionMean += clientMean / clients.length;
+        maxY = Math.max(maxY, clientMean);
       }
       meanClientLine.x.push(i+1);
       meanClientLine.y.push(versionMean);
       meanClientLine.text.push(`${clients.length} clients`);
 
-      if (valid[v]) {
+      if (metrics[v].validation) {
+        const val = metrics[v].validation[lossFn];
         validationLine.x.push(i+1);
-        validationLine.y.push(valid[v][lossFn]);
+        validationLine.y.push(val);
+        maxY = Math.max(maxY, val);
       }
     }
 
@@ -155,19 +144,21 @@ async function setup() {
       autosize: true,
       title: 'Federated Learning Progress',
       yaxis: {
-        title: lossFn
+        title: ['Cross-Entropy', 'Accuracy'][lossFn],
+        range: [0, [maxY * 1.05, 1][lossFn]]
       },
       xaxis: {
-        title: 'Model Version'
+        title: 'Model Version',
+        range: [0, versions.length + 1]
       }
     });
   }
 
   const metric = document.getElementById('performance-metric');
   metric.onchange = () => {
-    redrawGraph(metric.value);
+    redrawGraph(parseInt(metric.value));
   }
-  redrawGraph(metric.value);
+  redrawGraph(parseInt(metric.value));
 };
 
 setup();

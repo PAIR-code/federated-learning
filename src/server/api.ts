@@ -15,22 +15,21 @@
  * =============================================================================
  */
 
-import './fetch_polyfill';
-
 import * as tf from '@tensorflow/tfjs';
 import * as io from 'socket.io';
+import * as http from 'http';
+import * as https from 'https';
 import * as path from 'path';
 
 // tslint:disable-next-line:max-line-length
-import { deserializeVars, DownloadMsg, Events, log, SerializedVariable, serializeVars, stackSerialized, FederatedServerModel, isFederatedServerModel, clientHyperparams, ClientHyperparams, VersionCallback, ModelMsg } from './common';
+import { CompileConfig, deserializeVars, DownloadMsg, Events, log, SerializedVariable, serializeVars, stackSerialized, FederatedServerModel, isFederatedServerModel, clientHyperparams, ClientHyperparams, VersionCallback, ModelMsg, AsyncTfModel } from './common';
 import { FederatedServerTfModel } from './federated_model';
-import { ModelCompileConfig } from '@tensorflow/tfjs';
 
 export type FederatedServerConfig = {
   clientHyperparams?: ClientHyperparams,
   updatesPerVersion?: number,
   modelDir?: string,
-  modelCompileConfig?: ModelCompileConfig
+  modelCompileConfig?: CompileConfig
 };
 
 export class ServerAPI {
@@ -46,14 +45,15 @@ export class ServerAPI {
   updatesPerVersion: number;
 
   constructor(
-    server: io.Server, model: FederatedServerModel | tf.Model,
+    server: http.Server | https.Server, model: AsyncTfModel | FederatedServerModel,
     config: FederatedServerConfig) {
-    this.server = server;
+    this.server = io(server);
     if (isFederatedServerModel(model)) {
       this.model = model;
     } else {
       const modelDir = config.modelDir || path.resolve(`${__dirname}/federated-server-models`);
-      this.model = new FederatedServerTfModel(modelDir, model, config.modelCompileConfig);
+      const compileConfig = config.modelCompileConfig || {};
+      this.model = new FederatedServerTfModel(modelDir, model, compileConfig);
     }
     this.updatesPerVersion = config.updatesPerVersion || 10;
     this.clientHyperparams = clientHyperparams(config.clientHyperparams);
