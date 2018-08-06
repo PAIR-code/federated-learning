@@ -16,10 +16,13 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {labelNames} from './labels';
 
 const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+
+export const labelNames = [
+  'accio', 'expelliarmus', 'lumos', 'nox'
+];
 
 export async function loadAudioTransferLearningModel() {
   const model = await tf.loadModel(audioTransferLearningModelURL);

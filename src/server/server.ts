@@ -23,7 +23,7 @@ import * as path from 'path';
 
 // tslint:disable-next-line:max-line-length
 import { CompileConfig, deserializeVars, DownloadMsg, Events, log, SerializedVariable, serializeVars, stackSerialized, FederatedServerModel, isFederatedServerModel, clientHyperparams, ClientHyperparams, VersionCallback, ModelMsg, AsyncTfModel } from './common';
-import { FederatedServerTfModel } from './federated_model';
+import { FederatedServerTfModel } from './models';
 
 export type FederatedServerConfig = {
   clientHyperparams?: ClientHyperparams,
@@ -32,7 +32,7 @@ export type FederatedServerConfig = {
   modelCompileConfig?: CompileConfig
 };
 
-export class ServerAPI {
+export class Server {
   model: FederatedServerModel;
   clientHyperparams: ClientHyperparams;
   downloadMsg: DownloadMsg;

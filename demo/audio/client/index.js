@@ -19,45 +19,10 @@ import * as tf from '@tensorflow/tfjs';
 import * as npy from './npy';
 import uuid from 'uuid/v4';
 import MediaStreamRecorder from 'msr';
-import {ClientAPI} from 'federated-learning-client';
-import {plotSpectrogram, plotSpectrum} from './spectral_plots';
-import {loadAudioTransferLearningModel} from './model';
+import {loadAudioTransferLearningModel, labelNames} from './model';
 import {FrequencyListener} from './frequency_listener';
-import {labelNames} from './labels';
-
-window.tf = tf;
-
-const recordFieldset = document.getElementById('spells');
-labelNames.forEach(name => {
-  const button = document.createElement('button');
-  button.classList.add('record-button');
-  button.setAttribute('value', name);
-  button.setAttribute('disabled', 'disabled');
-  button.innerText = name;
-  recordFieldset.appendChild(button);
-});
-const lastPrediction = document.createElement('div');
-recordFieldset.appendChild(lastPrediction);
-
-const htmlEl = document.getElementsByTagName('html')[0];
-const spectrumCanvas = document.getElementById('spectrum-canvas');
-const modelDiv = document.getElementById('model');
-const modelVersion = document.getElementById('model-version');
-const statusBar = document.getElementById('status');
-const recordButtons = Array.from(
-    document.getElementsByClassName('record-button'));
-const labeledExamples = document.getElementById('labeled-examples');
-const waitingTemplate = `Waiting for input&hellip;`;
-const modelTemplate = `
-  <div class='chart model-input'>
-    <label>Input</label>
-    <canvas id="spectrogram-canvas" height="180" width="270"></canvas>
-  </div>
-  <div class='chart model-output'>
-    <label>Output</label>
-    <div id='probs'></div>
-  </div>
-`;
+import * as federated from 'federated-learning-client';
+import * as ui from './ui';
 
 let serverURL = location.origin;
 if (URLSearchParams) {
@@ -67,50 +32,22 @@ if (URLSearchParams) {
   }
 }
 
-function setStatus(statusHTML) {
-  statusBar.innerHTML = statusHTML;
-}
+const client = new federated.Client(serverURL, loadAudioTransferLearningModel, {
+  verbose: true
+});
 
-function setReadyStatus(clientAPI) {
-  let html = 'Ready to listen!';
-  const need = clientAPI.numExamplesPerUpdate() - clientAPI.numExamples();
-  html += ` Need <span class='status-number'>${need}</span> more before training.`
-  const trained = clientAPI.numUpdates();
-  if (trained) {
-    html += ` You've trained <span class='status-number'>${trained}</span> 🧙`;
-  }
-  setStatus(html);
-}
+client.onNewVersion(() => {
+  ui.setVersion(client.numVersions());
+});
 
-loadAudioTransferLearningModel().then(async (model) => {
-  const clientAPI = new ClientAPI(serverURL, model);
-
-  clientAPI.onNewVersion((model, oldVersion, newVersion) => {
-    console.log(`${oldVersion} -> ${newVersion}`);
-    modelVersion.innerText = `version #${clientAPI.numVersions()}`;
-  });
-
-  const t1 = new Date().getTime();
-  await clientAPI.setup();
-  const t2 = new Date().getTime();
-  console.log(`download took ${t2-t1}ms`);
-
-  window.api = clientAPI;
-  window.model = clientAPI.model;
-
-  setStatus('Waiting for microphone&hellip;');
+client.setup().then(async () => {
+  ui.setStatus('Waiting for microphone&hellip;');
   const stream =
       await navigator.mediaDevices.getUserMedia({audio: true, video: false});
 
-  setupUI(stream, model, clientAPI);
-});
-
-function setupUI(stream, model, clientAPI) {
-  const inputShape = model.inputs[0].shape;
-  const numFrames = inputShape[1];
-  const fftLength = inputShape[2];
-  let resultRow;
-  let yTrue;// = getNextLabel();
+  const numFrames = client.inputShape()[0];
+  const fftLength = client.inputShape()[1];
+  let yTrue;
   let yPred;
   let probs;
   let xNpy;
@@ -127,28 +64,23 @@ function setupUI(stream, model, clientAPI) {
   recorder.mimeType = 'audio/wav';
   recorder.ondataavailable = wavBlob => {
     // create audio element with recording
-    const url = URL.createObjectURL(wavBlob);
-    const audioControls = document.createElement('audio');
-    const audioSource = document.createElement('source');
-    audioControls.setAttribute('controls', 'controls');
-    audioSource.src = url;
-    audioSource.type = 'audio/wav';
-    audioControls.appendChild(audioSource);
-    resultRow.children[0].appendChild(audioControls);
+    ui.createAudioElement(wavBlob);
 
-    const fn = labelNames[yTrue];
+    // Setup .wav and .npy files
+    const fname = labelNames[yTrue];
     const npyBlob = new Blob([new Uint8Array(xNpy)]);
     const wavFile =
-        new File([wavBlob], `${fn}.wav`, {type: 'audio/wav'});
+        new File([wavBlob], `${fname}.wav`, {type: 'audio/wav'});
     const npyFile =
-        new File([npyBlob], `${fn}.npy`, {type: 'application/octet-stream'});
-    // send .wav file to server
+        new File([npyBlob], `${fname}.npy`, {type: 'application/octet-stream'});
+
+    // Send data to server
     const req = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('wav', wavFile);
     formData.append('npy', npyFile);
     formData.append('clientId', clientId);
-    formData.append('modelVersion', clientAPI.modelVersion());
+    formData.append('modelVersion', client.modelVersion());
     formData.append('timestamp', new Date().getTime().toString());
     formData.append('predictedLabel', yPred);
     formData.append('trueLabel', yTrue);
@@ -161,39 +93,25 @@ function setupUI(stream, model, clientAPI) {
   // On each audio frame, update our rotating buffer with the latest FFT data
   // from our analyser. For fun, also update the spectrum plot
   const listener = FrequencyListener(stream, numFrames, fftLength);
-  listener.onEachFrame(freqData => {
-    plotSpectrum(spectrumCanvas, freqData, fftLength);
-  });
+  listener.onEachFrame(freqData => ui.plotSpectrum(freqData, fftLength));
   listener.listen();
 
-  // Create our record button
-  setReadyStatus(clientAPI);
-  recordButtons.forEach(b => b.removeAttribute('disabled'));
-
-  // When we click it, record for 1 second
-  recordButtons.forEach(button => {
+  // Setup record buttons
+  ui.setReadyStatus(client);
+  ui.recordButtons.forEach(button => {
+    button.removeAttribute('disabled');
     button.addEventListener('click', () => {
-      lastPrediction.innerHTML = '';
-      recordButtons.forEach(b => b.setAttribute('disabled', 'disabled'));
+      ui.startListening(button);
       yTrue = labelNames.indexOf(button.getAttribute('value'));
-      button.classList.add('active');
-      console.log(yTrue);
-      modelDiv.innerHTML = waitingTemplate;
-      setStatus('Listening&hellip;');
       recorder.start(1100);
       setTimeout(finishRecording, 1000);
     });
   });
 
   // When we're done recording,
-  async function finishRecording() {
+  function finishRecording() {
     // Setup results html
-    modelDiv.innerHTML = modelTemplate;
-    resultRow = document.createElement('tr');
-    for (let i = 0; i < 4; i++)
-      resultRow.appendChild(document.createElement('td'));
-    labeledExamples.prepend(resultRow);
-    resultRow.children[2].innerText = labelNames[yTrue];
+    ui.setupResults();
 
     // Compute input tensor
     const freqData = listener.getFrequencyData();
@@ -206,77 +124,31 @@ function setupUI(stream, model, clientAPI) {
     const y = tf.tensor2d([onehotY]);
 
     // Compute predictions
-    const p = model.predict(x);
+    const p = client.predict(x);
     tf.tidy(() => {
       yPred = tf.argMax(p, 1).dataSync()[0];
       probs = p.dataSync();
+      metrics = client.evaluate(x, y);
     });
-    metrics = await clientAPI.model.evaluate(x, y);
 
     // Stop separate .wav recording
     recorder.stop();
 
-    // Plot spectrograms
-    const mainSpectrogram = document.getElementById('spectrogram-canvas');
-    const miniSpectrogram = document.createElement('canvas');
-    miniSpectrogram.setAttribute('width', '81');
-    miniSpectrogram.setAttribute('height', '54');
-    plotSpectrogram(mainSpectrogram, freqData, fftLength);
-    plotSpectrogram(miniSpectrogram, freqData, fftLength);
-    resultRow.children[1].appendChild(miniSpectrogram);
+    // Add plots / result descriptions / magic
+    ui.plotSpectrograms(freqData, fftLength);
+    ui.plotProbabilities(probs);
+    ui.describeResults(yTrue, yPred);
+    ui.castSpell(labelNames[yPred]);
 
-    resultRow.children[3].innerText = labelNames[yPred];
-    if (yTrue != yPred) {
-      resultRow.children[3].className = 'incorrect-prediction';
-      lastPrediction.innerHTML = `You tried to cast <span class='last-prediction'>${labelNames[yTrue]}</span>, but your wand performed <span class='last-prediction'>${labelNames[yPred]}</span>!`;
-    } else {
-      lastPrediction.innerHTML = `You successfully cast <span class='last-prediction'>${labelNames[yPred]}</span>!`;
-    }
-
-    switch (labelNames[yPred]) {
-      case 'nox':
-        htmlEl.classList.add('nox');
-        break;
-      case 'lumos':
-        htmlEl.classList.remove('nox');
-        break;
-      case 'accio':
-        htmlEl.classList.add('accio');
-        break;
-      case 'expelliarmus':
-        htmlEl.classList.remove('accio');
-    }
-
-
-    // Plot probabilities
-    Plotly.newPlot('probs', [{x: labelNames, y: probs, type: 'bar'}], {
-      autosize: false,
-      width: Math.min(270*1.25, document.getElementById('model').clientWidth),
-      height: 180,
-      margin: {l: 30, r: 5, b: 30, t: 5, pad: 0},
-    });
-
-    // Prepare our next loop...
-    const cleanup = (err) => {
-      // dispose of tensors
+    // Train and prepare our next loop!
+    ui.setStatus('Fitting Model&hellip;');
+    client.fit(x, y).catch(console.log).finally(() => {
       tf.dispose([x, y, p]);
-
-      // re-allow recording
-      recordButtons.forEach(b => {
-        b.removeAttribute('disabled');
-        b.classList.remove('active');
-      });
-
-      setReadyStatus(clientAPI);
-      console.log('...done!');
-    };
-
-    // ...after we train
-    console.log('fitting model...');
-    setStatus('Fitting Model&hellip;')
-    clientAPI.federatedUpdate(x, y).catch(console.log).finally(cleanup);
+      ui.reallowRecording();
+      ui.setReadyStatus(client);
+    });
   }
-}
+});
 
 function normalize(x) {
   return tf.tidy(() => {

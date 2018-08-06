@@ -16,7 +16,6 @@
  */
 
 import './fetch_polyfill';
-
 import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
 import { promisify } from 'util';
