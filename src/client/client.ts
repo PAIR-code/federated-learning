@@ -17,11 +17,12 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as socketProxy from 'socket.io-client';
+// tslint:disable-next-line:max-line-length
+import {FederatedCompileConfig, VersionCallback, ModelMsg, DownloadMsg, Events, deserializeVar, SerializedVariable, serializeVars, AsyncTfModel} from './common';
+// tslint:disable-next-line:max-line-length
+import {FederatedClientModel, isFederatedClientModel, FederatedClientTfModel} from './models';
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
-// tslint:disable-next-line:max-line-length
-import { CompileConfig, VersionCallback, ModelMsg, DownloadMsg, Events, deserializeVar, SerializedVariable, serializeVars, FederatedClientModel, isFederatedClientModel, FederatedClientTfModel, AsyncTfModel } from './common';
-
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
 
@@ -30,7 +31,7 @@ type CounterObj = {
 };
 
 export type FederatedClientConfig = {
-  modelCompileConfig?: CompileConfig,
+  modelCompileConfig?: FederatedCompileConfig,
   verbose?: boolean
 };
 
@@ -224,7 +225,7 @@ export class Client {
 
       // upload the updates to the server
       await this.time('Upload weights to server', async () => {
-        await this.uploadVars({ version: modelVersion, vars: newVars });
+        await this.uploadVars({version: modelVersion, vars: newVars});
       });
       this.versionUpdateCounts[modelVersion] += 1;
 

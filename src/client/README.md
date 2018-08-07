@@ -78,8 +78,8 @@ federated.Client(SERVER_URL, 'https://initial.com/model.json', {
 })
 ```
 
-This dictionary will be passed to [`tf.Model.compile`](https://js.tensorflow.org/api/0.12.0/#tf.Model.compile), so you can also pass custom `metrics`.
-However, we will always set the `optimizer` to [`tf.SGDOptimizer`](https://js.tensorflow.org/api/0.12.0/#train.sgd) to properly adopt a learning rate based on hyperparameters sent by the server. If you need more flexibility than this, you can define
+This dictionary will be passed to [`tf.Model.compile`](https://js.tensorflow.org/api/latest/#tf.Model.compile), so you can also pass custom `metrics`.
+However, we will always set the `optimizer` to [`tf.SGDOptimizer`](https://js.tensorflow.org/api/latest/#train.sgd) to properly adopt a learning rate based on hyperparameters sent by the server. If you need more flexibility than this, you can define
 a custom [`FederatedClientModel`](#TODO).
 
 ### Getting Stats

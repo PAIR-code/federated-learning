@@ -18,18 +18,59 @@
 import './fetch_polyfill';
 import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
-import { promisify } from 'util';
-import { AsyncTfModel, FederatedTfModel, FederatedServerModel, CompileConfig } from './common';
+import {promisify} from 'util';
+// tslint:disable-next-line:max-line-length
+import {AsyncTfModel, FederatedModel, FederatedTfModel, FederatedCompileConfig} from './common';
 
 const readdir = promisify(fs.readdir);
 
-export class FederatedServerTfModel extends FederatedTfModel implements FederatedServerModel {
+// Federated server models need to implement a few additional methods
+export interface FederatedServerModel extends FederatedModel {
+  isFederatedServerModel: boolean;
+  version: string;
+
+  /**
+   * Initialize the model
+   */
+  setup(): Promise<void>;
+
+  /**
+   * Return a list of versions that can be `load`ed
+   */
+  list(): Promise<string[]>;
+
+  /**
+   * Return the most recent `load`able version
+   */
+  last(): Promise<string>;
+
+  /**
+   * Save the current model and update `version`.
+   */
+  save(): Promise<void>;
+
+  /**
+   * Load the specified version of the model.
+   *
+   * @param version identifier of the model
+   */
+  load(version: string): Promise<void>;
+}
+
+export function isFederatedServerModel(model: any):
+  model is FederatedServerModel {
+  return model && model.isFederatedServerModel;
+}
+
+export class FederatedServerTfModel
+  extends FederatedTfModel implements FederatedServerModel {
   isFederatedServerModel = true;
   saveDir: string;
   version: string;
 
-  constructor(saveDir: string, initialModel?: AsyncTfModel, compileConfig?: CompileConfig) {
-    super(initialModel, compileConfig);
+  constructor(saveDir: string, initialModel?: AsyncTfModel,
+    config?: FederatedCompileConfig) {
+    super(initialModel, config);
     this.saveDir = saveDir;
   }
 

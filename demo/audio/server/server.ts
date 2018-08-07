@@ -25,8 +25,8 @@ import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
-import { Request, Response, NextFunction } from 'express';
-import { promisify } from 'util';
+import {Request, Response, NextFunction} from 'express';
+import {promisify} from 'util';
 import * as npy from './npy';
 import fetch from 'node-fetch';
 
@@ -55,7 +55,7 @@ if (process.env.SSL_KEY && process.env.SSL_CERT) {
 if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
   const users = {};
   users[process.env.BASIC_AUTH_USER] = process.env.BASIC_AUTH_PASS;
-  app.use(basicAuth({ users, challenge: true }));
+  app.use(basicAuth({users, challenge: true}));
 }
 
 // Setup file uploading (to save .wav files)
@@ -101,8 +101,8 @@ app.post('/data', (req: Request, res: Response) => {
   const wavFile = req.files.wav as fileUpload.UploadedFile;
   const npyFile = req.files.npy as fileUpload.UploadedFile;
   const labelName = wavFile.name.split('.')[0];
-  wavFile.mv(`${fileDir}/${labelName}/${reqId}.wav`, () => { });
-  npyFile.mv(`${fileDir}/${labelName}/${reqId}.npy`, () => { });
+  wavFile.mv(`${fileDir}/${labelName}/${reqId}.wav`, () => {});
+  npyFile.mv(`${fileDir}/${labelName}/${reqId}.npy`, () => {});
   writeFile(`${fileDir}/${labelName}/${reqId}.json`, JSON.stringify(req.body));
 
   res.sendStatus(200);
@@ -135,9 +135,9 @@ async function loadInitialModel(): Promise<tf.Model> {
     model.layers[i].trainable = false;  // freeze everything
   }
   const transferLayer = model.layers[10].output;
-  const newDenseLayer = tf.layers.dense({ units: 4, activation: 'softmax' });
+  const newDenseLayer = tf.layers.dense({units: 4, activation: 'softmax'});
   const newOutputs = newDenseLayer.apply(transferLayer) as tf.SymbolicTensor;
-  return tf.model({ inputs: model.inputs, outputs: newOutputs });
+  return tf.model({inputs: model.inputs, outputs: newOutputs});
 }
 
 const fedServer = new federated.Server(webServer, loadInitialModel, {
@@ -169,7 +169,7 @@ async function setup() {
     }
     // Create space for the new model's metrics
     if (!metrics[newVersion]) {
-      metrics[newVersion] = { validation: null, clients: {} }
+      metrics[newVersion] = {validation: null, clients: {}}
     }
     // Compute validation accuracy
     const newValMetrics = model.evaluate(validInputs, validLabels);

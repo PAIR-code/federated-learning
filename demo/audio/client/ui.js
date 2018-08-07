@@ -129,7 +129,7 @@ export function plotSpectrograms(freqData, fftLength) {
 export function plotProbabilities(probs) {
   Plotly.newPlot('probs', [{x: labelNames, y: probs, type: 'bar'}], {
     autosize: false,
-    width: Math.min(270*1.25, document.getElementById('model').clientWidth),
+    width: Math.min(270*1.25, modelDiv.clientWidth),
     height: 180,
     margin: {l: 30, r: 5, b: 30, t: 5, pad: 0},
   });

@@ -20,6 +20,38 @@
   src: url(harryp.ttf);
 }
 
+html {
+  color: #222;
+  background-color: white;
+  transition: all 500ms ease-in-out;
+}
+
+html.nox {
+  background-color: #222;
+  color: #aaa;
+}
+
+html.accio {
+  cursor: url(wand.png) 0 0, auto !important;
+}
+
+html.accio.nox {
+  cursor: url(wand-active.png) 0 0, auto !important;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+html.accio button:not(:disabled) {
+  cursor: url(wand-active.png) 0 0, pointer !important;
+}
+
+body {
+  font-family: harryp;
+  font-size: 24px;
+}
+
 .header {
   background-color:black;
   position: absolute;
@@ -57,31 +89,6 @@
   color: yellow;
 }
 
-html.accio {
-  cursor: url(wand.png) 0 0, auto !important;
-}
-
-html.accio.nox {
-  cursor: url(wand-active.png) 0 0, auto !important;
-}
-
-button:not(:disabled) {
-  cursor: pointer;
-}
-
-html.accio button:not(:disabled) {
-  cursor: url(wand-active.png) 0 0, pointer !important;
-}
-
-html {
-  color: #222;
-  background-color: white;
-  transition: all 500ms ease-in-out;
-}
-html.nox {
-  background-color: #222;
-  color: #aaa;
-}
 .container {
   width: 666px;
   margin: 0 auto;
@@ -93,13 +100,14 @@ html.nox {
   min-width: 1000px;
 }
 
-body {
-  font-family: harryp;
-  font-size: 24px;
+#results {
+  max-width: 1600px;
 }
+
 legend {
   font-size: 32px;
 }
+
 #model-version {
   font-size: 24px;
 }
@@ -117,49 +125,58 @@ span.last-prediction {
   font-size: 48px;
   padding: 0 10px;
 }
+
 .record-button.active {
   background-color: darkgoldenrod;
 }
-#results {
-  max-width: 1600px;
-}
+
 .chart {
   display: inline-block;
   position: relative;
   padding-top: 1.2em;
   vertical-align: top;
 }
+
 .chart label {
   position: absolute;
   top: 0;
   left: 0;
 }
+
 .chart canvas {
   border: 1px solid #ccc;
 }
+
 #example-table {
   width: 100%;
 }
+
 #example-table tbody tr {
   border-top: 1px solid;
 }
+
 #example-table td {
   padding-right: 1em;
 }
+
 #example-table th {
   text-align: left;
   padding-right: 1em;
 }
+
 #example-table .incorrect-prediction {
   color: darkred;
   font-weight: bold;
 }
+
 audio {
   max-width: 250px;
 }
+
 fieldset {
   position: relative;
 }
+
 .version {
   position: absolute;
   right: 1em;
