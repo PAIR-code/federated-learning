@@ -136,8 +136,8 @@ export class Client {
     await this.time('Initial model setup', async () => {
       await this.model.setup();
     });
-    this.x = tf.tensor([], [0].concat(this.model.inputShape()));
-    this.y = tf.tensor([], [0].concat(this.model.outputShape()));
+    this.x = tf.tensor([], [0].concat(this.model.inputShape));
+    this.y = tf.tensor([], [0].concat(this.model.outputShape));
     await this.time('Download weights from server', async () => {
       this.msg = await this.connectTo(this.serverUrl);
     });
@@ -179,8 +179,8 @@ export class Client {
    */
   public async fit(x: tf.Tensor, y: tf.Tensor): Promise<void> {
     // incorporate examples into our stored `x` and `y`
-    const xNew = addRows(this.x, x, this.model.inputShape());
-    const yNew = addRows(this.y, y, this.model.outputShape());
+    const xNew = addRows(this.x, x, this.model.inputShape);
+    const yNew = addRows(this.y, y, this.model.outputShape);
     tf.dispose([this.x, this.y]);
     this.x = xNew;
     this.y = yNew;
@@ -249,12 +249,12 @@ export class Client {
     return this.model.predict(x);
   }
 
-  public inputShape(): number[] {
-    return this.model.inputShape();
+  public get inputShape(): number[] {
+    return this.model.inputShape;
   }
 
-  public outputShape(): number[] {
-    return this.model.outputShape();
+  public get outputShape(): number[] {
+    return this.model.outputShape;
   }
 
   public numUpdates(): number {
@@ -309,9 +309,9 @@ export class Client {
       this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 
-  private log(msg: string) {
+  private log(...args: any[]) {
     if (this.verbose) {
-      console.log(`FederatedClient: ${msg}`);
+      console.log('FederatedClient:', ...args);
     }
   }
 
