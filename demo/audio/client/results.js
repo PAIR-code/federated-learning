@@ -1,5 +1,3 @@
-import { max } from "@tensorflow/tfjs";
-
 /**
  * @license
  * Copyright 2018 Google LLC. All Rights Reserved.
@@ -45,7 +43,6 @@ async function setup() {
   const metrics = await metricsRes.json();
   const versions = Object.keys(metrics);
   versions.sort();
-  window.metrics = metrics;
 
   function redrawGraph(lossFn) {
     const meanClientLine = {
