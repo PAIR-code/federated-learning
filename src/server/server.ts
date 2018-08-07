@@ -26,19 +26,6 @@ import {FederatedCompileConfig, deserializeVars, DownloadMsg, Events, Serialized
 // tslint:disable-next-line:max-line-length
 import {FederatedServerModel, isFederatedServerModel, FederatedServerTfModel} from './models';
 
-let LOGGING_ENABLED = (!!process.env.VERBOSE) || false;
-
-export function verbose(enabled: boolean) {
-  LOGGING_ENABLED = enabled;
-}
-
-// tslint:disable-next-line:no-any
-export function log(...args: any[]) {
-  if (LOGGING_ENABLED) {
-    console.log('Federated Server:', ...args);
-  }
-}
-
 export type FederatedServerConfig = {
   clientHyperparams?: ClientHyperparams,
   updatesPerVersion?: number,
@@ -58,37 +45,46 @@ export class Server {
   aggregation = 'mean';
   versionCallbacks: VersionCallback[];;
   updatesPerVersion: number;
+  verbose: boolean;
 
   constructor(
-    server: http.Server | https.Server,
+    server: http.Server | https.Server | io.Server,
     model: AsyncTfModel | FederatedServerModel,
     config: FederatedServerConfig) {
-    this.server = io(server);
+    // Setup server
+    if (server instanceof http.Server || server instanceof https.Server) {
+      this.server = io(server);
+    } else {
+      this.server = server;
+    }
+
+    // Setup model
     if (isFederatedServerModel(model)) {
       this.model = model;
     } else {
-      const defaultDir = path.resolve(`${__dirname}/federated-server-models`);
+      const defaultDir = path.resolve(`${process.cwd()}/saved-models`);
       const modelDir = config.modelDir || defaultDir;
       const compileConfig = config.modelCompileConfig || {};
       this.model = new FederatedServerTfModel(modelDir, model, compileConfig);
     }
-    if (config.verbose) {
-      verbose(config.verbose);
-    }
+    this.verbose = (!!config.verbose) || (!!process.env.VERBOSE) || false;
     this.updatesPerVersion = config.updatesPerVersion || 10;
     this.clientHyperparams = clientHyperparams(config.clientHyperparams);
     this.downloadMsg = null;
     this.versionCallbacks = [
       (model, v1, v2) => {
-        log(`updated model: ${v1} -> ${v2}`);
+        this.log(`updated model: ${v1} -> ${v2}`);
       }
     ];
   }
 
   async setup() {
-    await this.model.setup();
+    await this.time('setting up model', async () => {
+      await this.model.setup();
+    });
+
     this.downloadMsg = await this.computeDownloadMsg();
-    this.versionCallbacks.forEach(c => c(this.model, null, this.model.version));
+    await this.performCallbacks();
 
     this.server.on('connection', async (socket: io.Socket) => {
       if (!this.downloadMsg) {
@@ -96,11 +92,11 @@ export class Server {
       }
 
       this.numClients++;
-      log(`connection: ${this.numClients} clients`);
+      this.log(`connection: ${this.numClients} clients`);
 
       socket.on('disconnect', () => {
         this.numClients--;
-        log(`disconnection: ${this.numClients} clients`);
+        this.log(`disconnection: ${this.numClients} clients`);
       });
 
       socket.emit(Events.Download, this.downloadMsg);
@@ -108,7 +104,7 @@ export class Server {
       socket.on(Events.Upload, async (msg: ModelMsg, ack) => {
         ack(true);
         if (msg.version === this.model.version && !this.updating) {
-          log(`new update from ${socket.client.id}`);
+          this.log(`new update from ${socket.client.id}`);
           this.updates.push(msg.vars);
           if (this.updates.length >= this.updatesPerVersion) {
             await this.updateModel();
@@ -141,22 +137,43 @@ export class Server {
     this.updating = true;
     const oldVersion = this.model.version;
 
-    const newWeights = tf.tidy(() => {
-      const stacked = stackSerialized(this.updates);
-      const updates = deserializeVars(stacked);
-      if (this.aggregation === 'mean') {
-        return updates.map(update => update.mean(0));
-      } else {
-        throw new Error(`unsupported aggregation ${this.aggregation}`);
-      }
+    await this.time('computing new weights', async () => {
+      const newWeights = tf.tidy(() => {
+        const stacked = stackSerialized(this.updates);
+        const updates = deserializeVars(stacked);
+        if (this.aggregation === 'mean') {
+          return updates.map(update => update.mean(0));
+        } else {
+          throw new Error(`unsupported aggregation ${this.aggregation}`);
+        }
+      });
+      this.model.setVars(newWeights);
     });
 
-    this.model.setVars(newWeights);
     this.model.save();
-    const newVersion = this.model.version;
     this.downloadMsg = await this.computeDownloadMsg();
     this.updates = [];
     this.updating = false;
-    this.versionCallbacks.forEach(c => c(this.model, oldVersion, newVersion));
+    this.performCallbacks(oldVersion);
+  }
+
+  private log(...args: any[]) {
+    if (this.verbose) {
+      console.log('Federated Server:', ...args);
+    }
+  }
+
+  private async time(msg: string, action: () => Promise<void>) {
+    const t1 = new Date().getTime();
+    await action();
+    const t2 = new Date().getTime();
+    this.log(`${msg} took ${t2 - t1}ms`)
+  }
+
+  private async performCallbacks(oldVersion?: string) {
+    await this.time('performing callbacks', async () => {
+      this.versionCallbacks.forEach(
+        c => c(this.model, oldVersion, this.model.version));
+    });
   }
 }
