@@ -23,6 +23,8 @@ import {promisify} from 'util';
 import {AsyncTfModel, FederatedModel, FederatedTfModel, FederatedCompileConfig} from './common';
 
 const readdir = promisify(fs.readdir);
+const exists = promisify(fs.exists);
+const mkdir = promisify(fs.mkdir);
 
 // Federated server models need to implement a few additional methods
 export interface FederatedServerModel extends FederatedModel {
@@ -75,6 +77,9 @@ export class FederatedServerTfModel
   }
 
   async setup() {
+    if (!(await exists(this.saveDir))) {
+      await mkdir(this.saveDir);
+    }
     const last = await this.last();
     if (last) {
       await this.load(last);

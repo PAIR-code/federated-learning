@@ -109,7 +109,6 @@ export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
   return tf.tensor(array, serialized.shape, serialized.dtype);
 }
 
-
 export type LossOrMetricFn = (yTrue: Tensor, yPred: Tensor) => Tensor;
 
 export type TfModelCallback = () => Promise<tf.Model>;
@@ -225,12 +224,12 @@ export interface FederatedModel {
   /**
    * Shape of model inputs (not including the batch dimension)
    */
-  inputShape(): number[];
+  inputShape: number[];
 
   /**
    * Shape of model outputs (not including the batch dimension)
    */
-  outputShape(): number[];
+  outputShape: number[];
 }
 
 export class FederatedTfModel implements FederatedModel {
@@ -295,11 +294,11 @@ export class FederatedTfModel implements FederatedModel {
     }
   }
 
-  inputShape() {
+  get inputShape() {
     return this.model.inputLayers[0].batchInputShape.slice(1);
   }
 
-  outputShape() {
+  get outputShape() {
     return (this.model.outputShape as number[]).slice(1);
   }
 }
@@ -322,8 +321,8 @@ export class FederatedDynamicModel implements FederatedModel {
     public evaluate: (xs: Tensor, ys: Tensor) => number[],
     public predict: (xs: Tensor) => Tensor,
     public loss: (xs: Tensor, ys: Tensor) => Scalar,
-    public inputShape: () => number[],
-    public outputShape: () => number[],
+    public inputShape: number[],
+    public outputShape: number[],
     public optimizer: tf.SGDOptimizer) {}
 
   async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig): Promise<void> {

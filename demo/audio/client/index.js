@@ -56,8 +56,8 @@ client.setup().then(async () => {
 
   // On each audio frame, update our rotating buffer with the latest FFT data
   // from our analyser. For fun, also update the spectrum plot
-  const numFrames = client.inputShape()[0];
-  const fftLength = client.inputShape()[1];
+  const numFrames = client.inputShape[0];
+  const fftLength = client.inputShape[1];
   const listener = FrequencyListener(stream, numFrames, fftLength);
   listener.onEachFrame(freqData => ui.plotSpectrum(freqData, fftLength));
   listener.listen();
