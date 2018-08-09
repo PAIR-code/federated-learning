@@ -35,47 +35,20 @@ export type FederatedClientConfig = {
   verbose?: boolean
 };
 
-function concat(a: tf.Tensor, b: tf.Tensor) {
-  if (a.shape[0] === 0) {
-    return b.clone();
-  } else if (b.shape[0] === 0) {
-    return a.clone();
-  } else {
-    return a.concat(b);
-  }
-}
-
-function slice(a: tf.Tensor, begin: number, size?: number) {
-  if (begin >= a.shape[0]) {
-    return tf.tensor([], [0].concat(a.shape.slice(1)));
-  } else {
-    return a.slice(begin, size);
-  }
-}
-
-function addRows(existing: tf.Tensor, newEls: tf.Tensor, unitShape: number[]) {
-  if (tf.util.arraysEqual(newEls.shape, unitShape)) {
-    return tf.tidy(() => concat(existing, tf.expandDims(newEls)));
-  } else { // batch dimension
-    tf.util.assertShapesMatch(newEls.shape.slice(1), unitShape);
-    return tf.tidy(() => concat(existing, newEls));
-  }
-}
-
 /**
- * Federated Learning Client API library.
+ * Federated Learning Client library.
  *
  * Example usage with a tf.Model:
  * ```js
- * const tensorflowModel = await tf.loadModel('a-model.json');
- * const federatedModel = new FederatedTfModel(tensorflowModel);
- * const clientAPI = new ClientAPI(federatedModel);
- * await clientAPI.connect('http://server.com');
- * await clientAPI.fitAndUpload(data.X, data.y);
+ * const model = await tf.loadModel('a-model.json');
+ * const client = new Client('http://server.com', model);
+ * await client.setup();
+ * await client.federatedUpdate(data.X, data.y);
  * ```
  * The server->client synchronisation happens transparently whenever the server
  * broadcasts weights.
- * The client->server sync must be triggered manually with uploadVars
+ * The client->server syncs happen periodically after enough `federatedUpdate`
+ * calls occur.
  */
 export class Client {
   private msg: DownloadMsg;
@@ -108,7 +81,7 @@ export class Client {
       }
     ];
     this.versionUpdateCounts = {};
-    this.verbose = config.verbose;
+    this.verbose = (config || {}).verbose;
   }
 
   /**
@@ -177,7 +150,7 @@ export class Client {
    * @param x Training inputs
    * @param y Training labels
    */
-  public async fit(x: tf.Tensor, y: tf.Tensor): Promise<void> {
+  public async federatedUpdate(x: tf.Tensor, y: tf.Tensor): Promise<void> {
     // incorporate examples into our stored `x` and `y`
     const xNew = addRows(this.x, x, this.model.inputShape);
     const yNew = addRows(this.y, y, this.model.outputShape);
@@ -187,13 +160,14 @@ export class Client {
 
     // repeatedly, for as many iterations as we have batches of examples:
     const examplesPerUpdate = this.msg.hyperparams.examplesPerUpdate;
+    this.log(examplesPerUpdate);
     while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
 
       // grab the right number of examples
-      const xTrain = slice(this.x, 0, examplesPerUpdate);
-      const yTrain = slice(this.y, 0, examplesPerUpdate);
+      const xTrain = sliceWithEmptyTensors(this.x, 0, examplesPerUpdate);
+      const yTrain = sliceWithEmptyTensors(this.y, 0, examplesPerUpdate);
       const fitConfig = {
         epochs: this.msg.hyperparams.epochs,
         batchSize: this.msg.hyperparams.batchSize,
@@ -233,8 +207,8 @@ export class Client {
       // TODO: consider storing some examples longer-term and reusing them for
       // updates for multiple versions, if session is long-lived.
       tf.dispose([xTrain, yTrain]);
-      const xRest = slice(this.x, examplesPerUpdate);
-      const yRest = slice(this.y, examplesPerUpdate);
+      const xRest = sliceWithEmptyTensors(this.x, examplesPerUpdate);
+      const yRest = sliceWithEmptyTensors(this.y, examplesPerUpdate);
       tf.dispose([this.x, this.y]);
       this.x = xRest;
       this.y = yRest;
@@ -337,4 +311,33 @@ async function fromEvent<T>(
     };
     emitter.on(eventName, listener);
   }) as Promise<T>;
+}
+
+// TODO: remove once tfjs >= 0.12.5 is released
+function concatWithEmptyTensors(a: tf.Tensor, b: tf.Tensor) {
+  if (a.shape[0] === 0) {
+    return b.clone();
+  } else if (b.shape[0] === 0) {
+    return a.clone();
+  } else {
+    return a.concat(b);
+  }
+}
+
+function sliceWithEmptyTensors(a: tf.Tensor, begin: number, size?: number) {
+  if (begin >= a.shape[0]) {
+    return tf.tensor([], [0].concat(a.shape.slice(1)));
+  } else {
+    return a.slice(begin, size);
+  }
+}
+
+function addRows(existing: tf.Tensor, newEls: tf.Tensor, unitShape: number[]) {
+  if (tf.util.arraysEqual(newEls.shape, unitShape)) {
+    return tf.tidy(() => concatWithEmptyTensors(
+      existing, tf.expandDims(newEls)));
+  } else { // batch dimension
+    tf.util.assertShapesMatch(newEls.shape.slice(1), unitShape);
+    return tf.tidy(() => concatWithEmptyTensors(existing, newEls));
+  }
 }

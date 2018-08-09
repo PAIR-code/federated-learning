@@ -34,6 +34,22 @@ export type FederatedServerConfig = {
   verbose?: boolean
 };
 
+/**
+ * Federated Learning Server library.
+ *
+ * Example usage with a tf.Model:
+ * ```js
+ * const model = await tf.loadModel('file:///a/model.json');
+ * const webServer = http.createServer();
+ * const fedServer = new Server(webServer, model);
+ * fedServer.setup().then(() => {
+ *  webServer.listen(80);
+ * });
+ * ```
+ *
+ * The server aggregates model weight updates from clients and publishes new
+ * versions of the model periodically to all clients.
+ */
 export class Server {
   model: FederatedServerModel;
   clientHyperparams: ClientHyperparams;
@@ -48,14 +64,14 @@ export class Server {
   verbose: boolean;
 
   constructor(
-    server: http.Server | https.Server | io.Server,
+    webServer: http.Server | https.Server | io.Server,
     model: AsyncTfModel | FederatedServerModel,
     config: FederatedServerConfig) {
     // Setup server
-    if (server instanceof http.Server || server instanceof https.Server) {
-      this.server = io(server);
+    if (webServer instanceof http.Server || webServer instanceof https.Server) {
+      this.server = io(webServer);
     } else {
-      this.server = server;
+      this.server = webServer;
     }
 
     // Setup model
@@ -69,7 +85,7 @@ export class Server {
     }
     this.verbose = (!!config.verbose) || (!!process.env.VERBOSE) || false;
     this.updatesPerVersion = config.updatesPerVersion || 10;
-    this.clientHyperparams = clientHyperparams(config.clientHyperparams);
+    this.clientHyperparams = clientHyperparams(config.clientHyperparams || {});
     this.downloadMsg = null;
     this.versionCallbacks = [
       (model, v1, v2) => {
@@ -78,6 +94,12 @@ export class Server {
     ];
   }
 
+  /**
+   * Set up the federated learning server.
+   *
+   * This mainly delegates to `FederatedServerModel.setup` but also performs
+   * any user-defined callbacks and initializes the websocket server.
+   */
   async setup() {
     await this.time('setting up model', async () => {
       await this.model.setup();
@@ -115,11 +137,16 @@ export class Server {
     });
   }
 
+  /**
+   * Register a new callback to be invoked whenever the server creates a new
+   * version of the model
+   * @param callback function to be called on each version update.
+   */
   onNewVersion(callback: VersionCallback) {
     this.versionCallbacks.push(callback);
   }
 
-  async computeDownloadMsg(): Promise<DownloadMsg> {
+  private async computeDownloadMsg(): Promise<DownloadMsg> {
     return {
       model: {
         vars: await serializeVars(this.model.getVars()),
@@ -133,7 +160,7 @@ export class Server {
   // TODO: implement median and trimmed mean aggregations
   // TODO: optionally skip updates if validation loss increases
   // TOOD: consider only updating once we achieve a certain number of _clients_
-  async updateModel() {
+  private async updateModel() {
     this.updating = true;
     const oldVersion = this.model.version;
 

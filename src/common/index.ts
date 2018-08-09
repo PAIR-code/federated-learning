@@ -161,7 +161,13 @@ export const DEFAULT_HYPERPARAMS: ClientHyperparams = {
 };
 
 export function clientHyperparams(hps?: ClientHyperparams): ClientHyperparams {
-  const defaults = Object.create(DEFAULT_HYPERPARAMS);
+  const defaults = {
+    examplesPerUpdate: 5,
+    learningRate: 0.001,
+    batchSize: 32,
+    epochs: 5,
+    weightNoiseStddev: 0
+  };
   return Object.assign(defaults, hps || {});
 }
 
@@ -240,7 +246,6 @@ export class FederatedTfModel implements FederatedModel {
 
   constructor(initialModel?: AsyncTfModel, config?: FederatedCompileConfig) {
     this._initialModel = initialModel;
-    // we override this later
     this.optimizer = tf.train.sgd(DEFAULT_HYPERPARAMS.learningRate);
     this.compileConfig = {
       loss: config.loss || 'categoricalCrossentropy',

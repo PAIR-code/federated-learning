@@ -11,7 +11,8 @@ Tensorflow.js model weights.
 import * as federated from 'tfjs-federated-learning-client';
 
 const SERVER_URL = 'https://federated.learning.server';
-const client = federated.Client(SERVER_URL);
+const INIT_MODEL = 'https://initial.com/tf-model.json';
+const client = federated.Client(SERVER_URL, INIT_MODEL);
 
 client.onNewVersion((model, oldVersion, newVersion) => {
   console.log(`updated model from ${oldVersion} to ${newVersion}`);
@@ -42,16 +43,10 @@ updated weights, which for applications like transfer learning may be fairly
 small in size relative to the full model. However, to begin the process, the
 client must first obtain a copy of the full model.
 
-The easiest way to do this is by getting it from the server, like this:
-
-```js
-federated.Client(SERVER_URL)
-// or
-federated.Client(SERVER_URL, null, clientConfigObject)
-```
-
-However, to avoid unnecessary load on the server, it is sometimes more efficient
-to load the initial model from elsewhere, like this:
+We currently do not yet support loading the full model from the server, though
+we plan to support this in the future. However, to avoid unnecessary load on the
+server, it's actually generally more efficient
+to load it from elsewhere, like this:
 
 ```js
 federated.Client(SERVER_URL, 'https://initial.com/model.json')
