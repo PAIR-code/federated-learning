@@ -24,12 +24,12 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as rimraf from 'rimraf';
 
-let initialVersion: string;
 const PORT = 3001;
 const socketURL = `http://0.0.0.0:${PORT}`;
 const initWeights =
   [tf.tensor([1, 1, 1, 1], [2, 2]), tf.tensor([1, 2, 3, 4], [1, 4])];
 const updateThreshold = 2;
+const initVersion = 'initial';
 
 class MockModel implements FederatedServerModel, FederatedClientModel {
   isFederatedClientModel = true;
@@ -42,9 +42,7 @@ class MockModel implements FederatedServerModel, FederatedClientModel {
     this.vars = vars;
   }
   async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig) {}
-  async setup() {
-    await this.save();
-  }
+  async setup() {}
   async save() {
     this.version = new Date().getTime().toString();
   }
@@ -80,6 +78,7 @@ describe('Server-to-client API', () => {
     serverVars = initWeights.map(t => tf.variable(t));
     const clientModel = new MockModel(clientVars);
     const serverModel = new MockModel(serverVars);
+    serverModel.version = initVersion;
 
     // Set up the server exposing our upload/download API
     httpServer = http.createServer();
@@ -90,32 +89,25 @@ describe('Server-to-client API', () => {
       updatesPerVersion: updateThreshold,
       clientHyperparams: {
         examplesPerUpdate: 1
-      },
-      verbose: true
+      }
     });
-    console.log(server.clientHyperparams);
     await server.setup();
-    initialVersion = server.model.version;
-    console.log(server.clientHyperparams);
-    console.log(server.downloadMsg);
 
-    // Set up the API client with zeroed out weights
-    client = new Client(socketURL, clientModel, {
-      verbose: true
-    });
+    client = new Client(socketURL, clientModel);
     await client.setup();
   });
 
   afterEach(async () => {
     rimraf.sync(dataDir);
     await httpServer.close();
+    await client.dispose();
   });
 
-  it('transmits model version on startup', () => {
-    expect(client.modelVersion()).toBe(initialVersion);
+  it('transmits model version on startup', async () => {
+    expect(client.modelVersion()).toBe(initVersion);
   });
 
-  it('transmits model parameters on startup', () => {
+  it('transmits model parameters on startup', async () => {
     test_util.expectArraysClose(clientVars[0], initWeights[0]);
     test_util.expectArraysClose(clientVars[1], initWeights[1]);
   });
@@ -124,8 +116,8 @@ describe('Server-to-client API', () => {
     expect(server.updates.length).toBe(0);
 
     clientVars[0].assign(tf.tensor([2, 2, 2, 2], [2, 2]));
-    const dummyX = tf.tensor2d([[0], [0]]);
-    const dummyY = tf.tensor1d([0]);
+    const dummyX = tf.tensor2d([[0]]);
+    const dummyY = tf.tensor2d([[0]]);
     await client.federatedUpdate(dummyX, dummyY);
 
     expect(server.updates.length).toBe(1);
@@ -133,8 +125,8 @@ describe('Server-to-client API', () => {
 
   it('triggers a download after enough uploads', async (done) => {
     client.onNewVersion((_, oldVersion, newVersion) => {
-      expect(oldVersion).toBe(initialVersion);
-      expect(newVersion).not.toBe(initialVersion);
+      expect(oldVersion).toBe(initVersion);
+      expect(newVersion).not.toBe(initVersion);
       expect(newVersion).toBe(server.model.version);
       test_util.expectArraysClose(
         clientVars[0], tf.tensor([1.5, 1.5, 1.5, 1.5], [2, 2]));
@@ -147,7 +139,6 @@ describe('Server-to-client API', () => {
     const dummyY1 = tf.tensor2d([[0]]);
     const dummyX3 = tf.tensor2d([[0], [0], [0]]);  // 3 examples
     const dummyY3 = tf.tensor2d([[0], [0], [0]]);
-    console.log(dummyX3.shape);
     clientVars[0].assign(tf.tensor([2, 2, 2, 2], [2, 2]));
     clientVars[1].assign(tf.tensor([1, 2, 3, 4], [1, 4]));
     await client.federatedUpdate(dummyX1, dummyY1);
