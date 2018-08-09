@@ -285,7 +285,7 @@ export class Client {
 
   private log(...args: any[]) {
     if (this.verbose) {
-      console.log('FederatedClient:', ...args);
+      console.log('Federated Client:', ...args);
     }
   }
 
