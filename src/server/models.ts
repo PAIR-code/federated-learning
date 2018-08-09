@@ -37,26 +37,9 @@ export interface FederatedServerModel extends FederatedModel {
   setup(): Promise<void>;
 
   /**
-   * Return a list of versions that can be `load`ed
-   */
-  list(): Promise<string[]>;
-
-  /**
-   * Return the most recent `load`able version
-   */
-  last(): Promise<string>;
-
-  /**
    * Save the current model and update `version`.
    */
   save(): Promise<void>;
-
-  /**
-   * Load the specified version of the model.
-   *
-   * @param version identifier of the model
-   */
-  load(version: string): Promise<void>;
 }
 
 export function isFederatedServerModel(model: any):
@@ -84,7 +67,7 @@ export class FederatedServerTfModel
     if (last) {
       await this.load(last);
     } else {
-      tf.ENV.set('IS_BROWSER', true);
+      tf.ENV.set('IS_BROWSER', true); // TODO: remove me in tfjs 0.12.5
       await this.fetchInitial();
       tf.ENV.set('IS_BROWSER', false);
       await this.save();

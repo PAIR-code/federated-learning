@@ -47,3 +47,20 @@ client.setup().then(() => {
 ## Advanced Usage
 
 See specific [server](./src/server/README.md) and [client](./src/client/README.md) docs.
+
+## A Note about Privacy
+
+Federated learning is considered "private" because clients never send their data to the server, only updated weights. In an ideal world,
+1. the server should not be able to meaningfully reconstruct client data from weight updates
+2. one client should not be able to reliably detect the presence of another client from model updates
+
+To help achieve (1), we can:
+- increase `numExamplesPerUpdate` (averages together more individual data points before computing the update)
+- increase `weightNoiseStddev` (adds noise to the update)
+- possibly change `epochs`, `batchSize`, and `learningRate` (clear that modifying these affects reconstructability, but unclear exactly _how_)
+- implement secure aggregation (encrypt update and only allow decryption after averaging with many other users)
+- modify the model architecture (different layer updates contain different amounts of information about inputs)
+
+To help achieve (2), we can:
+- increase `numUpdatesPerVersion` (average together more updates before computing the new version)
+- implement new features that limit the contributions of individual clients to the new version
