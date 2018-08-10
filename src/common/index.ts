@@ -344,9 +344,10 @@ export class FederatedDynamicModel implements FederatedModel {
         this.optimizer.setLearningRate(config.learningRate);
       }
     }
-    const epochs = config.epochs || 1;
+    const epochs = (config && config.epochs) || 1;
     for (let i = 0; i < epochs; i++) {
-      this.optimizer.minimize(() => this.loss(x, y));
+      const ret = this.optimizer.minimize(() => this.loss(y, this.predict(x)));
+      tf.dispose(ret);
     }
   }
 

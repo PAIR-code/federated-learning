@@ -89,7 +89,7 @@ export class Client {
    * @return The version of the model we're currently training
    */
   public modelVersion(): string {
-    return this.msg.model.version;
+    return this.msg == null ? 'unsynced' : this.msg.model.version;
   }
 
   /**
@@ -161,7 +161,9 @@ export class Client {
 
     // repeatedly, for as many iterations as we have batches of examples:
     const examplesPerUpdate = this.msg.hyperparams.examplesPerUpdate;
-    this.log(examplesPerUpdate);
+    this.log(
+        'examplesPerUpdate', examplesPerUpdate,
+        'current training set:', this.x.shape);
     while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
@@ -177,7 +179,12 @@ export class Client {
 
       // fit the model for the specified # of steps
       await this.time('Fit model', async () => {
-        await this.model.fit(xTrain, yTrain, fitConfig);
+        try {
+          await this.model.fit(xTrain, yTrain, fitConfig);
+        } catch (err) {
+          console.error(err);
+          throw err;
+        }
       });
 
       // serialize, possibly adding noise

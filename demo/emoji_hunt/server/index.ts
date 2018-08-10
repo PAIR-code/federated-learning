@@ -55,7 +55,9 @@ app.use(express.static(resolve(`${__dirname}/../client/dist`)));
 
 app.use(cookieParser());
 
-if (process.env.USE_OAUTH) {
+console.log(process.env.USE_OAUTH);
+
+if (process.env.USE_OAUTH && (process.env.USE_OAUTH as any) != false) {
   app.use(async (req, res, next) => {
     try {
       const token = req.cookies['oauth2token'];
@@ -92,8 +94,10 @@ app.post('/data', (req, res) => {
 setupModel(modelDir)
     .then((model) => {
       const federatedServer = new federated.Server(httpServer, model, {
-        clientHyperparams: {learningRate: 3e-4},
+        clientHyperparams:
+            {learningRate: 3e-4, batchSize: 1, examplesPerUpdate: 1},
         updatesPerVersion: 5,
+
         modelDir
       });
       return federatedServer.setup().then(() => {

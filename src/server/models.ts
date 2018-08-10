@@ -125,6 +125,8 @@ export class FederatedServerDynamicModel extends FederatedDynamicModel
     outputShape: number[];
   }) {
     super(args);
+    this.saveDir = args.saveDir;
+    this.save();
   }
 
   async setup() {
