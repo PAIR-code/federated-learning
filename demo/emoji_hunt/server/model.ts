@@ -17,7 +17,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import {loadFrozenModel} from '@tensorflow/tfjs-converter';
-import {FederatedDynamicModel} from 'federated-learning-server';
+import {FederatedDynamicModel, FederatedServerModel} from 'federated-learning-server';
 
 // tslint:disable:max-line-length
 const MODEL_URL =
@@ -27,8 +27,11 @@ const WEIGHT_MANIFEST =
 
 const LEARNING_RATE = 0.01;
 
+const MODEL_INPUT_WIDTH = 224;
+
+
 // Load the model & set it up for training
-export async function setupModel() {
+export async function setupModel(): Promise<FederatedServerModel> {
   const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
   const vars = model.weights;
 
@@ -52,15 +55,20 @@ export async function setupModel() {
     }
   }
 
+  const optimizer = tf.train.sgd(LEARNING_RATE);
+
   // TODO: better to not run softmax and use softmaxCrossEntropy?
   const loss = (input: tf.Tensor, label: tf.Tensor) => {
     const preds = model.predict(input) as tf.Tensor;
     return tf.losses.logLoss(label, preds) as tf.Scalar;
   };
 
-  const optimizer = tf.train.sgd(LEARNING_RATE);
+  const evaluate = (input: tf.Tensor, label: tf.Tensor) =>
+      Array.prototype.slice.call(loss(input, label).dataSync()) as number[];
 
-  const varsAndLoss = new FederatedDynamicModel(trainable, loss, optimizer);
+  const varsAndLoss = new FederatedDynamicModel(
+      trainable, evaluate, model.predict.bind(model), loss,
+      [MODEL_INPUT_WIDTH, MODEL_INPUT_WIDTH, 3], [423], optimizer);
 
-  return {model, varsAndLoss};
+  return varsAndLoss;
 }
