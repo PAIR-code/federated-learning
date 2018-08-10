@@ -15,6 +15,24 @@
  * =============================================================================
  */
 
-export * from './models';
-export * from './client';
-export * from './common';
+import {FederatedModel, FederatedTfModel} from './common';
+
+export interface FederatedClientModel extends FederatedModel {
+  isFederatedClientModel: boolean;
+
+  setup(): Promise<void>;
+}
+
+export class FederatedClientTfModel extends FederatedTfModel
+  implements FederatedClientModel {
+  isFederatedClientModel = true;
+
+  async setup() {
+    await this.fetchInitial();
+  }
+}
+
+export function isFederatedClientModel(model: any):
+  model is FederatedClientModel {
+  return model && model.isFederatedClientModel;
+}

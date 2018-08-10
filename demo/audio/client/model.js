@@ -20,14 +20,21 @@ import * as tf from '@tensorflow/tfjs';
 const audioTransferLearningModelURL =
     'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
 
+export const labelNames = [
+  'accio', 'expelliarmus', 'lumos', 'nox'
+];
+
 export async function loadAudioTransferLearningModel() {
   const model = await tf.loadModel(audioTransferLearningModelURL);
 
-  for (let i = 0; i < 9; ++i) {
+  for (let i = 0; i < model.layers.length; ++i) {
     model.layers[i].trainable = false;  // freeze conv layers
   }
 
-  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
-
-  return model;
+  const cutoffTensor = model.layers[10].output;
+  const k = labelNames.length;
+  const newDenseLayer = tf.layers.dense({units: k, activation: 'softmax'});
+  const newOutputTensor = newDenseLayer.apply(cutoffTensor);
+  return tf.model(
+      {inputs: model.inputs, outputs: newOutputTensor});
 }

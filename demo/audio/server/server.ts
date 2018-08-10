@@ -15,42 +15,41 @@
  * =============================================================================
  */
 
+import * as tf from '@tensorflow/tfjs';
 import * as express from 'express';
 import * as basicAuth from 'express-basic-auth';
 import * as fileUpload from 'express-fileupload';
-import * as federatedServer from 'federated-learning-server';
-import {ServerAPI} from 'federated-learning-server';
+import * as federated from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
-import * as io from 'socket.io';
 import * as uuid from 'uuid/v4';
-import {labelNames, loadAudioTransferLearningModel} from './model';
+import {Request, Response, NextFunction} from 'express';
+import {promisify} from 'util';
+import * as npy from './npy';
+import fetch from 'node-fetch';
 
-const dataDir = path.resolve(__dirname + '/data');
-const fileDir = path.join(dataDir, 'files');
-const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
+const writeFile = promisify(fs.writeFile);
 
+// Load tfjs-node (below other code, so clang-format doesn't move it)
+import '@tensorflow/tfjs-node';
+
+// Setup express app using either HTTP or HTTPS, depending on environment vars
 const app = express();
-
-// Use either HTTP or HTTPS, depending on environment variables
-let httpServer;
+let webServer;
 let port;
 if (process.env.SSL_KEY && process.env.SSL_CERT) {
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY),
     cert: fs.readFileSync(process.env.SSL_CERT)
   };
-  httpServer = https.createServer(httpsOptions, app);
+  webServer = https.createServer(httpsOptions, app);
   port = process.env.PORT || 443;
 } else {
-  httpServer = http.createServer(app);
+  webServer = http.createServer(app);
   port = process.env.PORT || 3000;
 }
-
-// Set up websockets
-const sockServer = io(httpServer);
 
 // Optionally use basic auth
 if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
@@ -59,69 +58,130 @@ if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
   app.use(basicAuth({users, challenge: true}));
 }
 
+// Setup file uploading (to save .wav files)
 app.use(fileUpload());
 
-// tslint:disable-next-line:no-any
-app.use((req: any, res: any, next: any) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
 });
 
-// tslint:disable-next-line:no-any
-app.post('/data', (req: any, res: any) => {
-  if (!req.files) {
-    return res.status(400).send('Must upload a file');
-  } else {
-    res.send('File uploaded!');
-  }
+// Create directories
+const labelNames = ['accio', 'expelliarmus', 'lumos', 'nox'];
+const rootDir = path.resolve(__dirname + '/data');
+const fileDir = path.join(rootDir, 'files');
+const modelDir = path.join(rootDir, 'models');
+const mkdir = (dir) => !fs.existsSync(dir) && fs.mkdirSync(dir);
+[rootDir, modelDir, fileDir].forEach(mkdir);
+for (let i = 0; i < labelNames.length; i++) {
+  mkdir(path.join(fileDir, labelNames[i]));
+}
 
-  const file = req.files.file;
-  const fileParts = file.name.split('.');
-  const labelName = fileParts[0];
-  const extension = fileParts[1];
-  const labelDir = path.join(fileDir, labelName);
-  const filename = path.join(labelDir, `${uuid()}.${extension}`);
-  file.mv(filename);
+// Load existing performance metrics
+const metrics = {};
+const metricsPath = (version) => path.join(modelDir, version, 'metrics.json');
+fs.readdirSync(modelDir).forEach(v => {
+  if (fs.existsSync(metricsPath(v))) {
+    metrics[v] = JSON.parse(fs.readFileSync(metricsPath(v)).toString());
+  }
 });
 
+// Setup endpoints to track client and validation accuracy for visualization
+app.post('/data', (req: Request, res: Response) => {
+  // Record metrics
+  const version = req.body.modelVersion;
+  const clientId = req.body.clientId;
+  if (!metrics[version]['clients'][clientId]) {
+    metrics[version]['clients'][clientId] = [];
+  }
+  metrics[version]['clients'][clientId].push(JSON.parse(req.body.metrics));
+
+  // Save files + metadata for later analysis (dont't do this in real life)
+  const reqId = `${clientId}_${uuid()}`;
+  const wavFile = req.files.wav as fileUpload.UploadedFile;
+  const npyFile = req.files.npy as fileUpload.UploadedFile;
+  const labelName = wavFile.name.split('.')[0];
+  wavFile.mv(`${fileDir}/${labelName}/${reqId}.wav`, () => {});
+  npyFile.mv(`${fileDir}/${labelName}/${reqId}.npy`, () => {});
+  writeFile(`${fileDir}/${labelName}/${reqId}.json`, JSON.stringify(req.body));
+
+  res.sendStatus(200);
+});
+
+// Expose in-memory metrics
+app.get('/metrics', async (req: Request, res: Response) => {
+  res.send(metrics);
+});
+
+// Expose the client as a set of static files
 app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
-loadAudioTransferLearningModel().then(model => {
-  federatedServer.setup(sockServer, model, dataDir).then((api) => {
-    mkdir(fileDir);
-    for (let i = 0; i < labelNames.length; i++) {
-      mkdir(path.join(fileDir, labelNames[i]));
-    }
+const initialModelUrl =
+  'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+const validInputUrl =
+  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-inputs.npy';
+const validLabelUrl =
+  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-labels.npy';
 
-    // tslint:disable-next-line:no-any
-    app.get('/status', (req: any, res: any) => {
-      api.modelDB.getData().then(data => {
-        const css = `td, th {
-          font-family: monospace;
-          text-align: left;
-          padding-right: 1em;
-        }`;
-        let html = `<html><head><style>${css}</style></head>`;
-        html += '<body><table><thead><tr>';
-        html += '<th>Model</th><th>Client</th><th>Time</th>';
-        html += '<th>Predicted</th><th>Actual</th>';
-        html += '</tr></thead><tbody>';
-        for (let i = 0; i < data.length; i++) {
-          html += '<tr>';
-          html += `<td>${data[i].modelVersion}</td>`;
-          html += `<td>${data[i].clientId}</td>`;
-          html += `<td>${new Date(parseInt(data[i].timestamp, 10))}</td>`;
-          html += `<td>${data[i].metadata.yTrue}</td>`;
-          html += `<td>${data[i].metadata.yPred}</td>`;
-          html += '</tr>';
-        }
-        html += '</tbody></table></body></html>';
-        res.send(html);
-      });
-    });
+async function loadNpyUrl(url): Promise<tf.Tensor> {
+  const res = await fetch(url);
+  const arr = await res.arrayBuffer();
+  return npy.parse(arr);
+}
 
-    httpServer.listen(port, () => {
-      console.log(`listening on ${port}`);
-    });
-  });
+async function loadInitialModel(): Promise<tf.Model> {
+  const model = await tf.loadModel(initialModelUrl);
+  for (let i = 0; i < model.layers.length; ++i) {
+    model.layers[i].trainable = false;  // freeze everything
+  }
+  const transferLayer = model.layers[10].output;
+  const newDenseLayer = tf.layers.dense({units: 4, activation: 'softmax'});
+  const newOutputs = newDenseLayer.apply(transferLayer) as tf.SymbolicTensor;
+  return tf.model({inputs: model.inputs, outputs: newOutputs});
+}
+
+const fedServer = new federated.Server(webServer, loadInitialModel, {
+  modelDir,
+  updatesPerVersion: 5,
+  clientHyperparams: {
+    examplesPerUpdate: 4,
+    epochs: 10,
+    learningRate: 0.001,
+    weightNoiseStddev: 0.0001
+  },
+  modelCompileConfig: {
+    loss: 'categoricalCrossentropy',
+    metrics: ['accuracy']
+  },
+  verbose: true
 });
+
+async function setup() {
+  const validInputs = await loadNpyUrl(validInputUrl);
+  const validLabelsFlat = await loadNpyUrl(validLabelUrl);
+  const validLabels = tf.oneHot(validLabelsFlat as tf.Tensor1D, 4);
+  tf.dispose(validLabelsFlat);
+
+  fedServer.onNewVersion((model, oldVersion, newVersion) => {
+    // Save old metrics to disk, now that we're done with them
+    if (metrics[oldVersion]) {
+      writeFile(metricsPath(oldVersion), JSON.stringify(metrics[oldVersion]));
+    }
+    // Create space for the new model's metrics
+    if (!metrics[newVersion]) {
+      metrics[newVersion] = {validation: null, clients: {}}
+    }
+    // Compute validation accuracy
+    const newValMetrics = model.evaluate(validInputs, validLabels);
+    metrics[newVersion].validation = newValMetrics;
+    console.log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
+  });
+
+  await fedServer.setup();
+
+  webServer.listen(port, () => {
+    console.log(`listening on ${port}`);
+  });
+}
+
+setup();

@@ -17,8 +17,9 @@
 
 import * as tf from '@tensorflow/tfjs';
 // tslint:disable-next-line:max-line-length
-import {Model, ModelFitConfig, Optimizer, Scalar, Tensor, Variable} from '@tensorflow/tfjs';
-import {LayerVariable} from '@tensorflow/tfjs-layers/dist/variables';
+import {Scalar, Tensor, Variable, LayerVariable, ModelCompileConfig} from '@tensorflow/tfjs';
+
+export type VarList = Array<Tensor | Variable | LayerVariable>;
 
 export type SerializedVariable = {
   dtype: tf.DataType,
@@ -26,17 +27,22 @@ export type SerializedVariable = {
   data: ArrayBuffer
 };
 
+const dtypeToTypedArrayCtor = {
+  'float32': Float32Array,
+  'int32': Int32Array,
+  'bool': Uint8Array
+};
+
 export async function serializeVar(variable: tf.Tensor):
-    Promise<SerializedVariable> {
+  Promise<SerializedVariable> {
   const data = await variable.data();
   // small TypedArrays are views into a larger buffer
   const copy =
-      data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   return {dtype: variable.dtype, shape: variable.shape.slice(), data: copy};
 }
 
-export async function serializeVars(
-    vars: Array<Variable|LayerVariable|Tensor>) {
+export async function serializeVars(vars: VarList) {
   const varsP: Array<Promise<SerializedVariable>> = [];
   vars.forEach((value, key) => {
     // tslint:disable-next-line:no-any
@@ -50,7 +56,36 @@ export async function serializeVars(
   return Promise.all(varsP);
 }
 
-export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
+export function stackSerialized(vars: SerializedVariable[][]) {
+  const updateCount = vars.length;
+  const weightCount = vars[0].length;
+  const stackedVars = [];
+
+  for (let wt = 0; wt < weightCount; wt++) {
+    const singleVar = vars[0][wt];
+    const byteLength = singleVar.data.byteLength;
+    const stackedVar = new Uint8Array(byteLength * updateCount);
+    for (let up = 0; up < updateCount; up++) {
+      const update = vars[up][wt].data;
+      stackedVar.set(new Uint8Array(update), up * byteLength);
+    }
+
+    stackedVars.push({
+      dtype: singleVar.dtype,
+      shape: [updateCount].concat(singleVar.shape),
+      data: stackedVar.buffer.slice(
+        stackedVar.byteOffset, stackedVar.byteOffset + stackedVar.byteLength)
+    });
+  }
+
+  return stackedVars;
+}
+
+export function deserializeVars(vars: SerializedVariable[]) {
+  return vars.map(deserializeVar);
+}
+
+export function serializedToArray(serialized: SerializedVariable) {
   const {dtype, shape, data: dataBuffer} = serialized;
   let data;
   // Because socket.io will deserialise JS ArrayBuffers into Nodejs Buffers
@@ -61,83 +96,121 @@ export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
     // tslint:disable-next-line no-any
     const dataAsBuffer = dataBuffer as any as Buffer;
     data = dataAsBuffer.buffer.slice(
-        dataAsBuffer.byteOffset,
-        dataAsBuffer.byteOffset + dataAsBuffer.byteLength);
+      dataAsBuffer.byteOffset,
+      dataAsBuffer.byteOffset + dataAsBuffer.byteLength);
   }
   const numel = shape.reduce((x, y) => x * y, 1);
   const ctor = dtypeToTypedArrayCtor[dtype];
-  const array = new ctor(data, 0, numel);
-  return tf.tensor(array, shape, dtype);
+  return new ctor(data, 0, numel);
 }
 
-export type TensorJson = {
-  values: number[],
-  shape: number[],
-  dtype?: tf.DataType
+export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
+  const array = serializedToArray(serialized);
+  return tf.tensor(array, serialized.shape, serialized.dtype);
+}
+
+export type LossOrMetricFn = (yTrue: Tensor, yPred: Tensor) => Tensor;
+
+export type TfModelCallback = () => Promise<tf.Model>;
+
+export type AsyncTfModel = string | tf.Model | TfModelCallback;
+
+export type VersionCallback = (model: FederatedModel,
+  oldVersion: string, newVersion: string) => void;
+
+export enum Events {
+  Download = 'downloadVars',
+  Upload = 'uploadVars',
+}
+
+export type ModelMsg = {
+  version: string,
+  vars: SerializedVariable[]
 };
 
-export type ModelJson = {
-  vars: TensorJson[]
+export type DownloadMsg = {
+  model: ModelMsg,
+  hyperparams: ClientHyperparams
 };
 
-export type UpdateJson = {
-  numExamples: number,
-  vars: TensorJson[],
-  modelVersion?: string,
-  clientId?: string
+export type FederatedFitConfig = {
+  learningRate?: number,
+  epochs?: number,
+  batchSize?: number
 };
 
-export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
-  let data;
-  // tslint:disable-next-line:no-any
-  const lv = (t as any);
-  if (lv.write != null) {
-    data = await lv.read().data();
+export type FederatedCompileConfig = {
+  loss?: string | LossOrMetricFn,
+  metrics?: string[]
+}
+
+export type ClientHyperparams = {
+  batchSize?: number,          // batch size (usually not relevant)
+  learningRate?: number,       // step size
+  epochs?: number,             // number of steps
+  examplesPerUpdate?: number,  // min examples before fitting
+  weightNoiseStddev?: number   // how much noise to add to weights
+};
+
+export const DEFAULT_HYPERPARAMS: ClientHyperparams = {
+  examplesPerUpdate: 5,
+  learningRate: 0.001,
+  batchSize: 32,
+  epochs: 5,
+  weightNoiseStddev: 0
+};
+
+export function clientHyperparams(hps?: ClientHyperparams): ClientHyperparams {
+  const defaults = {
+    examplesPerUpdate: 5,
+    learningRate: 0.001,
+    batchSize: 32,
+    epochs: 5,
+    weightNoiseStddev: 0
+  };
+  return Object.assign(defaults, hps || {});
+}
+
+export async function fetchModel(asyncModel: AsyncTfModel): Promise<tf.Model> {
+  if (typeof asyncModel === 'string') {
+    return await tf.loadModel(asyncModel);
+  } else if (asyncModel instanceof tf.Model) {
+    return asyncModel;
   } else {
-    data = await t.data();
+    return await asyncModel();
   }
-  // Note: could make this async / use base64 encoding on the buffer data
-  return {'values': Array.from(data), 'shape': t.shape, 'dtype': t.dtype};
 }
 
-export function jsonToTensor(j: TensorJson): tf.Tensor {
-  return tf.tensor(j.values, j.shape, j.dtype || 'float32');
-}
-
-export async function serializedToJson(s: SerializedVariable):
-    Promise<TensorJson> {
-  return tensorToJson(deserializeVar(s));
-}
-
-export async function jsonToSerialized(j: TensorJson):
-    Promise<SerializedVariable> {
-  return serializeVar(jsonToTensor(j));
-}
-
-const dtypeToTypedArrayCtor = {
-  'float32': Float32Array,
-  'int32': Int32Array,
-  'bool': Uint8Array
-};
-
-export type VarList = Array<Tensor|Variable|LayerVariable>;
-
-/**
- * Basic interface that users need to implement to perform federated learning.
- *
- * Any model that implements `fit`, `getVars` and `setVars` can be passed into
- * a `ClientAPI` and `ServerAPI` to do federated learning.
- */
 export interface FederatedModel {
   /**
    * Trains the model to better predict the given targets.
    *
    * @param x `tf.Tensor` of training input data.
    * @param y `tf.Tensor` of training target data.
+   * @param config optional fit configuration.
    *
    * @return A `Promise` resolved when training is done.
    */
-  fit(x: Tensor, y: Tensor): Promise<void>;
+  fit(x: Tensor, y: Tensor, config?: FederatedFitConfig): Promise<void>;
+
+  /**
+   * Makes predictions on input data.
+   *
+   * @param x `tf.Tensor` of input data.
+   *
+   * @return model ouputs
+   */
+  predict(x: Tensor): Tensor;
+
+  /**
+   * Evaluates performance on data.
+   *
+   * @param x `tf.Tensor` of input data.
+   * @param y `tf.Tensor` of target data.
+   *
+   * @return An array of evaluation metrics.
+   */
+  evaluate(x: Tensor, y: Tensor): number[];
 
   /**
    * Gets the model's variables.
@@ -145,7 +218,7 @@ export interface FederatedModel {
    * @return A list of `tf.Variable`s or LayerVariables representing the model's
    * trainable weights.
    */
-  getVars(): VarList;
+  getVars(): Tensor[];
 
   /**
    * Sets the model's variables to given values.
@@ -153,38 +226,85 @@ export interface FederatedModel {
    * @param vals An array of `tf.Tensor`s representing updated model weights
    */
   setVars(vals: Tensor[]): void;
-}
-
-/**
- * Implementation of `FederatedModel` designed to wrap a `tf.Model`.
- */
-export class FederatedTfModel implements FederatedModel {
-  private model: Model;
-  private config: ModelFitConfig;
 
   /**
-   * Construct a new `FederatedModel` wrapping a `tf.Model`.
-   *
-   * @param model An instance of `tf.Model` that has already been `compile`d.
-   * @param config Optional `tf.ModelFitConfig` for training.
+   * Shape of model inputs (not including the batch dimension)
    */
-  constructor(model: Model, config?: ModelFitConfig) {
-    this.model = model;
-    this.config = config || {epochs: 10, batchSize: 32};
+  inputShape: number[];
+
+  /**
+   * Shape of model outputs (not including the batch dimension)
+   */
+  outputShape: number[];
+}
+
+export class FederatedTfModel implements FederatedModel {
+  optimizer: tf.SGDOptimizer;
+  model: tf.Model;
+  compileConfig: ModelCompileConfig;
+  private _initialModel: AsyncTfModel;
+
+  constructor(initialModel?: AsyncTfModel, config?: FederatedCompileConfig) {
+    this._initialModel = initialModel;
+    this.optimizer = tf.train.sgd(DEFAULT_HYPERPARAMS.learningRate);
+    this.compileConfig = {
+      loss: config.loss || 'categoricalCrossentropy',
+      metrics: config.metrics || ['accuracy'],
+      optimizer: this.optimizer
+    };
   }
 
-  async fit(x: Tensor, y: Tensor): Promise<void> {
-    await this.model.fit(x, y, this.config);
+  async fetchInitial() {
+    if (this._initialModel) {
+      this.model = await fetchModel(this._initialModel);
+      this.model.compile(this.compileConfig);
+    } else {
+      throw new Error('no initial model provided!');
+    }
   }
 
-  getVars(): VarList {
+  async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig) {
+    if (config.learningRate) {
+      this.optimizer.setLearningRate(config.learningRate);
+    }
+    await this.model.fit(x, y, {
+      epochs: config.epochs || DEFAULT_HYPERPARAMS.epochs,
+      batchSize: config.batchSize || DEFAULT_HYPERPARAMS.batchSize
+    });
+  }
+
+  predict(x: Tensor) {
+    return this.model.predict(x) as Tensor;
+  }
+
+  evaluate(x: Tensor, y: Tensor) {
+    return tf.tidy(() => {
+      const results = this.model.evaluate(x, y);
+      if (results instanceof Array) {
+        return results.map(r => r.dataSync()[0]);
+      } else {
+        return [results.dataSync()[0]]
+      }
+    });
+  }
+
+  getVars(): tf.Tensor[] {
     return this.model.trainableWeights.map((v) => v.read());
   }
 
-  setVars(vals: Tensor[]) {
+  // TODO: throw friendly error if passed variable of wrong shape?
+  setVars(vals: tf.Tensor[]) {
     for (let i = 0; i < vals.length; i++) {
       this.model.trainableWeights[i].write(vals[i]);
     }
+  }
+
+  get inputShape() {
+    return this.model.inputLayers[0].batchInputShape.slice(1);
+  }
+
+  get outputShape() {
+    return (this.model.outputShape as number[]).slice(1);
   }
 }
 
@@ -202,10 +322,18 @@ export class FederatedDynamicModel implements FederatedModel {
    * @param optimizer Optimizer to optimize the model with when fit is called
    */
   constructor(
-      public vars: Variable[], public loss: (xs: Tensor, ys: Tensor) => Scalar,
-      public optimizer: Optimizer) {}
+    public vars: Variable[],
+    public evaluate: (xs: Tensor, ys: Tensor) => number[],
+    public predict: (xs: Tensor) => Tensor,
+    public loss: (xs: Tensor, ys: Tensor) => Scalar,
+    public inputShape: number[],
+    public outputShape: number[],
+    public optimizer: tf.SGDOptimizer) {}
 
-  async fit(x: Tensor, y: Tensor): Promise<void> {
+  async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig): Promise<void> {
+    if (config.learningRate) {
+      this.optimizer.setLearningRate(config.learningRate);
+    }
     const lossVal = this.optimizer.minimize(() => this.loss(x, y));
     if (lossVal) {
       lossVal.dispose();
@@ -220,68 +348,5 @@ export class FederatedDynamicModel implements FederatedModel {
     for (let i = 0; i < vals.length; i++) {
       this.vars[i].assign(vals[i]);
     }
-  }
-}
-
-export function federated(model: FederatedDynamicModel|FederatedModel|
-                          Model): FederatedModel {
-  if (model instanceof Model) {
-    return new FederatedTfModel(model);
-  } else {
-    return model;
-  }
-}
-
-export enum Events {
-  Download = 'downloadVars',
-  Upload = 'uploadVars',
-  Data = 'uploadData'
-}
-
-export type UploadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[],
-  numExamples: number
-};
-
-export type DataJson = {
-  input: TensorJson,
-  target: TensorJson,
-  output?: TensorJson,
-  clientId?: string,
-  timestamp?: string,
-  modelVersion?: string,
-  // tslint:disable-next-line no-any
-  metadata?: any
-};
-
-export type DataMsg = {
-  input: SerializedVariable,
-  target: SerializedVariable,
-  output?: SerializedVariable,
-  modelVersion?: string,
-  timestamp?: string,
-  // tslint:disable-next-line no-any
-  metadata?: any
-};
-
-export type DownloadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[],
-  hyperparams: HyperParamsMsg
-};
-
-export type HyperParamsMsg = object;
-
-let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;
-
-export function verbose(enabled: boolean) {
-  LOGGING_ENABLED = enabled;
-}
-
-// tslint:disable-next-line:no-any
-export function log(...args: any[]) {
-  if (LOGGING_ENABLED) {
-    console.error(...args);
   }
 }

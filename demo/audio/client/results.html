@@ -30,33 +30,19 @@ limitations under the License.
         </ul>
       </nav>
     </div>
-    <div class='container'>
-      <fieldset id='spells'>
-        <legend>Spells</legend>
-        <div id='status'>Connecting to server&hellip;</div>
-      </fieldset>
-      <fieldset class='spectrum'>
-        <legend>Audio</legend>
-        <div class='chart'>
-          <label>Spectrum</label>
-          <canvas id="spectrum-canvas" height="90" width="617"></canvas>
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Model (<span id='model-version'>version pending&hellip;</span>)</legend>
-        <div id='model'>
-          Waiting for input&hellip;
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Priori Incantatem</legend>
-        <table id='example-table'>
-          <thead><tr><th>audio</th><th>image</th><th>label</th><th>prediction</th></tr></thead>
-          <tbody id='labeled-examples'></tbody>
-        </table>
-      </fieldset>
+    <div class='results container'>
+      <label>
+        Showing
+        <select id='performance-metric'>
+          <option value='1'>Accuracy</option>
+          <option value='0'>Cross-Entropy</option>
+        </select>
+        by federated client over time:
+      </label>
+      <div id='results'>
+      </div>
     </div>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <script src="index.js"></script>
+    <script src="results.js"></script>
   </body>
 </html>
