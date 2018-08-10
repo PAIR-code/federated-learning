@@ -89,9 +89,9 @@ app.post('/data', (req, res) => {
                     res.send('Uploaded!')});
 });
 
-setupModel()
-    .then(({varsAndLoss}) => {
-      const federatedServer = new federated.Server(httpServer, varsAndLoss, {
+setupModel(modelDir)
+    .then((model) => {
+      const federatedServer = new federated.Server(httpServer, model, {
         clientHyperparams: {learningRate: 3e-4},
         updatesPerVersion: 5,
         modelDir

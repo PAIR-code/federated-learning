@@ -17,7 +17,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 // tslint:disable-next-line:max-line-length
-import {LayerVariable, ModelCompileConfig, Optimizer, Scalar, scalar, Tensor, Variable} from '@tensorflow/tfjs';
+import {LayerVariable, ModelCompileConfig, Tensor, Variable} from '@tensorflow/tfjs';
 
 export type VarList = Array<Tensor|Variable|LayerVariable>;
 
@@ -142,7 +142,7 @@ export type FederatedFitConfig = {
 export type FederatedCompileConfig = {
   loss?: string|LossOrMetricFn,
   metrics?: string[]
-}
+};
 
 export type ClientHyperparams = {
   batchSize?: number,          // batch size (usually not relevant)
@@ -283,7 +283,7 @@ export class FederatedTfModel implements FederatedModel {
       if (results instanceof Array) {
         return results.map(r => r.dataSync()[0]);
       } else {
-        return [results.dataSync()[0]]
+        return [results.dataSync()[0]];
       }
     });
   }
@@ -309,7 +309,7 @@ export class FederatedTfModel implements FederatedModel {
 }
 
 export class FederatedDynamicModel implements FederatedModel {
-  isFederatedServerModel = true;
+  isFederatedClientModel = true;
   version: string;
   vars: tf.Variable[];
   predict: (inputs: tf.Tensor) => tf.Tensor;
@@ -363,26 +363,4 @@ export class FederatedDynamicModel implements FederatedModel {
       v.assign(vals[i]);
     });
   }
-}
-
-async function flatSerialize(tensors: tf.Tensor[]) {
-  const meta = tensors.map(({shape, dtype}) => ({shape, dtype}));
-
-  const datas = await Promise.all(tensors.map(t => t.data().then(unview)));
-
-  const totBytes =
-      datas.map(({byteLength}) => byteLength).reduce((x, y) => x + y);
-
-  const dataArr = new Uint8Array(totBytes);
-
-  let cursor = 0;
-  const byteOffsets = [];
-
-  for (const buf of datas) {
-    dataArr.set(new Uint8Array(buf), cursor);
-    byteOffsets.push(cursor);
-    cursor += buf.byteLength;
-  }
-
-  return {data: dataArr.buffer, meta, byteOffsets};
 }

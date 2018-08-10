@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@types/jasmine": "^2.8.8",
-    "@types/node": "~9.6.0",
+    "@types/node": "^10.5.7",
     "@types/rimraf": "^2.0.2",
     "@types/seedrandom": "~2.4.27",
     "clang-format": "~1.2.2",
