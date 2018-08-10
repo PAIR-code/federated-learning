@@ -11,9 +11,9 @@ TensorflowJS model weights.
 import * as http from 'http';
 import * as federated from 'tfjs-federated-learning-server';
 
-const INITIAL_MODEL_URL = 'file:///initial/model.json';
+const INIT_MODEL = 'file:///initial/model.json';
 const httpServer = http.createServer();
-const fedServer = new federated.Server(httpServer, INITIAL_MODEL_URL);
+const fedServer = new federated.Server(httpServer, INIT_MODEL);
 
 fedServer.onNewVersion((model, oldVersion, newVersion) => {
   console.log(`updated model from ${oldVersion} to ${newVersion}`);
@@ -38,24 +38,30 @@ federated.Server(httpServer, async () => { // or from an asynchrous function ret
 federated.Server(httpServer, federatedServerModel); // if you need fully custom behavior; see below
 ```
 
-The simplest way to set up a `federated.Server` is to pass a [`tf.Model`](https://js.tensorflow.org/api/latest/#class:Model). However, you can also pass a string that will be delegated to [`tf.loadModel`](https://js.tensorflow.org/api/latest/#loadModel) (both `https?://` and `file://` URLs should work), or an asynchronous function that will return a `tf.Model`. The final option is to define your own `FederatedServerModel`, which has to implement various saving and loading methods. See its [documentation](#TODO) for more details.
+The simplest way to set up a `federated.Server` is to pass a [`tf.Model`](https://js.tensorflow.org/api/latest/#class:Model). However, you can also pass a string that will be delegated to [`tf.loadModel`](https://js.tensorflow.org/api/latest/#loadModel) (both `https?://` and `file://` URLs should work), or an asynchronous function that will return a `tf.Model`. The final option is to define your own `FederatedServerModel`, which has to implement various saving and loading methods. See its [documentation](./models.ts) for more details.
 
-Note that by default, different `tf.Model` versions will be saved as files in subfolders of `${__dirname}/federated-server-models/`. If you would like to change this directory, you can pass a `modelDir` configuration parameter, e.g. `federated.Server(httpServer, model, { modelDir: '/mnt/my-vfs' })`.
+Note that by default, different `tf.Model` versions will be saved as files in subfolders of `${process.cwd()}/saved-models/`. If you would like to change this directory, you can pass a `modelDir` configuration parameter, e.g. `federated.Server(httpServer, model, { modelDir: '/mnt/my-vfs' })`.
 
 ### Setting Hyperparameters
 
 ```js
-federated.Server(httpServer, model, {
-  // These hyperparams only affect the server
-  updatesPerVersion: 20, // server merges every 20 client weight updates
-  weightAggregator: 'mean' // how to merge weights (only mean supported now)
+new federated.Server(httpServer, model, {
+  // These are true server parameters
+  updatesPerVersion: 20,    // server merges every 20 client weight updates
+  weightAggregator: 'mean', // how to merge weights (only mean supported now)
+  verbose: false,           // whether to print debugging/timing information
+  modelDir: '/mnt/my-vfs',  // server stores tf.Model-specific versions here
+  modelCompileConfig: {     // tf.Model-specific compile config
+    loss: 'categoricalCrossEntropy',
+    metrics: ['accuracy']
+  },
   // These get broadcast to clients
   clientHyperparams: {
+    learningRate: 0.01,    // client takes SGD steps of size 0.01
+    epochs: 5,             // client takes 5 SGD steps per weight update
     examplesPerUpdate: 10, // client computes weight updates every 10 examples
-    learningRate: 0.01, // client takes SGD steps of size 0.01
-    epochs: 5, // client takes 5 SGD steps per weight update
-    batchSize: 5, // batch size (if less than `examplesPerUpdate`)
-    noiseStddev: 0.001 // client adds N(0, 0.001) noise to their updates
+    batchSize: 5,          // client subdivides `examplesPerUpdate` into batches
+    noiseStddev: 0.001     // client adds N(0, 0.001) noise to their updates
   }
 })
 ```
@@ -69,7 +75,7 @@ General:
 
 Robustness:
 - `median` and `trimmed-mean` aggregations (for [Byzantine-robustness](https://arxiv.org/abs/1803.01498))
-- client authentication (e.g. gmail account + captcha)
+- client authentication (e.g. google oauth, captchas)
 - smoothing to limit individual clients' weight contributions (to prevent model from overfitting to most active clients and also create preconditions for Byzantine-robust learning if some clients are adversarial)
 - create virtual server-side clients who minimize train loss
 - discard client updates that increase server-side train loss (or subtract updates' projections onto the direction of increasing train loss)

@@ -249,15 +249,15 @@ export class Client {
   }
 
   public numExamples(): number {
-    if (this.x) {
-      return this.x.shape[0];
-    } else {
-      return 0;
-    }
+    return this.x.shape[0];
   }
 
   public numExamplesPerUpdate(): number {
     return this.msg.hyperparams.examplesPerUpdate;
+  }
+
+  public numExamplesRemaining(): number {
+    return this.numExamplesPerUpdate() - this.numExamples();
   }
 
   /**
