@@ -17,9 +17,9 @@
 
 import * as tf from '@tensorflow/tfjs';
 // tslint:disable-next-line:max-line-length
-import {Scalar, Tensor, Variable, LayerVariable, ModelCompileConfig} from '@tensorflow/tfjs';
+import {LayerVariable, ModelCompileConfig, Tensor, Variable} from '@tensorflow/tfjs';
 
-export type VarList = Array<Tensor | Variable | LayerVariable>;
+export type VarList = Array<Tensor|Variable|LayerVariable>;
 
 export type SerializedVariable = {
   dtype: tf.DataType,
@@ -27,18 +27,18 @@ export type SerializedVariable = {
   data: ArrayBuffer
 };
 
-const dtypeToTypedArrayCtor = {
+export const dtypeToTypedArrayCtor = {
   'float32': Float32Array,
   'int32': Int32Array,
   'bool': Uint8Array
 };
 
 export async function serializeVar(variable: tf.Tensor):
-  Promise<SerializedVariable> {
+    Promise<SerializedVariable> {
   const data = await variable.data();
   // small TypedArrays are views into a larger buffer
   const copy =
-    data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   return {dtype: variable.dtype, shape: variable.shape.slice(), data: copy};
 }
 
@@ -74,7 +74,7 @@ export function stackSerialized(vars: SerializedVariable[][]) {
       dtype: singleVar.dtype,
       shape: [updateCount].concat(singleVar.shape),
       data: stackedVar.buffer.slice(
-        stackedVar.byteOffset, stackedVar.byteOffset + stackedVar.byteLength)
+          stackedVar.byteOffset, stackedVar.byteOffset + stackedVar.byteLength)
     });
   }
 
@@ -96,8 +96,8 @@ export function serializedToArray(serialized: SerializedVariable) {
     // tslint:disable-next-line no-any
     const dataAsBuffer = dataBuffer as any as Buffer;
     data = dataAsBuffer.buffer.slice(
-      dataAsBuffer.byteOffset,
-      dataAsBuffer.byteOffset + dataAsBuffer.byteLength);
+        dataAsBuffer.byteOffset,
+        dataAsBuffer.byteOffset + dataAsBuffer.byteLength);
   }
   const numel = shape.reduce((x, y) => x * y, 1);
   const ctor = dtypeToTypedArrayCtor[dtype];
@@ -113,10 +113,10 @@ export type LossOrMetricFn = (yTrue: Tensor, yPred: Tensor) => Tensor;
 
 export type TfModelCallback = () => Promise<tf.Model>;
 
-export type AsyncTfModel = string | tf.Model | TfModelCallback;
+export type AsyncTfModel = string|tf.Model|TfModelCallback;
 
-export type VersionCallback = (model: FederatedModel,
-  oldVersion: string, newVersion: string) => void;
+export type VersionCallback =
+    (model: FederatedModel, oldVersion: string, newVersion: string) => void;
 
 export enum Events {
   Download = 'downloadVars',
@@ -140,9 +140,9 @@ export type FederatedFitConfig = {
 };
 
 export type FederatedCompileConfig = {
-  loss?: string | LossOrMetricFn,
+  loss?: string|LossOrMetricFn,
   metrics?: string[]
-}
+};
 
 export type ClientHyperparams = {
   batchSize?: number,          // batch size (usually not relevant)
@@ -283,7 +283,7 @@ export class FederatedTfModel implements FederatedModel {
       if (results instanceof Array) {
         return results.map(r => r.dataSync()[0]);
       } else {
-        return [results.dataSync()[0]]
+        return [results.dataSync()[0]];
       }
     });
   }
@@ -308,45 +308,60 @@ export class FederatedTfModel implements FederatedModel {
   }
 }
 
-/**
- * Implementation of `FederatedModel` designed to wrap a loss function and
- * variables it operates over.
- */
 export class FederatedDynamicModel implements FederatedModel {
-  /**
-   * Construct a new `FederatedDynamicModel` wrapping loss function and
-   * variables it operates over.
-   *
-   * @param vars Variables to upload/download from the server.
-   * @param loss Loss function to pass to the optimizer.
-   * @param optimizer Optimizer to optimize the model with when fit is called
-   */
-  constructor(
-    public vars: Variable[],
-    public evaluate: (xs: Tensor, ys: Tensor) => number[],
-    public predict: (xs: Tensor) => Tensor,
-    public loss: (xs: Tensor, ys: Tensor) => Scalar,
-    public inputShape: number[],
-    public outputShape: number[],
-    public optimizer: tf.SGDOptimizer) {}
+  isFederatedClientModel = true;
+  version: string;
+  vars: tf.Variable[];
+  predict: (inputs: tf.Tensor) => tf.Tensor;
+  loss: (labels: tf.Tensor, preds: tf.Tensor) => tf.Scalar;
+  optimizer: tf.Optimizer;
+  inputShape: number[];
+  outputShape: number[];
 
-  async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig): Promise<void> {
+  constructor(args: {
+    vars: tf.Variable[]; predict: (inputs: tf.Tensor) => tf.Tensor;
+    loss: (labels: tf.Tensor, preds: tf.Tensor) => tf.Scalar;
+    optimizer: tf.Optimizer;
+    inputShape: number[];
+    outputShape: number[];
+  }) {
+    this.vars = args.vars;
+    this.predict = args.predict;
+    this.loss = args.loss;
+    this.optimizer = args.optimizer;
+    this.inputShape = args.inputShape;
+    this.outputShape = args.outputShape;
+  }
+
+  async setup() {
+    return Promise.resolve();
+  }
+
+  async fit(x: tf.Tensor, y: tf.Tensor, config?: FederatedFitConfig):
+      Promise<void> {
     if (config.learningRate) {
-      this.optimizer.setLearningRate(config.learningRate);
+      if (this.optimizer instanceof tf.SGDOptimizer) {
+        this.optimizer.setLearningRate(config.learningRate);
+      }
     }
-    const lossVal = this.optimizer.minimize(() => this.loss(x, y));
-    if (lossVal) {
-      lossVal.dispose();
+    const epochs = (config && config.epochs) || 1;
+    for (let i = 0; i < epochs; i++) {
+      const ret = this.optimizer.minimize(() => this.loss(y, this.predict(x)));
+      tf.dispose(ret);
     }
   }
 
-  getVars(): Variable[] {
-    return this.vars.slice();
+  evaluate(x: tf.Tensor, y: tf.Tensor): number[] {
+    return Array.prototype.slice.call(this.loss(y, this.predict(x)).dataSync());
   }
 
-  setVars(vals: Tensor[]): void {
-    for (let i = 0; i < vals.length; i++) {
-      this.vars[i].assign(vals[i]);
-    }
+  getVars() {
+    return this.vars;
+  }
+
+  setVars(vals: tf.Tensor[]) {
+    this.vars.forEach((v, i) => {
+      v.assign(vals[i]);
+    });
   }
 }

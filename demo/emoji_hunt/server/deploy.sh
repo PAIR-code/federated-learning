@@ -20,6 +20,7 @@ whereami=`pwd`
 DEV_ENV=${DEV:-false}
 SSL_CERT=${SSL_CERT:-cert.pem}
 SSL_KEY=${SSL_KEY:-key.pem}
+USE_OAUTH=${USE_OAUTH:-1}
 
 if [ ! -e $SSL_CERT ]
 then
@@ -35,7 +36,7 @@ cd ../client
 
 if [ "$DEV_ENV" = true ]
 then
-  yarn run parcel watch index.html &
+  yarn run parcel watch --no-hmr index.html &
 else
   yarn build
 fi
@@ -51,4 +52,4 @@ fi
 
 PORT=${PORT:-3000}
 
-USE_OAUTH=1 SSL_KEY=$SSL_KEY SSL_CERT=$SSL_CERT PORT=$PORT $TSNODE index.ts
+USE_OAUTH=$USE_OAUTH SSL_KEY=$SSL_KEY SSL_CERT=$SSL_CERT PORT=$PORT $TSNODE index.ts

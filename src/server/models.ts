@@ -16,15 +16,19 @@
  */
 
 import './fetch_polyfill';
+
 import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
 import {promisify} from 'util';
+
 // tslint:disable-next-line:max-line-length
-import {AsyncTfModel, FederatedModel, FederatedTfModel, FederatedCompileConfig} from './common';
+import {AsyncTfModel, dtypeToTypedArrayCtor, FederatedCompileConfig, FederatedDynamicModel, FederatedModel, FederatedTfModel} from './common';
 
 const readdir = promisify(fs.readdir);
 const exists = promisify(fs.exists);
 const mkdir = promisify(fs.mkdir);
+const writeFile = promisify(fs.writeFile);
+const readFile = promisify(fs.readFile);
 
 // Federated server models need to implement a few additional methods
 export interface FederatedServerModel extends FederatedModel {
@@ -42,19 +46,21 @@ export interface FederatedServerModel extends FederatedModel {
   save(): Promise<void>;
 }
 
+// tslint:disable-next-line:no-any
 export function isFederatedServerModel(model: any):
-  model is FederatedServerModel {
+    model is FederatedServerModel {
   return model && model.isFederatedServerModel;
 }
 
-export class FederatedServerTfModel
-  extends FederatedTfModel implements FederatedServerModel {
+export class FederatedServerTfModel extends FederatedTfModel implements
+    FederatedServerModel {
   isFederatedServerModel = true;
   saveDir: string;
   version: string;
 
-  constructor(saveDir: string, initialModel?: AsyncTfModel,
-    config?: FederatedCompileConfig) {
+  constructor(
+      saveDir: string, initialModel?: AsyncTfModel,
+      config?: FederatedCompileConfig) {
     super(initialModel, config);
     this.saveDir = saveDir;
   }
@@ -67,7 +73,7 @@ export class FederatedServerTfModel
     if (last) {
       await this.load(last);
     } else {
-      tf.ENV.set('IS_BROWSER', true); // TODO: remove me in tfjs 0.12.5
+      tf.ENV.set('IS_BROWSER', true);  // TODO: remove me in tfjs 0.12.5
       await this.fetchInitial();
       tf.ENV.set('IS_BROWSER', false);
       await this.save();
@@ -102,4 +108,100 @@ export class FederatedServerTfModel
     this.model = await tf.loadModel(url);
     this.model.compile(this.compileConfig);
   }
+}
+
+export class FederatedServerDynamicModel extends FederatedDynamicModel
+    implements FederatedServerModel {
+  saveDir: string;
+  version = '';
+  isFederatedServerModel = true;
+
+  constructor(args: {
+    saveDir: string, vars: tf.Variable[];
+    predict: (inputs: tf.Tensor) => tf.Tensor;
+    loss: (labels: tf.Tensor, preds: tf.Tensor) => tf.Scalar;
+    optimizer: tf.Optimizer;
+    inputShape: number[];
+    outputShape: number[];
+  }) {
+    super(args);
+    this.saveDir = args.saveDir;
+    this.save();
+  }
+
+  async setup() {
+    return;
+  }
+
+  async save() {
+    const version = new Date().getTime().toString();
+    this.version = version;
+    const path = `${this.saveDir}/${version}/`;
+    await mkdir(path);
+    const jsonPath = `${path}/meta.json`;
+    const binPath = `${path}/data.bin`;
+    const {data, json} = await flatSerialize(this.vars);
+    await writeFile(jsonPath, json);
+    await writeFile(binPath, data);
+  }
+
+  async load(version: string) {
+    const path = `${this.saveDir}/${version}/`;
+    const jsonPath = `${path}/meta.json`;
+    const binPath = `${path}/data.bin`;
+    const json =
+        JSON.parse(await readFile(jsonPath, {flag: 'r', encoding: 'utf8'}));
+    const data = await readFile(binPath, {flag: 'rb'});
+    return flatDeserialize({data, json});
+  }
+}
+
+export type FlatVars = {
+  data: Uint8Array,
+  json: {
+    meta: Array<{shape: number[], dtype: 'float32' | 'int32' | 'bool'}>,
+    byteOffsets: number[]
+  }
+};
+
+function unview(a: ArrayBuffer|ArrayBufferView) {
+  if (ArrayBuffer.isView(a)) {
+    return a.buffer.slice(a.byteOffset, a.byteOffset + a.byteLength);
+  } else {
+    return a;
+  }
+}
+
+export async function flatSerialize(tensors: tf.Tensor[]): Promise<FlatVars> {
+  const meta = tensors.map(({shape, dtype}) => ({shape, dtype}));
+
+  const datas = await Promise.all(tensors.map(t => t.data().then(unview)));
+
+  const totBytes =
+      datas.map(({byteLength}) => byteLength).reduce((x, y) => x + y);
+
+  const dataArr = new Uint8Array(totBytes);
+
+  let cursor = 0;
+  const byteOffsets = [];
+
+  for (const buf of datas) {
+    dataArr.set(new Uint8Array(buf), cursor);
+    byteOffsets.push(cursor);
+    cursor += buf.byteLength;
+  }
+
+  return {data: dataArr, json: {meta, byteOffsets}};
+}
+
+export function flatDeserialize({data, json: {meta, byteOffsets}}: FlatVars) {
+  const numels = meta.map(({shape}) => shape.reduce((x, y) => x * y, 1));
+
+  const tensors = meta.map(({shape, dtype}, i) => {
+    const ctor = dtypeToTypedArrayCtor[dtype];
+    const arr = new ctor(data.buffer, byteOffsets[i], numels[i]);
+    return tf.tensor(arr, shape, dtype);
+  });
+
+  return tensors;
 }

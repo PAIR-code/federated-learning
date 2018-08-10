@@ -17,7 +17,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import {loadFrozenModel} from '@tensorflow/tfjs-converter';
-import {FederatedDynamicModel} from 'federated-learning-server';
+import * as federated from 'federated-learning-server';
 
 // tslint:disable:max-line-length
 const MODEL_URL =
@@ -27,23 +27,26 @@ const WEIGHT_MANIFEST =
 
 const LEARNING_RATE = 0.01;
 
+const MODEL_INPUT_WIDTH = 224;
+const NUM_LABELS = 424;
 // Load the model & set it up for training
-export async function setupModel() {
+export async function setupModel(saveDir: string):
+    Promise<federated.FederatedServerModel> {
   const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
-  const vars = model.weights;
+  const weights = model.weights;
 
   // TODO: there must be a better way
   const nonTrainables = /(batchnorm)|(reshape)/g;
 
   // Make weights trainable & extract them
-  const trainable: tf.Variable[] = [];
+  const vars: tf.Variable[] = [];
 
-  for (const weightName in vars) {
+  for (const weightName in weights) {
     if (!weightName.match(nonTrainables)) {
-      vars[weightName] = vars[weightName].map((t: tf.Tensor) => {
+      weights[weightName] = weights[weightName].map((t: tf.Tensor) => {
         if (t.dtype === 'float32') {
           const ret = tf.variable(t);
-          trainable.push(ret);
+          vars.push(ret);
           return ret;
         } else {
           return t;
@@ -52,15 +55,18 @@ export async function setupModel() {
     }
   }
 
+  const optimizer = tf.train.sgd(LEARNING_RATE);
+  const predict = (x: tf.Temsor) => model.predict(x);
   // TODO: better to not run softmax and use softmaxCrossEntropy?
   const loss = (input: tf.Tensor, label: tf.Tensor) => {
-    const preds = model.predict(input) as tf.Tensor;
+    const preds = predict(input) as tf.Tensor;
     return tf.losses.logLoss(label, preds) as tf.Scalar;
   };
 
-  const optimizer = tf.train.sgd(LEARNING_RATE);
+  const inputShape = [MODEL_INPUT_WIDTH, MODEL_INPUT_WIDTH, 3];
+  const outputShape = [NUM_LABELS];
+  const varsAndLoss = new federated.FederatedServerDynamicModel(
+      {vars, saveDir, predict, loss, optimizer, inputShape, outputShape});
 
-  const varsAndLoss = new FederatedDynamicModel(trainable, loss, optimizer);
-
-  return {model, varsAndLoss};
+  return varsAndLoss;
 }

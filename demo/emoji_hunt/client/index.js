@@ -17,7 +17,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import {loadFrozenModel} from '@tensorflow/tfjs-converter'
-import {ClientAPI, FederatedDynamicModel, verbose} from 'federated-learning-client';
+import * as federated from 'federated-learning-client';
 
 import {SCAVENGER_HUNT_LABELS} from './labels.js';
 import {EMOJIS_LVL_1} from './levels.js';
@@ -35,29 +35,28 @@ const USE_OAUTH = false;
 
 console.log('server url:', SERVER_URL)
 
-verbose(true);
-
 const MODEL_INPUT_WIDTH = 224;
+const NUM_LABELS = 424;
 
 const LEARNING_RATE = 0.1;
 
 // Load the model & set it up for training
 async function setupModel() {
   const model = await loadFrozenModel(MODEL_URL, WEIGHT_MANIFEST);
-  const vars = model.weights;
+  const weights = model.weights;
 
   // TODO: there must be a better way
   const nonTrainables = /(batchnorm)|(reshape)/g;
 
   // Make weights trainable & extract them
-  const trainable = [];
+  const vars = [];
 
-  for (const weightName in vars) {
+  for (const weightName in weights) {
     if (!weightName.match(nonTrainables)) {
-      vars[weightName] = vars[weightName].map(t => {
+      weights[weightName] = weights[weightName].map(t => {
         if (t.dtype === 'float32') {
           const ret = tf.variable(t);
-          trainable.push(ret);
+          vars.push(ret);
           return ret;
         } else {
           return t;
@@ -67,15 +66,21 @@ async function setupModel() {
   }
 
   // TODO: better to not run softmax and use softmaxCrossEntropy?
-  const loss = (input, label) => {
-    const preds = model.predict(input);
-    return tf.losses.logLoss(label, preds);
-  };
+  const loss = (y, label) => tf.losses.logLoss(y, label)
 
-  const optimizer = tf.train.sgd(LEARNING_RATE);
+  const optimizer = tf.train.sgd(LEARNING_RATE) //@ts-disable;
+  const inputShape = [MODEL_INPUT_WIDTH, MODEL_INPUT_WIDTH, 3];
+  const outputShape = [NUM_LABELS];
 
-  const varsAndLoss = new FederatedDynamicModel(trainable, loss, optimizer)
-  return {model, varsAndLoss, optimizer};
+  const varsAndLoss = new federated.FederatedDynamicModel({
+    vars,
+    predict: x => model.predict(x),
+    loss,
+    optimizer,
+    inputShape,
+    outputShape
+  });
+  return varsAndLoss;
 }
 
 async function getTopPred(preds) {
@@ -126,21 +131,22 @@ async function main() {
 
   ui.status('loading model...');
 
-  const {model, varsAndLoss, optimizer} = await setupModel();
+  const model = await setupModel();
 
-  const client = new ClientAPI(varsAndLoss);
+  const client = new federated.Client(SERVER_URL, model, {
+    verbose: true
+  });
 
-  client.onDownload(msg => {
-    ui.modelVersion(`model version: ${msg.modelVersion}`);
+  ui.modelVersion(`model version: ${client.modelVersion()}`);
+
+  client.onNewVersion((model, oldVersion, newVersion) => {
+    console.log(model, oldVersion, newVersion, client.modelVersion());
+    ui.modelVersion(`model version: ${newVersion}`);
   });
 
   ui.status('trying to connect to federated learning server...');
 
-  await client.connect(SERVER_URL);
-
-  const hyperparams = client.hyperparams();
-
-  optimizer.setLearningRate(hyperparams['learningRate']);
+  await client.setup();
 
   let isTraining = false;
 
@@ -201,7 +207,7 @@ async function main() {
     };
 
     const preds = tf.tidy(() => {
-      return model.predict(preprocess(webcam));
+      return client.predict(preprocess(webcam));
     });
 
     const {label} = await getTopPred(preds);

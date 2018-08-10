@@ -17,10 +17,12 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as socketProxy from 'socket.io-client';
+
 // tslint:disable-next-line:max-line-length
-import {FederatedCompileConfig, VersionCallback, ModelMsg, DownloadMsg, Events, deserializeVar, SerializedVariable, serializeVars, AsyncTfModel} from './common';
+import {AsyncTfModel, deserializeVar, DownloadMsg, Events, FederatedCompileConfig, ModelMsg, SerializedVariable, serializeVars, VersionCallback} from './common';
 // tslint:disable-next-line:max-line-length
-import {FederatedClientModel, isFederatedClientModel, FederatedClientTfModel} from './models';
+import {FederatedClientModel, FederatedClientTfModel, isFederatedClientModel} from './models';
+
 // tslint:disable-next-line:no-angle-bracket-type-assertion no-any
 const socketio = (<any>socketProxy).default || socketProxy;
 const CONNECTION_TIMEOUT = 10 * 1000;
@@ -66,8 +68,9 @@ export class Client {
    * `model` updates from the server.
    * @param model - model to use with federated learning
    */
-  constructor(serverUrl: string, model: FederatedClientModel | AsyncTfModel,
-    config?: FederatedClientConfig) {
+  constructor(
+      serverUrl: string, model: FederatedClientModel|AsyncTfModel,
+      config?: FederatedClientConfig) {
     this.serverUrl = serverUrl;
     if (isFederatedClientModel(model)) {
       this.model = model;
@@ -75,11 +78,9 @@ export class Client {
       const compileConfig = (config || {}).modelCompileConfig || {};
       this.model = new FederatedClientTfModel(model, compileConfig);
     }
-    this.versionCallbacks = [
-      (model, v1, v2) => {
-        this.log(`Updated model: ${v1} -> ${v2}`);
-      }
-    ];
+    this.versionCallbacks = [(model, v1, v2) => {
+      this.log(`Updated model: ${v1} -> ${v2}`);
+    }];
     this.versionUpdateCounts = {};
     this.verbose = (config || {}).verbose;
   }
@@ -88,7 +89,7 @@ export class Client {
    * @return The version of the model we're currently training
    */
   public modelVersion(): string {
-    return this.msg.model.version;
+    return this.msg == null ? 'unsynced' : this.msg.model.version;
   }
 
   /**
@@ -126,7 +127,7 @@ export class Client {
       this.setVars(msg.model.vars);
       this.versionUpdateCounts[newVersion] = 0;
       this.versionCallbacks.forEach(
-        cb => cb(this.model, oldVersion, newVersion));
+          cb => cb(this.model, oldVersion, newVersion));
     });
   }
 
@@ -160,7 +161,9 @@ export class Client {
 
     // repeatedly, for as many iterations as we have batches of examples:
     const examplesPerUpdate = this.msg.hyperparams.examplesPerUpdate;
-    this.log(examplesPerUpdate);
+    this.log(
+        'examplesPerUpdate', examplesPerUpdate,
+        'current training set:', this.x.shape);
     while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
@@ -176,7 +179,12 @@ export class Client {
 
       // fit the model for the specified # of steps
       await this.time('Fit model', async () => {
-        await this.model.fit(xTrain, yTrain, fitConfig);
+        try {
+          await this.model.fit(xTrain, yTrain, fitConfig);
+        } catch (err) {
+          console.error(err);
+          throw err;
+        }
       });
 
       // serialize, possibly adding noise
@@ -262,7 +270,7 @@ export class Client {
   private async uploadVars(msg: ModelMsg): Promise<{}> {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
-        setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
+          setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
       this.socket.emit(Events.Upload, msg, () => {
         clearTimeout(rejectTimer);
         resolve();
@@ -280,9 +288,10 @@ export class Client {
   private async connectTo(serverURL: string): Promise<DownloadMsg> {
     this.socket = socketio(serverURL);
     return fromEvent<DownloadMsg>(
-      this.socket, Events.Download, CONNECTION_TIMEOUT);
+        this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 
+  // tslint:disable-next-line:no-any
   private log(...args: any[]) {
     if (this.verbose) {
       console.log('Federated Client:', ...args);
@@ -293,24 +302,24 @@ export class Client {
     const t1 = new Date().getTime();
     await action();
     const t2 = new Date().getTime();
-    this.log(`${msg} took ${t2 - t1}ms`)
+    this.log(`${msg} took ${t2 - t1}ms`);
   }
 }
 
 async function fromEvent<T>(
-  emitter: SocketIOClient.Socket, eventName: string,
-  timeout: number): Promise<T> {
+    emitter: SocketIOClient.Socket, eventName: string,
+    timeout: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const rejectTimer = setTimeout(
-      () => reject(`${eventName} event timed out`), timeout);
-    const listener = (evtArgs: T) => {
-      emitter.removeListener(eventName, listener);
-      clearTimeout(rejectTimer);
+           const rejectTimer = setTimeout(
+               () => reject(`${eventName} event timed out`), timeout);
+           const listener = (evtArgs: T) => {
+             emitter.removeListener(eventName, listener);
+             clearTimeout(rejectTimer);
 
-      resolve(evtArgs);
-    };
-    emitter.on(eventName, listener);
-  }) as Promise<T>;
+             resolve(evtArgs);
+           };
+           emitter.on(eventName, listener);
+         }) as Promise<T>;
 }
 
 // TODO: remove once tfjs >= 0.12.5 is released
@@ -334,9 +343,9 @@ function sliceWithEmptyTensors(a: tf.Tensor, begin: number, size?: number) {
 
 function addRows(existing: tf.Tensor, newEls: tf.Tensor, unitShape: number[]) {
   if (tf.util.arraysEqual(newEls.shape, unitShape)) {
-    return tf.tidy(() => concatWithEmptyTensors(
-      existing, tf.expandDims(newEls)));
-  } else { // batch dimension
+    return tf.tidy(
+        () => concatWithEmptyTensors(existing, tf.expandDims(newEls)));
+  } else {  // batch dimension
     tf.util.assertShapesMatch(newEls.shape.slice(1), unitShape);
     return tf.tidy(() => concatWithEmptyTensors(existing, newEls));
   }

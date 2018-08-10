@@ -16,15 +16,15 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import * as io from 'socket.io';
 import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
+import * as io from 'socket.io';
 
 // tslint:disable-next-line:max-line-length
-import {FederatedCompileConfig, deserializeVars, DownloadMsg, Events, SerializedVariable, serializeVars, stackSerialized, clientHyperparams, ClientHyperparams, VersionCallback, ModelMsg, AsyncTfModel} from './common';
+import {AsyncTfModel, clientHyperparams, ClientHyperparams, deserializeVars, DownloadMsg, Events, FederatedCompileConfig, ModelMsg, SerializedVariable, serializeVars, stackSerialized, VersionCallback} from './common';
 // tslint:disable-next-line:max-line-length
-import {FederatedServerModel, isFederatedServerModel, FederatedServerTfModel} from './models';
+import {FederatedServerModel, FederatedServerTfModel, isFederatedServerModel} from './models';
 
 export type FederatedServerConfig = {
   clientHyperparams?: ClientHyperparams,
@@ -59,14 +59,14 @@ export class Server {
   updates: SerializedVariable[][] = [];
   updating = false;
   aggregation = 'mean';
-  versionCallbacks: VersionCallback[];;
+  versionCallbacks: VersionCallback[];
+
   updatesPerVersion: number;
   verbose: boolean;
 
   constructor(
-    webServer: http.Server | https.Server | io.Server,
-    model: AsyncTfModel | FederatedServerModel,
-    config: FederatedServerConfig) {
+      webServer: http.Server|https.Server|io.Server,
+      model: AsyncTfModel|FederatedServerModel, config: FederatedServerConfig) {
     // Setup server
     if (webServer instanceof http.Server || webServer instanceof https.Server) {
       this.server = io(webServer);
@@ -87,11 +87,9 @@ export class Server {
     this.updatesPerVersion = config.updatesPerVersion || 10;
     this.clientHyperparams = clientHyperparams(config.clientHyperparams || {});
     this.downloadMsg = null;
-    this.versionCallbacks = [
-      (model, v1, v2) => {
-        this.log(`updated model: ${v1} -> ${v2}`);
-      }
-    ];
+    this.versionCallbacks = [(model, v1, v2) => {
+      this.log(`updated model: ${v1} -> ${v2}`);
+    }];
   }
 
   /**
@@ -184,6 +182,7 @@ export class Server {
     this.performCallbacks(oldVersion);
   }
 
+  // tslint:disable-next-line:no-any
   private log(...args: any[]) {
     if (this.verbose) {
       console.log('Federated Server:', ...args);
@@ -194,13 +193,13 @@ export class Server {
     const t1 = new Date().getTime();
     await action();
     const t2 = new Date().getTime();
-    this.log(`${msg} took ${t2 - t1}ms`)
+    this.log(`${msg} took ${t2 - t1}ms`);
   }
 
   private async performCallbacks(oldVersion?: string) {
     await this.time('performing callbacks', async () => {
       this.versionCallbacks.forEach(
-        c => c(this.model, oldVersion, this.model.version));
+          c => c(this.model, oldVersion, this.model.version));
     });
   }
 }
