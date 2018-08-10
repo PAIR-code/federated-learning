@@ -141,7 +141,7 @@ export class FederatedServerDynamicModel extends FederatedDynamicModel
     const jsonPath = `${path}/meta.json`;
     const binPath = `${path}/data.bin`;
     const {data, json} = await flatSerialize(this.vars);
-    await writeFile(jsonPath, json);
+    await writeFile(jsonPath, JSON.stringify(json));
     await writeFile(binPath, data);
   }
 
