@@ -56,7 +56,7 @@ export async function setupModel(saveDir: string):
   }
 
   const optimizer = tf.train.sgd(LEARNING_RATE);
-  const predict = model.predict.bind(model);
+  const predict = (x: tf.Temsor) => model.predict(x);
   // TODO: better to not run softmax and use softmaxCrossEntropy?
   const loss = (input: tf.Tensor, label: tf.Tensor) => {
     const preds = predict(input) as tf.Tensor;
