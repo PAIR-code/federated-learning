@@ -160,7 +160,6 @@ export class Client {
 
     // repeatedly, for as many iterations as we have batches of examples:
     const examplesPerUpdate = this.msg.hyperparams.examplesPerUpdate;
-    this.log(examplesPerUpdate);
     while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();

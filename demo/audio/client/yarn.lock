@@ -3992,6 +3992,10 @@ tar@^4:
     safe-buffer "^5.1.2"
     yallist "^3.0.2"
 
+"tfjs-npy@https://github.com/co2meal/tfjs-npy.git":
+  version "0.0.3"
+  resolved "https://github.com/co2meal/tfjs-npy.git#07b806679a105df9e43a71356661f7a0400b08bd"
+
 through2@^2.0.0, through2@~2.0.3:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/through2/-/through2-2.0.3.tgz#0004569b37c7c74ba39c43f3ced78d1ad94140be"
