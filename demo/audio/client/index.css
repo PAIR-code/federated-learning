@@ -15,107 +15,189 @@
  * =============================================================================
  */
 
-body {
-  font-family: monospace;
+@font-face {
+  font-family: harryp;
+  src: url(harryp.ttf);
 }
+
+html {
+  color: #222;
+  background-color: white;
+  transition: all 500ms ease-in-out;
+}
+
+html.nox {
+  background-color: #222;
+  color: #aaa;
+}
+
+html.accio {
+  cursor: url(wand.png) 0 0, auto !important;
+}
+
+html.accio.nox {
+  cursor: url(wand-active.png) 0 0, auto !important;
+}
+
 button:not(:disabled) {
   cursor: pointer;
 }
-#record-button {
-  font-family: monospace;
-  margin-top: 5px;
-  background-color: lightgreen;
-  font-size: x-large;
+
+html.accio button:not(:disabled) {
+  cursor: url(wand-active.png) 0 0, pointer !important;
 }
+
+body {
+  font-family: harryp;
+  font-size: 24px;
+}
+
+.header {
+  background-color:black;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 60px;
+  width: 100%;
+  border-bottom: 1px solid #ccc;
+}
+
+.header h1 {
+  float: left;
+  margin: 5px;
+  color: yellow;
+}
+
+.header nav {
+  display: inline-block;
+}
+
+.header nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 60px;
+}
+
+.header nav li {
+  float: left;
+  margin-left: 1em;
+  line-height: 60px;
+}
+
+.header nav li a {
+  color: yellow;
+}
+
+.container {
+  width: 666px;
+  margin: 0 auto;
+  margin-top: 80px;
+}
+
+.results.container {
+  width: 90%;
+  min-width: 1000px;
+}
+
 #results {
   max-width: 1600px;
 }
+
+legend {
+  font-size: 32px;
+}
+
+#model-version {
+  font-size: 24px;
+}
+
+span.status-number,
+span.last-prediction {
+  font-size: 32px;
+  text-shadow: 2px 2px 2px yellow;
+}
+
+.record-button {
+  font-family: harryp;
+  margin-top: 5px;
+  background-color: lightgreen;
+  font-size: 48px;
+  padding: 0 10px;
+}
+
+.record-button.active {
+  background-color: darkgoldenrod;
+}
+
 .chart {
   display: inline-block;
   position: relative;
   padding-top: 1.2em;
   vertical-align: top;
 }
+
 .chart label {
   position: absolute;
   top: 0;
   left: 0;
 }
+
 .chart canvas {
   border: 1px solid #ccc;
 }
-.left-col {
-  display: inline-block;
-  width: 800px;
-}
-.right-col {
-  display: inline-block;
-  vertical-align: top;
-  width: 400px;
-}
-@media (max-width: 600px) {
-  .left-col, .right-col {
-    width: 100%;
-  }
-  .spectrum {
-    display: none;
-  }
-}
-#probs {
-  margin-top: 1em;
-}
-#label-radios {
-  list-style: none;
-  padding-left: 32px;
-}
-#label-radios li {
-  display: inline;
-}
-#label-radios label {
-  cursor: pointer;
-  position: relative;
-  font-family: "Open Sans", verdana, arial, sans-serif;
-  padding: 0 7px;
-  padding-bottom: 16px;
-  border: 1px solid #ccc;
-  font-size: 12px;
-  fill: rgb(68, 68, 68);
-}
-#label-radios label:hover {
-  background: #e8e8e8;
-}
-#label-radios input {
-  position: absolute;
-  margin: 0;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-}
+
 #example-table {
   width: 100%;
 }
+
 #example-table tbody tr {
   border-top: 1px solid;
 }
-#example-table tbody td {
+
+#example-table td {
   padding-right: 1em;
 }
+
 #example-table th {
   text-align: left;
   padding-right: 1em;
 }
+
 #example-table .incorrect-prediction {
   color: darkred;
   font-weight: bold;
 }
+
 audio {
-  width: 250px;
+  max-width: 250px;
 }
+
 fieldset {
   position: relative;
 }
+
 .version {
   position: absolute;
   right: 1em;
   bottom: 1em;
+}
+
+@media (max-width: 665px) {
+  .spectrum, .header nav, .model-input {
+    display: none;
+  }
+  .container {
+    width: 100%;
+  }
+  .header h1 {
+    width: 100%;
+    text-align: center;
+  }
+  audio {
+    max-width: 100px;
+  }
+  #example-table td, #example-table th {
+    padding-right: 0;
+  }
 }
