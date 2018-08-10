@@ -11,14 +11,16 @@ function setupModel() {
       tf.layers.dense({ units: 2, activation: 'relu' }),
     ]
   })
+  console.log(model);
   return model
 }
 
 async function main() {
-  ui.setupUI();
 
-  const model = setupModel();
-  const client = new federated.Client(SERVER_URL, model);
+  const client = new federated.Client(SERVER_URL, setupModel);
+
+  await client.setup();
+  ui.setupUI();
 
   ui.onClick.push(({label, x, y}) => {
     const xNorm = x / ui.CANVAS_SIZE;

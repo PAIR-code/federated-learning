@@ -23,8 +23,7 @@ To do this, we'll need to implement a client and instantiate a server.
 
 If we were starting from a pre-trained `tf.Model`, we can just pass its URL to the `federated.Client` constructor, as in the [client docs](src/client/README.md).
 
-Since we're implementing our own model, instead we can use [`FederatedDynamicModel`](src/client/common.ts#L311). This class wraps a bag of variables, a loss function, and a predict function.
-
+Since we're implementing our own model, we can instead pass a function that creates it to `federated.Client`
 ```js
 import * as federated from 'federated-learning-client'
 
