@@ -1,0 +1,23 @@
+{
+  "name": "decision-boundary-demo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@tensorflow/tfjs": "~0.12",
+    "federated-learning-client": "link:../../../src/client",
+    "federated-learning-server": "link:../../../src/server",
+    "p5": "0.6"
+  },
+  "scripts": {
+    "postinstall": "./postinstall.sh",
+    "watch": "yarn postinstall && parcel index.html --no-hmr --hmr-hostname 0.0.0.0",
+    "build": "yarn postinstall && parcel build index.html"
+  },
+  "devDependencies": {
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "cross-env": "^5.2.0",
+    "parcel": "^1.9.6",
+    "yalc": "^1.0.0-pre.22"
+  }
+}
