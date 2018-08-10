@@ -10,14 +10,12 @@
   "license": "Apache-2.0",
   "scripts": {
     "postinstall": "./postinstall.sh",
-    "dev": "yarn postinstall && ts-node server.ts",
-    "lint": "tslint -p . -t verbose"
+    "dev": "yarn postinstall && node server.js"
   },
   "dependencies": {
     "@tensorflow/tfjs": "~0.12",
     "@tensorflow/tfjs-node": "^0.1.9",
-    "@types/express": "^4.16.0",
-    "@types/express-fileupload": "^0.1.1",
+    "tfjs-npy": "https://github.com/co2meal/tfjs-npy.git",
     "cross-env": "^5.2.0",
     "express": "^4.16.3",
     "express-basic-auth": "^1.1.5",
@@ -27,9 +25,6 @@
     "uuid": "^3.3.2"
   },
   "devDependencies": {
-    "ts-node": "^7.0.0",
-    "tslint": "~5.8.0",
-    "typescript": "2.7.2",
     "yalc": "^1.0.0-pre.22"
   }
 }

@@ -15,25 +15,22 @@
  * =============================================================================
  */
 
-import * as tf from '@tensorflow/tfjs';
-import * as express from 'express';
-import * as basicAuth from 'express-basic-auth';
-import * as fileUpload from 'express-fileupload';
-import * as federated from 'federated-learning-server';
-import * as fs from 'fs';
-import * as http from 'http';
-import * as https from 'https';
-import * as path from 'path';
-import * as uuid from 'uuid/v4';
-import {Request, Response, NextFunction} from 'express';
-import {promisify} from 'util';
-import * as npy from './npy';
-import fetch from 'node-fetch';
+const tf = require('@tensorflow/tfjs');
+require('@tensorflow/tfjs-node');
 
-const writeFile = promisify(fs.writeFile);
-
-// Load tfjs-node (below other code, so clang-format doesn't move it)
-import '@tensorflow/tfjs-node';
+const express = require('express');
+const basicAuth = require('express-basic-auth');
+const fileUpload = require('express-fileupload');
+const federated = require('federated-learning-server');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
+const path = require('path');
+const uuid = require('uuid/v4');
+const util = require('util');
+const fetch = require('node-fetch');
+const npy = require('tfjs-npy');
+const writeFile = util.promisify(fs.writeFile);
 
 // Setup express app using either HTTP or HTTPS, depending on environment vars
 const app = express();
@@ -61,7 +58,7 @@ if (process.env.BASIC_AUTH_USER && process.env.BASIC_AUTH_PASS) {
 // Setup file uploading (to save .wav files)
 app.use(fileUpload());
 
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
 });
@@ -87,7 +84,7 @@ fs.readdirSync(modelDir).forEach(v => {
 });
 
 // Setup endpoints to track client and validation accuracy for visualization
-app.post('/data', (req: Request, res: Response) => {
+app.post('/data', (req, res) => {
   // Record metrics
   const version = req.body.modelVersion;
   const clientId = req.body.clientId;
@@ -98,8 +95,8 @@ app.post('/data', (req: Request, res: Response) => {
 
   // Save files + metadata for later analysis (dont't do this in real life)
   const reqId = `${clientId}_${uuid()}`;
-  const wavFile = req.files.wav as fileUpload.UploadedFile;
-  const npyFile = req.files.npy as fileUpload.UploadedFile;
+  const wavFile = req.files.wav;
+  const npyFile = req.files.npy;
   const labelName = wavFile.name.split('.')[0];
   wavFile.mv(`${fileDir}/${labelName}/${reqId}.wav`, () => {});
   npyFile.mv(`${fileDir}/${labelName}/${reqId}.npy`, () => {});
@@ -109,7 +106,7 @@ app.post('/data', (req: Request, res: Response) => {
 });
 
 // Expose in-memory metrics
-app.get('/metrics', async (req: Request, res: Response) => {
+app.get('/metrics', async (req, res) => {
   res.send(metrics);
 });
 
@@ -123,20 +120,20 @@ const validInputUrl =
 const validLabelUrl =
   'https://storage.googleapis.com/tfjs-federated-hogwarts/val-labels.npy';
 
-async function loadNpyUrl(url): Promise<tf.Tensor> {
+async function loadNpyUrl(url) {
   const res = await fetch(url);
   const arr = await res.arrayBuffer();
   return npy.parse(arr);
 }
 
-async function loadInitialModel(): Promise<tf.Model> {
+async function loadInitialModel() {
   const model = await tf.loadModel(initialModelUrl);
   for (let i = 0; i < model.layers.length; ++i) {
     model.layers[i].trainable = false;  // freeze everything
   }
   const transferLayer = model.layers[10].output;
   const newDenseLayer = tf.layers.dense({units: 4, activation: 'softmax'});
-  const newOutputs = newDenseLayer.apply(transferLayer) as tf.SymbolicTensor;
+  const newOutputs = newDenseLayer.apply(transferLayer);
   return tf.model({inputs: model.inputs, outputs: newOutputs});
 }
 
@@ -159,7 +156,7 @@ const fedServer = new federated.Server(webServer, loadInitialModel, {
 async function setup() {
   const validInputs = await loadNpyUrl(validInputUrl);
   const validLabelsFlat = await loadNpyUrl(validLabelUrl);
-  const validLabels = tf.oneHot(validLabelsFlat as tf.Tensor1D, 4);
+  const validLabels = tf.oneHot(validLabelsFlat, 4);
   tf.dispose(validLabelsFlat);
 
   fedServer.onNewVersion((model, oldVersion, newVersion) => {

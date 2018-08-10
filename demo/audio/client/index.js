@@ -16,7 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import * as npy from './npy';
+import * as npy from 'tfjs-npy';
 import uuid from 'uuid/v4';
 import MediaStreamRecorder from 'msr';
 import {loadAudioTransferLearningModel, labelNames} from './model';
@@ -102,14 +102,14 @@ client.setup().then(async () => {
   })
 
   // When we're done recording,
-  function finishRecording() {
+  async function finishRecording() {
     // Setup results html
     ui.setupResults();
 
     // Compute input tensor
     const freqData = listener.getFrequencyData();
     const x = getInputTensorFromFrequencyData(freqData, numFrames, fftLength);
-    xNpy = npy.serialize(x);
+    xNpy = await npy.serialize(x);
 
     // Compute label tensor
     const onehotY = new Array(labelNames.length).fill(0);
@@ -135,7 +135,7 @@ client.setup().then(async () => {
 
     // Train and prepare our next loop!
     ui.setStatus('Fitting Model&hellip;');
-    client.fit(x, y).catch(console.log).finally(() => {
+    client.federatedUpdate(x, y).catch(console.log).finally(() => {
       tf.dispose([x, y, p]);
       ui.setReadyStatus(client);
     });
