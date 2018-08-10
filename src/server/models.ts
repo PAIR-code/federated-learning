@@ -130,7 +130,30 @@ export class FederatedServerDynamicModel extends FederatedDynamicModel
   }
 
   async setup() {
-    return;
+    if (!(await exists(this.saveDir))) {
+      await mkdir(this.saveDir);
+    }
+    const last = await this.last();
+    if (last) {
+      await this.load(last);
+    } else {
+      await this.save();
+    }
+  }
+
+  async list() {
+    const models = await readdir(this.saveDir);
+    models.sort();
+    return models;
+  }
+
+  async last() {
+    const models = await this.list();
+    if (models.length) {
+      return models[models.length - 1];
+    } else {
+      return null;
+    }
   }
 
   async save() {
