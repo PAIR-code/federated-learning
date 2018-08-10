@@ -15,6 +15,8 @@
  * =============================================================================
  */
 
+import { nextFrame } from '@tensorflow/tfjs';
+
 function sel(str) {
   return document.querySelector(String.raw(...arguments));
 }
@@ -51,9 +53,22 @@ export async function webcam() {
   }
   try {
     const stream =
-      await navigator.mediaDevices.getUserMedia({audio: false, video: true});
+      await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {facingMode: 'environment'}
+      });
+
     video.srcObject = stream;
+
+    while (video.videoHeight === 0 || video.videoWidth === 0) {
+      status('waiting for video to initialise...');
+      await nextFrame();
+    }
+
+    video.width = video.videoWidth;
+    video.height = video.videoHeight;
     webcamSetup = true;
+
   } catch (exn) {
     status(`Error in accessing webcam: ${exn.toString()}`);
     throw exn;
