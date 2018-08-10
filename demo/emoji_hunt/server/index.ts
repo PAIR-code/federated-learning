@@ -97,7 +97,6 @@ setupModel(modelDir)
         clientHyperparams:
             {learningRate: 3e-4, batchSize: 1, examplesPerUpdate: 1},
         updatesPerVersion: 5,
-
         modelDir
       });
       return federatedServer.setup().then(() => {
