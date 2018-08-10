@@ -17,9 +17,9 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as socketProxy from 'socket.io-client';
-
+import * as uuid from 'uuid/v4';
 // tslint:disable-next-line:max-line-length
-import {AsyncTfModel, deserializeVar, DownloadMsg, Events, FederatedCompileConfig, ModelMsg, SerializedVariable, serializeVars, VersionCallback} from './common';
+import {FederatedCompileConfig, VersionCallback, DownloadMsg, Events, deserializeVar, SerializedVariable, serializeVars, AsyncTfModel, UploadMsg, UploadCallback} from './common';
 // tslint:disable-next-line:max-line-length
 import {FederatedClientModel, FederatedClientTfModel, isFederatedClientModel} from './models';
 
@@ -27,6 +27,8 @@ import {FederatedClientModel, FederatedClientTfModel, isFederatedClientModel} fr
 const socketio = (<any>socketProxy).default || socketProxy;
 const CONNECTION_TIMEOUT = 10 * 1000;
 const UPLOAD_TIMEOUT = 5 * 1000;
+const COOKIE_NAME = 'federated-learner-uuid';
+const YEAR_IN_MS = 365 * 24 * 60 * 60 * 1000;
 
 type CounterObj = {
   [key: string]: number
@@ -34,7 +36,9 @@ type CounterObj = {
 
 export type FederatedClientConfig = {
   modelCompileConfig?: FederatedCompileConfig,
-  verbose?: boolean
+  verbose?: boolean,
+  clientId?: string,
+  sendMetrics?: boolean
 };
 
 /**
@@ -57,11 +61,14 @@ export class Client {
   private model: FederatedClientModel;
   private socket: SocketIOClient.Socket;
   private versionCallbacks: VersionCallback[];
+  private uploadCallbacks: UploadCallback[];
   private x: tf.Tensor;
   private y: tf.Tensor;
   private versionUpdateCounts: CounterObj;
   private serverUrl: string;
   private verbose: boolean;
+  private sendMetrics: boolean;
+  clientId: string;
 
   /**
    * Construct a client API for federated learning that will push and pull
@@ -78,11 +85,21 @@ export class Client {
       const compileConfig = (config || {}).modelCompileConfig || {};
       this.model = new FederatedClientTfModel(model, compileConfig);
     }
-    this.versionCallbacks = [(model, v1, v2) => {
+    this.uploadCallbacks = [];
+    this.versionCallbacks = [(v1, v2) => {
       this.log(`Updated model: ${v1} -> ${v2}`);
     }];
     this.versionUpdateCounts = {};
     this.verbose = (config || {}).verbose;
+    this.sendMetrics = (config || {}).sendMetrics;
+    if ((config || {}).clientId) {
+      this.clientId = config.clientId;
+    } else if (getCookie(COOKIE_NAME)) {
+      this.clientId = getCookie(COOKIE_NAME);
+    } else {
+      this.clientId = uuid();
+      setCookie(COOKIE_NAME, this.clientId);
+    }
   }
 
   /**
@@ -93,11 +110,19 @@ export class Client {
   }
 
   /**
-   * Register a new callback to be invoked whenever the client downloads new
-   * weights from the server.
+   * Register a new callback to be invoked whenever the specified event occurs
+   *
+   * @param event must be "new-version"
+   * @param callback function to be called on each event
    */
-  onNewVersion(callback: VersionCallback) {
-    this.versionCallbacks.push(callback);
+  on(event: string, callback: VersionCallback | UploadCallback) {
+    if (event === 'new-version') {
+      this.versionCallbacks.push(callback as VersionCallback);
+    } else if (event === 'upload') {
+      this.uploadCallbacks.push(callback as UploadCallback);
+    } else {
+      throw new Error(`unrecognized event ${event}`);
+    }
   }
 
   /**
@@ -118,7 +143,7 @@ export class Client {
     this.setVars(this.msg.model.vars);
     const newVersion = this.modelVersion();
     this.versionUpdateCounts[newVersion] = 0;
-    this.versionCallbacks.forEach(cb => cb(this.model, null, newVersion));
+    this.versionCallbacks.forEach(cb => cb(null, newVersion));
 
     this.socket.on(Events.Download, (msg: DownloadMsg) => {
       const oldVersion = this.modelVersion();
@@ -127,7 +152,7 @@ export class Client {
       this.setVars(msg.model.vars);
       this.versionUpdateCounts[newVersion] = 0;
       this.versionCallbacks.forEach(
-        cb => cb(this.model, oldVersion, newVersion));
+        cb => cb(oldVersion, newVersion));
     });
   }
 
@@ -174,6 +199,12 @@ export class Client {
         learningRate: this.msg.hyperparams.learningRate
       };
 
+      // optionally compute evaluation metrics for them
+      let metrics = null;
+      if (this.sendMetrics) {
+        metrics = this.model.evaluate(xTrain, yTrain);
+      }
+
       // fit the model for the specified # of steps
       await this.time('Fit model', async () => {
         try {
@@ -203,9 +234,20 @@ export class Client {
       this.setVars(this.msg.model.vars);
 
       // upload the updates to the server
+      const uploadMsg: UploadMsg = {
+        model: {
+          version: modelVersion,
+          vars: newVars
+        },
+        clientId: this.clientId,
+      };
+      if (this.sendMetrics) {
+        uploadMsg.metrics = metrics;
+      }
       await this.time('Upload weights to server', async () => {
-        await this.uploadVars({version: modelVersion, vars: newVars});
+        await this.uploadVars(uploadMsg);
       });
+      this.uploadCallbacks.forEach(cb => cb(uploadMsg));
       this.versionUpdateCounts[modelVersion] += 1;
 
       // dispose of the examples we saw
@@ -264,7 +306,7 @@ export class Client {
    * Upload the current values of the tracked variables to the server
    * @return A promise that resolves when the server has recieved the variables
    */
-  private async uploadVars(msg: ModelMsg): Promise<{}> {
+  private async uploadVars(msg: UploadMsg): Promise<{}> {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
         setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
@@ -346,4 +388,21 @@ function addRows(existing: tf.Tensor, newEls: tf.Tensor, unitShape: number[]) {
     tf.util.assertShapesMatch(newEls.shape.slice(1), unitShape);
     return tf.tidy(() => concatWithEmptyTensors(existing, newEls));
   }
+}
+
+function getCookie(name: string) {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : null;
+}
+
+function setCookie(name: string, value: string) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const d = new Date();
+  d.setTime(d.getTime() + YEAR_IN_MS);
+  document.cookie = name + "=" + value + ";path=/;expires=" + d.toUTCString();
 }

@@ -17,9 +17,10 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Tensor, test_util, Variable} from '@tensorflow/tfjs';
-import {Client, FederatedClientModel} from 'federated-learning-client';
-import {Server, FederatedServerModel, FederatedFitConfig} from 'federated-learning-server';
+import {test_util} from '@tensorflow/tfjs';
+import {MockModel} from './mock_model';
+import {Client} from 'federated-learning-client';
+import {Server} from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as rimraf from 'rimraf';
@@ -28,46 +29,14 @@ const PORT = 3001;
 const socketURL = `http://0.0.0.0:${PORT}`;
 const initWeights =
   [tf.tensor([1, 1, 1, 1], [2, 2]), tf.tensor([1, 2, 3, 4], [1, 4])];
-const updateThreshold = 2;
 const initVersion = 'initial';
-
-class MockModel implements FederatedServerModel, FederatedClientModel {
-  isFederatedClientModel = true;
-  isFederatedServerModel = true;
-  inputShape = [1];
-  outputShape = [1];
-  vars: Variable[];
-  version: string;
-  constructor(vars: Variable[]) {
-    this.vars = vars;
-  }
-  async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig) {}
-  async setup() {}
-  async save() {
-    this.version = new Date().getTime().toString();
-  }
-  setVars(vars: Tensor[]) {
-    for (let i = 0; i < this.vars.length; i++) {
-      this.vars[i].assign(vars[i]);
-    }
-  }
-  getVars(): Tensor[] {
-    return this.vars;
-  }
-  predict(x: Tensor) {
-    return x;
-  }
-  evaluate(x: Tensor, y: Tensor) {
-    return [0];
-  }
-}
 
 describe('Server-to-client API', () => {
   let dataDir: string;
   let server: Server;
   let client: Client;
-  let clientVars: Variable[];
-  let serverVars: Variable[];
+  let clientVars: tf.Variable[];
+  let serverVars: tf.Variable[];
   let httpServer: http.Server;
 
   beforeEach(async () => {
@@ -86,7 +55,9 @@ describe('Server-to-client API', () => {
 
     server = new Server(httpServer, serverModel, {
       modelDir: dataDir,
-      updatesPerVersion: updateThreshold,
+      serverHyperparams: {
+        minUpdatesPerVersion: 2,
+      },
       clientHyperparams: {
         examplesPerUpdate: 1
       }
@@ -124,7 +95,7 @@ describe('Server-to-client API', () => {
   });
 
   it('triggers a download after enough uploads', async (done) => {
-    client.onNewVersion((_, oldVersion, newVersion) => {
+    client.on('new-version', (oldVersion, newVersion) => {
       expect(oldVersion).toBe(initVersion);
       expect(newVersion).not.toBe(initVersion);
       expect(newVersion).toBe(server.model.version);

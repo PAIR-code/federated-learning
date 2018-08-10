@@ -146,7 +146,8 @@ export function createAudioElement(wavBlob) {
   resultRow.children[0].appendChild(audioControls);
 }
 
-export function castSpell(spell) {
+export function castSpell(y) {
+  const spell = labelNames[y];
   if (spell === 'nox') {
     htmlEl.classList.add('nox');
   } else if (spell === 'lumos') {

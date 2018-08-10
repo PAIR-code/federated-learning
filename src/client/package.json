@@ -19,7 +19,9 @@
   "dependencies": {
     "@tensorflow/tfjs": "~0.12",
     "@types/socket.io-client": "^1.4.32",
-    "socket.io-client": "^2.1.1"
+    "@types/uuid": "^3.4.3",
+    "socket.io-client": "^2.1.1",
+    "uuid": "^3.3.2"
   },
   "devDependencies": {
     "clang-format": "~1.2.2",
