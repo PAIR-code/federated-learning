@@ -16,28 +16,32 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-
-const audioTransferLearningModelURL =
-    'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
-
-import '@tensorflow/tfjs-node';
+import {log} from 'federated-learning-server';
 
 export const labelNames = [
   'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
   'zero', 'left', 'right', 'go', 'stop'
 ];
 
-export async function loadAudioTransferLearningModel() {
+import '@tensorflow/tfjs-node';
+
+export async function loadAudioTransferLearningModel(url) {
+  log(`about to load model from ${url}`);
+
   // NOTE: have to temporarily pretend that this is a browser
   tf.ENV.set('IS_BROWSER', true);
-  const model = await tf.loadModel(audioTransferLearningModelURL);
+  const model = await tf.loadModel(url);
   tf.ENV.set('IS_BROWSER', false);
 
   for (let i = 0; i < 9; ++i) {
     model.layers[i].trainable = false;  // freeze conv layers
   }
 
-  model.compile({'optimizer': 'sgd', loss: 'categoricalCrossentropy'});
+  model.compile({
+    'optimizer': 'sgd',
+    loss: 'categoricalCrossentropy',
+    'metrics': ['accuracy']
+  });
 
   return model;
 }

@@ -15,109 +15,100 @@
  * =============================================================================
  */
 
-import {Server, Socket} from 'socket.io';
+import './fetch_polyfill';
+
+import * as tf from '@tensorflow/tfjs';
+import * as io from 'socket.io';
 
 // tslint:disable-next-line:max-line-length
-import {DataMsg, DownloadMsg, Events, log, serializedToJson, serializeVar, UploadMsg} from './common';
-import {ModelDB} from './model_db';
+import {deserializeVars, Events, federated, FederatedModel, log, ModelMsg, SerializedVariable, serializeVars, stackSerialized} from './common';
+
+type UpdateCallback = (version: string) => void;
 
 export class ServerAPI {
-  modelDB: ModelDB;
-  io: Server;
+  model: FederatedModel;
+  server: io.Server;
+  modelDir: string;
+  modelVersion: string;
   numClients = 0;
+  updating = false;
+  updates: SerializedVariable[][] = [];
+  updateCallbacks: UpdateCallback[] = [];
+  aggregation = 'mean';
 
   constructor(
-      modelDB: ModelDB, io: Server, private hyperparams: object = null,
+      model: FederatedModel|tf.Model, modelVersion: string, modelDir: string,
+      server: io.Server, private updatesPerVersion = 10,
       private exitOnClientExit = false) {
-    this.modelDB = modelDB;
-    this.io = io;
-  }
+    this.model = federated(model);
+    this.modelDir = modelDir;
+    this.modelVersion = modelVersion;
+    this.server = server;
 
-  async setHyperparams(hyperParams: object) {
-    this.hyperparams = hyperParams;
-    this.io.emit(Events.Download, await this.downloadMsg());
-  }
+    this.server.on('connection', async (socket: io.Socket) => {
+      this.numClients++;
+      log(`connection: ${this.numClients} clients`);
 
-  async downloadMsg(): Promise<DownloadMsg> {
-    const varsJson = await this.modelDB.currentVars();
-    const varsSeri = await Promise.all(varsJson.map(serializeVar));
-    return {
-      modelVersion: this.modelDB.modelVersion,
-      vars: varsSeri,
-      hyperparams: this.hyperparams
-    };
-  }
-
-  async setup() {
-    this.io.on('connection', async (socket: Socket) => {
       socket.on('disconnect', () => {
         this.numClients--;
-        log('disconnect', 'numClients:', this.numClients);
+        log(`disconnection: ${this.numClients} clients`);
         if (this.exitOnClientExit && this.numClients <= 0) {
-          this.io.close();
+          this.server.close();
           process.exit(0);
         }
       });
 
-      this.numClients++;
-      log('connection', 'numClients:', this.numClients);
+      socket.emit(Events.Download, await this.downloadMsg());
 
-      // Send current variables to newly connected client
-      const initVars = await this.downloadMsg();
-      socket.emit(Events.Download, initVars);
-
-      // Handle data updates (don't expect all clients to use this)
-      socket.on(Events.Data, async (msg: DataMsg, ack) => {
+      socket.on(Events.Upload, async (msg: ModelMsg, ack) => {
         ack(true);
-        const input = await serializedToJson(msg.input);
-        const target = await serializedToJson(msg.target);
-        let output;
-        if (msg.output) {
-          output = await serializedToJson(msg.output);
-        }
-        await this.modelDB.putData({
-          input,
-          target,
-          output,
-          clientId: socket.client.id,
-          modelVersion: msg.modelVersion,
-          timestamp: msg.timestamp,
-          metadata: msg.metadata
-        });
-        log('putData', 'clientId:', socket.client.id);
-      });
-
-      // When a client sends us updated weights
-      socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
-        // Immediately acknowledge the request
-        ack(true);
-
-        // Save weights
-        const updatedVars = await Promise.all(msg.vars.map(serializedToJson));
-        const update = {
-          clientId: socket.client.id,
-          modelVersion: msg.modelVersion,
-          numExamples: msg.numExamples,
-          vars: updatedVars
-        };
-        await this.modelDB.putUpdate(update);
-
-        log('putUpdate', 'modelVersion:', msg.modelVersion,
-            'clientId:', socket.client.id, 'numExamples:', msg.numExamples);
-
-        // Potentially update the model (asynchronously)
-        if (msg.modelVersion === this.modelDB.modelVersion) {
-          const updated = await this.modelDB.possiblyUpdate();
-
-          if (updated) {
-            // Send new variables to all clients if we updated
-            const newVars = await this.downloadMsg();
-            this.io.sockets.emit(Events.Download, newVars);
-
-            log('newModel', newVars.modelVersion);
+        if (msg.modelVersion === this.modelVersion && !this.updating) {
+          this.updates.push(msg.vars);
+          if (this.updates.length >= this.updatesPerVersion) {
+            this.updateModel();
+            this.server.sockets.emit(Events.Download, await this.downloadMsg());
           }
         }
       });
     });
+  }
+
+  onUpdate(callback: UpdateCallback) {
+    this.updateCallbacks.push(callback);
+  }
+
+  async downloadMsg(): Promise<ModelMsg> {
+    const vars = await serializeVars(this.model.getVars());
+    return {
+      vars,
+      modelVersion: this.modelVersion,
+    };
+  }
+
+  // TODO: optionally clip updates by global norm
+  // TODO: implement median and trimmed mean aggregations
+  // TODO: optionally skip updates if validation loss increases
+  updateModel() {
+    this.updating = true;
+    log(`starting update at ${new Date().getTime().toString()}`);
+
+    const newWeights = tf.tidy(() => {
+      const stacked = stackSerialized(this.updates);
+      const updates = deserializeVars(stacked);
+      if (this.aggregation === 'mean') {
+        return updates.map(update => update.mean(0));
+      } else {
+        throw new Error(`unsupported aggregation ${this.aggregation}`);
+      }
+    });
+
+    this.model.setVars(newWeights);
+    this.modelVersion = new Date().getTime().toString();
+    this.updates = [];
+    this.updating = false;
+    log(`finished update at ${new Date().getTime().toString()}`);
+
+    this.model.save(`file://${this.modelDir}/${this.modelVersion}`);
+    this.updateCallbacks.forEach(c => c(this.modelVersion));
   }
 }

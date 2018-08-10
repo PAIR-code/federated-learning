@@ -18,13 +18,17 @@
 body {
   font-family: monospace;
 }
-button {
+button:not(:disabled) {
   cursor: pointer;
 }
 #record-button {
   font-family: monospace;
   margin-top: 5px;
   background-color: lightgreen;
+  font-size: x-large;
+}
+#results {
+  max-width: 1600px;
 }
 .chart {
   display: inline-block;
@@ -41,12 +45,21 @@ button {
   border: 1px solid #ccc;
 }
 .left-col {
+  display: inline-block;
   width: 800px;
-  float: left;
 }
 .right-col {
   display: inline-block;
+  vertical-align: top;
   width: 400px;
+}
+@media (max-width: 600px) {
+  .left-col, .right-col {
+    width: 100%;
+  }
+  .spectrum {
+    display: none;
+  }
 }
 #probs {
   margin-top: 1em;

@@ -50,7 +50,37 @@ export async function serializeVars(
   return Promise.all(varsP);
 }
 
-export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
+export function stackSerialized(vars: SerializedVariable[][]) {
+  const updateCount = vars.length;
+  const weightCount = vars[0].length;
+  const stackedVars = [];
+
+  for (let wt = 0; wt < weightCount; wt++) {
+    const singleVar = vars[0][wt];
+    const byteLength = singleVar.data.byteLength;
+    const stackedVar = new Uint8Array(byteLength * updateCount);
+    for (let up = 0; up < updateCount; up++) {
+      const update = vars[up][wt].data;
+      // assert(update.byteLength === byteLength);
+      stackedVar.set(new Uint8Array(update), up * byteLength);
+    }
+
+    stackedVars.push({
+      dtype: singleVar.dtype,
+      shape: [updateCount].concat(singleVar.shape),
+      data: stackedVar.buffer.slice(
+          stackedVar.byteOffset, stackedVar.byteOffset + stackedVar.byteLength)
+    });
+  }
+
+  return stackedVars;
+}
+
+export function deserializeVars(vars: SerializedVariable[]) {
+  return vars.map(deserializeVar);
+}
+
+export function serializedToArray(serialized: SerializedVariable) {
   const {dtype, shape, data: dataBuffer} = serialized;
   let data;
   // Because socket.io will deserialise JS ArrayBuffers into Nodejs Buffers
@@ -66,52 +96,12 @@ export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
   }
   const numel = shape.reduce((x, y) => x * y, 1);
   const ctor = dtypeToTypedArrayCtor[dtype];
-  const array = new ctor(data, 0, numel);
-  return tf.tensor(array, shape, dtype);
+  return new ctor(data, 0, numel);
 }
 
-export type TensorJson = {
-  values: number[],
-  shape: number[],
-  dtype?: tf.DataType
-};
-
-export type ModelJson = {
-  vars: TensorJson[]
-};
-
-export type UpdateJson = {
-  numExamples: number,
-  vars: TensorJson[],
-  modelVersion?: string,
-  clientId?: string
-};
-
-export async function tensorToJson(t: tf.Tensor): Promise<TensorJson> {
-  let data;
-  // tslint:disable-next-line:no-any
-  const lv = (t as any);
-  if (lv.write != null) {
-    data = await lv.read().data();
-  } else {
-    data = await t.data();
-  }
-  // Note: could make this async / use base64 encoding on the buffer data
-  return {'values': Array.from(data), 'shape': t.shape, 'dtype': t.dtype};
-}
-
-export function jsonToTensor(j: TensorJson): tf.Tensor {
-  return tf.tensor(j.values, j.shape, j.dtype || 'float32');
-}
-
-export async function serializedToJson(s: SerializedVariable):
-    Promise<TensorJson> {
-  return tensorToJson(deserializeVar(s));
-}
-
-export async function jsonToSerialized(j: TensorJson):
-    Promise<SerializedVariable> {
-  return serializeVar(jsonToTensor(j));
+export function deserializeVar(serialized: SerializedVariable): tf.Tensor {
+  const array = serializedToArray(serialized);
+  return tf.tensor(array, serialized.shape, serialized.dtype);
 }
 
 const dtypeToTypedArrayCtor = {
@@ -153,6 +143,9 @@ export interface FederatedModel {
    * @param vals An array of `tf.Tensor`s representing updated model weights
    */
   setVars(vals: Tensor[]): void;
+
+  // tslint:disable-next-line:no-any
+  save(handlerOrURL: any, config?: any): Promise<void>;
 }
 
 /**
@@ -185,6 +178,11 @@ export class FederatedTfModel implements FederatedModel {
     for (let i = 0; i < vals.length; i++) {
       this.model.trainableWeights[i].write(vals[i]);
     }
+  }
+
+  // tslint:disable-next-line:no-any
+  async save(handler: any, config?: any) {
+    this.model.save(handler, config);
   }
 }
 
@@ -221,6 +219,13 @@ export class FederatedDynamicModel implements FederatedModel {
       this.vars[i].assign(vals[i]);
     }
   }
+
+  // tslint:disable-next-line:no-any
+  async save(handler: any, config?: any) {
+    return new Promise<void>(() => {
+      throw new Error('not implemented');
+    });
+  }
 }
 
 export function federated(model: FederatedDynamicModel|FederatedModel|
@@ -235,43 +240,12 @@ export function federated(model: FederatedDynamicModel|FederatedModel|
 export enum Events {
   Download = 'downloadVars',
   Upload = 'uploadVars',
-  Data = 'uploadData'
 }
 
-export type UploadMsg = {
+export type ModelMsg = {
   modelVersion: string,
-  vars: SerializedVariable[],
-  numExamples: number
+  vars: SerializedVariable[]
 };
-
-export type DataJson = {
-  input: TensorJson,
-  target: TensorJson,
-  output?: TensorJson,
-  clientId?: string,
-  timestamp?: string,
-  modelVersion?: string,
-  // tslint:disable-next-line no-any
-  metadata?: any
-};
-
-export type DataMsg = {
-  input: SerializedVariable,
-  target: SerializedVariable,
-  output?: SerializedVariable,
-  modelVersion?: string,
-  timestamp?: string,
-  // tslint:disable-next-line no-any
-  metadata?: any
-};
-
-export type DownloadMsg = {
-  modelVersion: string,
-  vars: SerializedVariable[],
-  hyperparams: HyperParamsMsg
-};
-
-export type HyperParamsMsg = object;
 
 let LOGGING_ENABLED = (process.env != null && !!process.env.VERBOSE) || false;
 

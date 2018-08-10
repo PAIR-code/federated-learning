@@ -20,15 +20,6 @@ limitations under the License.
     <link rel="stylesheet" type="text/css" href="index.css">
   </head>
   <body>
-    <div class='right-col'>
-      <fieldset>
-        <legend>Labeled Examples</legend>
-        <table id='example-table'>
-          <thead><tr><th>audio</th><th>image</th><th>label</th><th>prediction</th></tr></thead>
-          <tbody id='labeled-examples'></tbody>
-        </table>
-      </fieldset>
-    </div>
     <div class='left-col'>
       <fieldset>
         <legend>Hi!</legend>
@@ -36,7 +27,7 @@ limitations under the License.
         <h1 id='suggested-label'></h1>
         <button id='record-button' disabled>Connecting to server&hellip;</button>
       </fieldset>
-      <fieldset>
+      <fieldset class='spectrum'>
         <legend>Audio</legend>
         <div class='chart'>
           <label>Spectrum</label>
@@ -48,6 +39,15 @@ limitations under the License.
         <div id='model'>
           Waiting for input&hellip;
         </div>
+      </fieldset>
+    </div>
+    <div class='right-col'>
+      <fieldset>
+        <legend>Labeled Examples</legend>
+        <table id='example-table'>
+          <thead><tr><th>audio</th><th>image</th><th>label</th><th>prediction</th></tr></thead>
+          <tbody id='labeled-examples'></tbody>
+        </table>
       </fieldset>
     </div>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
