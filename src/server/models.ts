@@ -26,7 +26,12 @@ const readdir = promisify(fs.readdir);
 const exists = promisify(fs.exists);
 const mkdir = promisify(fs.mkdir);
 
-// Federated server models need to implement a few additional methods
+/**
+ * FederatedServerModel describes the interface that models passed to `Server`
+ * must implement.
+ *
+ * See the FederatedModel documentation in src/common/index.ts for more details.
+ */
 export interface FederatedServerModel extends FederatedModel {
   isFederatedServerModel: boolean;
   version: string;
@@ -42,11 +47,24 @@ export interface FederatedServerModel extends FederatedModel {
   save(): Promise<void>;
 }
 
+/**
+ * Type guard for federated server models.
+ *
+ * @param model any object
+ */
 export function isFederatedServerModel(model: any):
   model is FederatedServerModel {
   return model && model.isFederatedServerModel;
 }
 
+/**
+ * Specific version of FederatedServerModel that wraps a `tf.Model`,
+ * an async function returning a `tf.Model`, or a string that can be passed to
+ * `tf.loadModel`.
+ *
+ * Stores models as subdirectories of `saveDir`. Different model versions are
+ * identified by timestamps.
+ */
 export class FederatedServerTfModel
   extends FederatedTfModel implements FederatedServerModel {
   isFederatedServerModel = true;

@@ -17,12 +17,21 @@
 
 import {FederatedModel, FederatedTfModel} from './common';
 
+/**
+ * Interface that FederatedClientModels must support. Essentially a wrapper
+ * around FederatedModel, which is defined in src/common/index.ts.
+ */
 export interface FederatedClientModel extends FederatedModel {
   isFederatedClientModel: boolean;
 
   setup(): Promise<void>;
 }
 
+/**
+ * Specific version of FederatedClientModel that wraps a `tf.Model`, async
+ * function returning a `tf.Model`, or a string that can be passed to
+ * `tf.loadModel`.
+ */
 export class FederatedClientTfModel extends FederatedTfModel
   implements FederatedClientModel {
   isFederatedClientModel = true;
@@ -32,6 +41,11 @@ export class FederatedClientTfModel extends FederatedTfModel
   }
 }
 
+/**
+ * Type guard for FederatedClientModel.
+ *
+ * @param model any object
+ */
 export function isFederatedClientModel(model: any):
   model is FederatedClientModel {
   return model && model.isFederatedClientModel;
