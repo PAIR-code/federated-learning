@@ -15,10 +15,6 @@ const INIT_MODEL = 'file:///initial/model.json';
 const httpServer = http.createServer();
 const fedServer = new federated.Server(httpServer, INIT_MODEL);
 
-fedServer.onNewVersion((model, oldVersion, newVersion) => {
-  console.log(`updated model from ${oldVersion} to ${newVersion}`);
-});
-
 fedServer.setup().then(() => {
   httpServer.listen(8080);
 });
@@ -47,13 +43,9 @@ Note that by default, different `tf.Model` versions will be saved as files in su
 ```js
 new federated.Server(httpServer, model, {
   // These are true server parameters
-  updatesPerVersion: 20,    // server merges every 20 client weight updates
-  weightAggregator: 'mean', // how to merge weights (only mean supported now)
-  verbose: false,           // whether to print debugging/timing information
-  modelDir: '/mnt/my-vfs',  // server stores tf.Model-specific versions here
-  modelCompileConfig: {     // tf.Model-specific compile config
-    loss: 'categoricalCrossEntropy',
-    metrics: ['accuracy']
+  serverHyperparams: {
+    aggregation: 'mean',      // how to merge weights (only mean supported now)
+    minUpdatesPerVersion: 20, // server merges every 20 client weight updates
   },
   // These get broadcast to clients
   clientHyperparams: {
@@ -62,16 +54,40 @@ new federated.Server(httpServer, model, {
     examplesPerUpdate: 10, // client computes weight updates every 10 examples
     batchSize: 5,          // client subdivides `examplesPerUpdate` into batches
     noiseStddev: 0.001     // client adds N(0, 0.001) noise to their updates
+  },
+  verbose: false,           // whether to print debugging/timing information
+  modelDir: '/mnt/my-vfs',  // server stores tf.Model-specific versions here
+  modelCompileConfig: {     // tf.Model-specific compile config
+    loss: 'categoricalCrossEntropy',
+    metrics: ['accuracy']
   }
 })
 ```
 
 Many of these hyperparameters matter a great deal for the efficiency and privacy of learning, but the correct settings depend greatly on the nature of the data, the size of the model being trained, and how consistently the data is distributed across clients. In the future, we hope to support automated (and dynamic) tuning of these hyperparameters.
 
-### TODO
+### Listening to Events
 
-General:
-- save and expose client-side performance metrics
+You can add an event listener that fires each time a client uploads a new set of weights (and optionally, self-reported metrics of how well the model performed on the examples used in training):
+
+```js
+fedServer.on('upload', message => {
+  console.log(message.model.version); // version of the model
+  console.log(message.model.vars); // serialized model variables
+  console.log(message.clientId); // self-reported and usually random client ID
+  console.log(message.metrics); // array of performance metrics for the update; only sent for clients configured to `sendMetrics`
+});
+```
+
+You can also listen for whenever the server computes a new version of the model:
+
+```js
+fedServer.on('new-version', (oldVersion, newVersion) => {
+  console.log(`updated model from ${oldVersion} to ${newVersion}`);
+});
+```
+
+### TODO
 
 Robustness:
 - `median` and `trimmed-mean` aggregations (for [Byzantine-robustness](https://arxiv.org/abs/1803.01498))

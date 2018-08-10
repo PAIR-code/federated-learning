@@ -32,6 +32,30 @@ const fetch = require('node-fetch');
 const npy = require('tfjs-npy');
 const writeFile = util.promisify(fs.writeFile);
 
+const initialModelUrl =
+  'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
+const validInputUrl =
+  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-inputs.npy';
+const validLabelUrl =
+  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-labels.npy';
+
+async function loadNpyUrl(url) {
+  const res = await fetch(url);
+  const arr = await res.arrayBuffer();
+  return npy.parse(arr);
+}
+
+async function loadInitialModel() {
+  const model = await tf.loadModel(initialModelUrl);
+  for (let i = 0; i < model.layers.length; ++i) {
+    model.layers[i].trainable = false;  // freeze everything
+  }
+  const transferLayer = model.layers[10].output;
+  const newDenseLayer = tf.layers.dense({units: 4, activation: 'softmax'});
+  const newOutputs = newDenseLayer.apply(transferLayer);
+  return tf.model({inputs: model.inputs, outputs: newOutputs});
+}
+
 // Setup express app using either HTTP or HTTPS, depending on environment vars
 const app = express();
 let webServer;
@@ -85,23 +109,14 @@ fs.readdirSync(modelDir).forEach(v => {
 
 // Setup endpoints to track client and validation accuracy for visualization
 app.post('/data', (req, res) => {
-  // Record metrics
-  const version = req.body.modelVersion;
-  const clientId = req.body.clientId;
-  if (!metrics[version]['clients'][clientId]) {
-    metrics[version]['clients'][clientId] = [];
-  }
-  metrics[version]['clients'][clientId].push(JSON.parse(req.body.metrics));
-
   // Save files + metadata for later analysis (dont't do this in real life)
-  const reqId = `${clientId}_${uuid()}`;
+  const reqId = uuid();
   const wavFile = req.files.wav;
   const npyFile = req.files.npy;
   const labelName = wavFile.name.split('.')[0];
   wavFile.mv(`${fileDir}/${labelName}/${reqId}.wav`, () => {});
   npyFile.mv(`${fileDir}/${labelName}/${reqId}.npy`, () => {});
   writeFile(`${fileDir}/${labelName}/${reqId}.json`, JSON.stringify(req.body));
-
   res.sendStatus(200);
 });
 
@@ -113,33 +128,11 @@ app.get('/metrics', async (req, res) => {
 // Expose the client as a set of static files
 app.use(express.static(path.resolve(__dirname + '/dist/client')));
 
-const initialModelUrl =
-  'https://storage.googleapis.com/tfjs-speech-command-model-14w/model.json';
-const validInputUrl =
-  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-inputs.npy';
-const validLabelUrl =
-  'https://storage.googleapis.com/tfjs-federated-hogwarts/val-labels.npy';
-
-async function loadNpyUrl(url) {
-  const res = await fetch(url);
-  const arr = await res.arrayBuffer();
-  return npy.parse(arr);
-}
-
-async function loadInitialModel() {
-  const model = await tf.loadModel(initialModelUrl);
-  for (let i = 0; i < model.layers.length; ++i) {
-    model.layers[i].trainable = false;  // freeze everything
-  }
-  const transferLayer = model.layers[10].output;
-  const newDenseLayer = tf.layers.dense({units: 4, activation: 'softmax'});
-  const newOutputs = newDenseLayer.apply(transferLayer);
-  return tf.model({inputs: model.inputs, outputs: newOutputs});
-}
-
 const fedServer = new federated.Server(webServer, loadInitialModel, {
   modelDir,
-  updatesPerVersion: 5,
+  serverHyperparams: {
+    minUpdatesPerVersion: 5
+  },
   clientHyperparams: {
     examplesPerUpdate: 4,
     epochs: 10,
@@ -159,7 +152,7 @@ async function setup() {
   const validLabels = tf.oneHot(validLabelsFlat, 4);
   tf.dispose(validLabelsFlat);
 
-  fedServer.onNewVersion((model, oldVersion, newVersion) => {
+  fedServer.on('new-version', (oldVersion, newVersion) => {
     // Save old metrics to disk, now that we're done with them
     if (metrics[oldVersion]) {
       writeFile(metricsPath(oldVersion), JSON.stringify(metrics[oldVersion]));
@@ -169,9 +162,18 @@ async function setup() {
       metrics[newVersion] = {validation: null, clients: {}}
     }
     // Compute validation accuracy
-    const newValMetrics = model.evaluate(validInputs, validLabels);
+    const newValMetrics = fedServer.model.evaluate(validInputs, validLabels);
     metrics[newVersion].validation = newValMetrics;
     console.log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
+  });
+
+  fedServer.on('upload', msg => {
+    const version = msg.model.version;
+    const clientId = msg.clientId;
+    if (!metrics[version]['clients'][clientId]) {
+      metrics[version]['clients'][clientId] = [];
+    }
+    metrics[version]['clients'][clientId].push(msg.metrics);
   });
 
   await fedServer.setup();

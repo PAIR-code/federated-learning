@@ -17,7 +17,6 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as npy from 'tfjs-npy';
-import uuid from 'uuid/v4';
 import MediaStreamRecorder from 'msr';
 import {loadAudioTransferLearningModel, labelNames} from './model';
 import {FrequencyListener} from './frequency_listener';
@@ -33,26 +32,21 @@ if (URLSearchParams) {
 }
 
 const client = new federated.Client(serverURL, loadAudioTransferLearningModel, {
-  verbose: true
+  verbose: true,
+  sendMetrics: true
 });
 
-client.onNewVersion(() => {
+client.on('new-version', () => {
   ui.setVersion(client.numVersions());
 });
 
 client.setup().then(async () => {
-  let yTrue, yPred, probs, xNpy, metrics;
+  let yTrue, yPred, xNpy;
 
   // Get microphone access
   ui.setStatus('Waiting for microphone&hellip;');
   const stream =
       await navigator.mediaDevices.getUserMedia({audio: true, video: false});
-
-  // Assign client a persistent ID
-  if (!getCookie('federated-learner-uuid')) {
-    setCookie('federated-learner-uuid', uuid());
-  }
-  const clientId = getCookie('federated-learner-uuid');
 
   // On each audio frame, update our rotating buffer with the latest FFT data
   // from our analyser. For fun, also update the spectrum plot
@@ -82,13 +76,11 @@ client.setup().then(async () => {
     const formData = new FormData();
     formData.append('wav', wavFile);
     formData.append('npy', npyFile);
-    formData.append('clientId', clientId);
+    formData.append('clientId', client.clientId);
     formData.append('modelVersion', client.modelVersion());
     formData.append('timestamp', new Date().getTime().toString());
-    formData.append('predictedLabel', yPred);
+    formData.append('predLabel', yPred);
     formData.append('trueLabel', yTrue);
-    formData.append('modelOutput', probs);
-    formData.append('metrics', JSON.stringify(metrics));
     req.open('POST', serverURL + '/data');
     req.send(formData);
   };
@@ -106,22 +98,17 @@ client.setup().then(async () => {
     // Setup results html
     ui.setupResults();
 
-    // Compute input tensor
+    // Compute input and label tensors
     const freqData = listener.getFrequencyData();
     const x = getInputTensorFromFrequencyData(freqData, numFrames, fftLength);
+    const y = tf.tensor2d([onehot(yTrue)]);
     xNpy = await npy.serialize(x);
 
-    // Compute label tensor
-    const onehotY = new Array(labelNames.length).fill(0);
-    onehotY[yTrue] = 1;
-    const y = tf.tensor2d([onehotY]);
-
     // Compute predictions
-    const p = client.predict(x);
-    tf.tidy(() => {
+    const probs = tf.tidy(() => {
+      const p = client.predict(x);
       yPred = tf.argMax(p, 1).dataSync()[0];
-      probs = p.dataSync();
-      metrics = client.evaluate(x, y);
+      return p.dataSync();
     });
 
     // Stop separate .wav recording
@@ -131,12 +118,12 @@ client.setup().then(async () => {
     ui.plotSpectrograms(freqData, fftLength);
     ui.plotProbabilities(probs);
     ui.describeResults(yTrue, yPred);
-    ui.castSpell(labelNames[yPred]);
+    ui.castSpell(yPred);
 
     // Train and prepare our next loop!
     ui.setStatus('Fitting Model&hellip;');
     client.federatedUpdate(x, y).catch(console.log).finally(() => {
-      tf.dispose([x, y, p]);
+      tf.dispose([x, y]);
       ui.setReadyStatus(client);
     });
   }
@@ -162,13 +149,8 @@ function getInputTensorFromFrequencyData(freqData, numFrames, fftLength) {
   });
 }
 
-function getCookie(name) {
-  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
-  return v ? v[2] : null;
-}
-
-function setCookie(name, value) {
-  var d = new Date;
-  d.setTime(d.getTime() + 24*60*60*1000*365);
-  document.cookie = name + "=" + value + ";path=/;expires=" + d.toGMTString();
+function onehot(y) {
+  const arr = new Array(labelNames.length).fill(0);
+  arr[y] = 1;
+  return arr;
 }

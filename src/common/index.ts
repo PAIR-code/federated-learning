@@ -115,8 +115,9 @@ export type TfModelCallback = () => Promise<tf.Model>;
 
 export type AsyncTfModel = string|tf.Model|TfModelCallback;
 
-export type VersionCallback =
-    (model: FederatedModel, oldVersion: string, newVersion: string) => void;
+export type VersionCallback = (oldVersion: string, newVersion: string) => void;
+
+export type UploadCallback = (msg: UploadMsg) => void;
 
 export enum Events {
   Download = 'downloadVars',
@@ -126,6 +127,12 @@ export enum Events {
 export type ModelMsg = {
   version: string,
   vars: SerializedVariable[]
+};
+
+export type UploadMsg = {
+  model: ModelMsg,
+  clientId: string,
+  metrics?: number[]
 };
 
 export type DownloadMsg = {
@@ -152,7 +159,15 @@ export type ClientHyperparams = {
   weightNoiseStddev?: number   // how much noise to add to weights
 };
 
-export const DEFAULT_HYPERPARAMS: ClientHyperparams = {
+export type ServerHyperparams = {
+  aggregation?: string,
+  minUpdatesPerVersion?: number,
+  //minClientsPerVersion?: number,
+  //maxUpdatesPerClient?: number,
+  //maxUpdateL2Norm?: number
+}
+
+export const DEFAULT_CLIENT_HYPERPARAMS: ClientHyperparams = {
   examplesPerUpdate: 5,
   learningRate: 0.001,
   batchSize: 32,
@@ -160,15 +175,41 @@ export const DEFAULT_HYPERPARAMS: ClientHyperparams = {
   weightNoiseStddev: 0
 };
 
+export const DEFAULT_SERVER_HYPERPARAMS: ServerHyperparams = {
+  aggregation: 'mean',
+  minUpdatesPerVersion: 20,
+  //minClientsPerVersion: 1,
+  //maxUpdatesPerClient: 20,
+  //maxUpdateL2Norm: 0
+};
+
+function override(defaults: any, choices: any) {
+  const result: any = {};
+  for (let key in defaults) {
+    result[key] = (choices || {})[key] || defaults[key];
+  }
+  for (let key in (choices || {})) {
+    if (!(key in defaults)) {
+      throw new Error(`Unrecognized key "${key}"`);
+    }
+  }
+  return result;
+}
+
 export function clientHyperparams(hps?: ClientHyperparams): ClientHyperparams {
-  const defaults = {
-    examplesPerUpdate: 5,
-    learningRate: 0.001,
-    batchSize: 32,
-    epochs: 5,
-    weightNoiseStddev: 0
-  };
-  return Object.assign(defaults, hps || {});
+  try {
+    return override(DEFAULT_CLIENT_HYPERPARAMS, hps);
+  } catch (err) {
+    throw new Error(`Error setting clientHyperparams: ${err.message}`);
+  }
+}
+
+export function serverHyperparams(hps?: ServerHyperparams): ServerHyperparams {
+  try {
+    return override(DEFAULT_SERVER_HYPERPARAMS, hps);
+  } catch (err) {
+    throw new Error(`Error setting serverHyperparams: ${err.message}`);
+  }
 }
 
 export async function fetchModel(asyncModel: AsyncTfModel): Promise<tf.Model> {
@@ -246,7 +287,7 @@ export class FederatedTfModel implements FederatedModel {
 
   constructor(initialModel?: AsyncTfModel, config?: FederatedCompileConfig) {
     this._initialModel = initialModel;
-    this.optimizer = tf.train.sgd(DEFAULT_HYPERPARAMS.learningRate);
+    this.optimizer = tf.train.sgd(DEFAULT_CLIENT_HYPERPARAMS.learningRate);
     this.compileConfig = {
       loss: config.loss || 'categoricalCrossentropy',
       metrics: config.metrics || ['accuracy'],
@@ -268,8 +309,8 @@ export class FederatedTfModel implements FederatedModel {
       this.optimizer.setLearningRate(config.learningRate);
     }
     await this.model.fit(x, y, {
-      epochs: config.epochs || DEFAULT_HYPERPARAMS.epochs,
-      batchSize: config.batchSize || DEFAULT_HYPERPARAMS.batchSize
+      epochs: config.epochs || DEFAULT_CLIENT_HYPERPARAMS.epochs,
+      batchSize: config.batchSize || DEFAULT_CLIENT_HYPERPARAMS.batchSize
     });
   }
 
