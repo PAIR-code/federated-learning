@@ -22,7 +22,7 @@ import * as path from 'path';
 import * as io from 'socket.io';
 
 // tslint:disable-next-line:max-line-length
-import {FederatedCompileConfig, deserializeVars, DownloadMsg, Events, SerializedVariable, serializeVars, stackSerialized, clientHyperparams, ClientHyperparams, VersionCallback, UploadMsg, AsyncTfModel, UploadCallback, serverHyperparams, ServerHyperparams} from './common';
+import {AsyncTfModel, clientHyperparams, ClientHyperparams, deserializeVars, DownloadMsg, Events, FederatedCompileConfig, SerializedVariable, serializeVars, serverHyperparams, ServerHyperparams, stackSerialized, UploadCallback, UploadMsg, VersionCallback} from './common';
 // tslint:disable-next-line:max-line-length
 import {FederatedServerModel, FederatedServerTfModel, isFederatedServerModel} from './models';
 
@@ -89,7 +89,7 @@ export class Server {
     this.serverHyperparams = serverHyperparams(config.serverHyperparams || {});
     this.downloadMsg = null;
     this.uploadCallbacks = [];
-    this.versionCallbacks = [(model, v1, v2) => {
+    this.versionCallbacks = [(v1, v2) => {
       this.log(`updated model: ${v1} -> ${v2}`);
     }];
   }
@@ -143,9 +143,7 @@ export class Server {
 
   private shouldUpdate(): boolean {
     const numUpdates = this.numUpdates;
-    return (
-      numUpdates >= this.serverHyperparams.minUpdatesPerVersion
-    );
+    return (numUpdates >= this.serverHyperparams.minUpdatesPerVersion);
   }
 
   /**
@@ -155,7 +153,7 @@ export class Server {
    * @param event must be "new-version" or "upload"
    * @param callback function to be called on each event
    */
-  on(event: string, callback: VersionCallback | UploadCallback) {
+  on(event: string, callback: VersionCallback|UploadCallback) {
     if (event === 'new-version') {
       this.versionCallbacks.push(callback as VersionCallback);
     } else if (event === 'upload') {
