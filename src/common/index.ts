@@ -161,10 +161,7 @@ export type ClientHyperparams = {
 
 export type ServerHyperparams = {
   aggregation?: string,
-  minUpdatesPerVersion?: number,
-  // minClientsPerVersion?: number,
-  // maxUpdatesPerClient?: number,
-  // maxUpdateL2Norm?: number
+  minUpdatesPerVersion?: number
 };
 
 export const DEFAULT_CLIENT_HYPERPARAMS: ClientHyperparams = {
@@ -177,10 +174,7 @@ export const DEFAULT_CLIENT_HYPERPARAMS: ClientHyperparams = {
 
 export const DEFAULT_SERVER_HYPERPARAMS: ServerHyperparams = {
   aggregation: 'mean',
-  minUpdatesPerVersion: 20,
-  // minClientsPerVersion: 1,
-  // maxUpdatesPerClient: 20,
-  // maxUpdateL2Norm: 0
+  minUpdatesPerVersion: 20
 };
 
 // tslint:disable-next-line:no-any
