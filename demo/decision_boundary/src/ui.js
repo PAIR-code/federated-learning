@@ -1,9 +1,10 @@
 import p5 from 'p5';
+import * as tf from '@tensorflow/tfjs';
 
 const container = document.querySelector('#canvasContainer');
 
 const RESOLUTION = 25;
-const CANVAS_SIZE = 400;
+export const CANVAS_SIZE = 400;
 const CIRCLE_DIAM = 2 * (CANVAS_SIZE / 3);
 
 const DOT_SIZE = CANVAS_SIZE / 20;
@@ -13,11 +14,26 @@ const CELL_SIZE = CANVAS_SIZE / RESOLUTION;
 const clickLocations = [];
 export const onClick = []
 
-let decisionBoundary = new Float32Array(RESOLUTION * RESOLUTION).fill(0.0);
+let decisionBoundary = new Float32Array(RESOLUTION * RESOLUTION);
+decisionBoundary.fill(0.0);
 
 const LABEL_COLOURS = {
   0: [255, 0, 0],
   1: [0, 0, 255]
+}
+
+const xArray = [];
+for(let i = 0; i < RESOLUTION; i++) {
+  for(let j = 0; j < RESOLUTION; j++) {
+    xArray.push([j*CELL_SIZE/CANVAS_SIZE, i*CELL_SIZE/CANVAS_SIZE]);
+  }
+}
+const xTensor = tf.tensor2d(xArray);
+
+export function syncClient(client) {
+  decisionBoundary.set(tf.tidy(() => {
+    client.predict(xTensor).argMax(1).cast('float32').sub(0.5).dataSync()
+  }));
 }
 
 function p5Sketch(p) {
@@ -58,7 +74,6 @@ function p5Sketch(p) {
   p.mousePressed = function() {
     const dist = p.dist(p.mouseX, p.mouseY, p.width / 2, p.height / 2);
     let dataPoint;
-    console.log(dist, CIRCLE_DIAM);
     if(2 * dist < CIRCLE_DIAM) {
       dataPoint = {x: p.mouseX, y: p.mouseY, label: 0};
     } else {
@@ -70,5 +85,5 @@ function p5Sketch(p) {
 }
 
 export function setupUI() {
-  return new p5(p5Sketch)
+  return new p5(p5Sketch);
 }

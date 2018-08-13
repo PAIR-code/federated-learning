@@ -68,7 +68,6 @@ async function setupModel() {
   // TODO: better to not run softmax and use softmaxCrossEntropy?
   const loss = (y, label) => tf.losses.logLoss(y, label)
 
-  const optimizer = tf.train.sgd(LEARNING_RATE) //@ts-disable;
   const inputShape = [MODEL_INPUT_WIDTH, MODEL_INPUT_WIDTH, 3];
   const outputShape = [NUM_LABELS];
 
@@ -76,7 +75,6 @@ async function setupModel() {
     vars,
     predict: x => model.predict(x),
     loss,
-    optimizer,
     inputShape,
     outputShape
   });

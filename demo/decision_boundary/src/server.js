@@ -6,21 +6,20 @@ const http = require('http');
 const httpServer = http.createServer();
 
 function setupModel() {
-  const model = tf.sequential({
-    layers: [
-      tf.layers.dense({inputShape: [2], units: 4, activation: 'relu'}),
-      tf.layers.dense({units: 2, activation: 'relu'}),
-    ]
-  });
+  const model = tf.sequential();
+  model.add(tf.layers.dense({units: 10, inputShape: [2], activation: 'sigmoid'}));
+  model.add(tf.layers.dense({units: 10, activation: 'sigmoid'}));
+  model.add(tf.layers.dense({units: 2, activation: 'softmax'}));
   return model;
 }
 
 async function main() {
   const model = setupModel();
   const server = new federated.Server(httpServer, model, {
-    clientHyperparams: {learningRate: 3e-4},
+    clientHyperparams: {learningRate: 1e-3, examplesPerUpdate: 2},
     serverHyperparams: {minUpdatesPerVersion: 2},
-    modelDir: './models'
+    modelDir: './models',
+    verbose: true
   });
 
   await server.setup();
