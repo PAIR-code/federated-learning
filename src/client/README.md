@@ -48,7 +48,7 @@ new federated.Client(SERVER_URL, federatedClientModel); // if you need custom be
 
 You can pass a `FederatedClientModel` if you need custom behavior not supported by `tf.Model`s. See its [documentation](./models.ts) for the methods you will need to implement.
 
-Currently, we do not support loading the model automatically from the server (e.g. just doing `federated.Client(SERVER_URL)`). If the model you want to load client-side is only hosted on your federated learning server, but is a `tf.Model`, you can implement this fairly simply by statically serving the model files. Here is an example of how to do this with `express`:
+Currently, we do not support loading the model automatically from the server (e.g. just doing `federated.Client(SERVER_URL)`). If the model you want to load client-side is only hosted on your federated learning server, but is a `tf.Model`, you can implement this fairly simply by statically serving the model files, which are conveniently symlinked. Here is an example of how to do this with `express`:
 
 ```js
 // server
@@ -57,14 +57,14 @@ const dir = '/models';
 app.use(express.static(dir));
 const webServer = http.createServer(app);
 const fedServer = new federated.Server(webServer, initModel, {
-   modelDir: dir // newest model will be symlinked to ${dir}/latest
+   modelDir: dir // current model will be symlinked to ${dir}/current
 });
 await fedServer.setup();
 webServer.listen(80);
 
 // client
 const url = 'http://my.server';
-const fedClient = new federated.Client(url, `${url}/latest/model.json`);
+const fedClient = new federated.Client(url, `${url}/current/model.json`);
 await fedClient.setup();
 ```
 

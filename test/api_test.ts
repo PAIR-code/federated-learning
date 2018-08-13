@@ -94,7 +94,7 @@ describe('Server-to-client API', () => {
   });
 
   it('triggers a download after enough uploads', async (done) => {
-    client.on('new-version', (oldVersion, newVersion) => {
+    client.onNewVersion((oldVersion, newVersion) => {
       expect(oldVersion).toBe(initVersion);
       expect(newVersion).not.toBe(initVersion);
       expect(newVersion).toBe(server.model.version);
