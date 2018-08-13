@@ -133,12 +133,12 @@ client.numExamplesRemaining() // how many more examples needed before updating
 
 You can also listen for changes in the model version (or successful uploads) by doing:
 ```js
-client.on('new-version', (oldVersion, newVersion) => {
+client.onNewVersion((oldVersion, newVersion) => {
   console.log(`you've seen ${client.numVersions()} versions now!`);
   $('#model-version').text(`Model Version #${newVersion}`);
 });
 
-client.on('upload', uploadMessage => {
+client.onUpload(uploadMessage => {
   console.log(`uploaded another version to the server!`);
 });
 ```

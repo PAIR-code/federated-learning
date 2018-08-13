@@ -152,7 +152,7 @@ async function setup() {
   const validLabels = tf.oneHot(validLabelsFlat, 4);
   tf.dispose(validLabelsFlat);
 
-  fedServer.on('new-version', (oldVersion, newVersion) => {
+  fedServer.onNewVersion((oldVersion, newVersion) => {
     // Save old metrics to disk, now that we're done with them
     if (metrics[oldVersion]) {
       writeFile(metricsPath(oldVersion), JSON.stringify(metrics[oldVersion]));
@@ -167,7 +167,7 @@ async function setup() {
     console.log(`Version ${newVersion} validation metrics: ${newValMetrics}`);
   });
 
-  fedServer.on('upload', msg => {
+  fedServer.onUpload(msg => {
     const version = msg.model.version;
     const clientId = msg.clientId;
     if (!metrics[version]['clients'][clientId]) {

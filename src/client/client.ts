@@ -111,19 +111,23 @@ export class Client {
   }
 
   /**
-   * Register a new callback to be invoked whenever the specified event occurs
+   * Register a new callback to be invoked whenever the server updates the model
+   * version.
    *
-   * @param event must be "new-version"
-   * @param callback function to be called on each event
+   * @param callback function to be called (w/ old and new version IDs)
    */
-  on(event: string, callback: VersionCallback|UploadCallback) {
-    if (event === 'new-version') {
-      this.versionCallbacks.push(callback as VersionCallback);
-    } else if (event === 'upload') {
-      this.uploadCallbacks.push(callback as UploadCallback);
-    } else {
-      throw new Error(`unrecognized event ${event}`);
-    }
+  onNewVersion(callback: VersionCallback) {
+    this.versionCallbacks.push(callback);
+  }
+
+  /**
+   * Register a new callback to be invoked whenever the client uploads a new set
+   * of weights.
+   *
+   * @param callback function to be called (w/ client's upload msg)
+   */
+  onUpload(callback: UploadCallback) {
+    this.uploadCallbacks.push(callback);
   }
 
   /**

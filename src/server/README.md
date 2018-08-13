@@ -71,7 +71,7 @@ Many of these hyperparameters matter a great deal for the efficiency and privacy
 You can add an event listener that fires each time a client uploads a new set of weights (and optionally, self-reported metrics of how well the model performed on the examples used in training):
 
 ```js
-fedServer.on('upload', message => {
+fedServer.onUpload(message => {
   console.log(message.model.version); // version of the model
   console.log(message.model.vars); // serialized model variables
   console.log(message.clientId); // self-reported and usually random client ID
@@ -82,7 +82,7 @@ fedServer.on('upload', message => {
 You can also listen for whenever the server computes a new version of the model:
 
 ```js
-fedServer.on('new-version', (oldVersion, newVersion) => {
+fedServer.onNewVersion((oldVersion, newVersion) => {
   console.log(`updated model from ${oldVersion} to ${newVersion}`);
 });
 ```

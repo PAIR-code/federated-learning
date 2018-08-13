@@ -139,8 +139,8 @@ async function main() {
 
   ui.modelVersion(`model version: ${client.modelVersion()}`);
 
-  client.onNewVersion((model, oldVersion, newVersion) => {
-    console.log(model, oldVersion, newVersion, client.modelVersion());
+  client.onNewVersion((oldVersion, newVersion) => {
+    console.log(oldVersion, newVersion, client.modelVersion());
     ui.modelVersion(`model version: ${newVersion}`);
   });
 

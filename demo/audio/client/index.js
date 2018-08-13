@@ -36,7 +36,7 @@ const client = new federated.Client(serverURL, loadAudioTransferLearningModel, {
   sendMetrics: true
 });
 
-client.on('new-version', () => {
+client.onNewVersion(() => {
   ui.setVersion(client.numVersions());
 });
 
@@ -101,7 +101,7 @@ client.setup().then(async () => {
     // Compute input and label tensors
     const freqData = listener.getFrequencyData();
     const x = getInputTensorFromFrequencyData(freqData, numFrames, fftLength);
-    const y = tf.tensor2d([onehot(yTrue)]);
+    const y = tf.oneHot([yTrue], labelNames.length);
     xNpy = await npy.serialize(x);
 
     // Compute predictions
@@ -147,10 +147,4 @@ function getInputTensorFromFrequencyData(freqData, numFrames, fftLength) {
     return normalize(tensorBuffer.toTensor().reshape(
         [1, numFrames, fftLength, 1]));
   });
-}
-
-function onehot(y) {
-  const arr = new Array(labelNames.length).fill(0);
-  arr[y] = 1;
-  return arr;
 }
