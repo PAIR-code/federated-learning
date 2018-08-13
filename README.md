@@ -26,7 +26,7 @@ const fedServer = new federated.Server(webServer, INIT_MODEL);
 
 fedServer.setup().then(() => {
   webServer.listen(80);
-})
+});
 ```
 
 On the client (browser) side:

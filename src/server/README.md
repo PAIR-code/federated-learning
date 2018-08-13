@@ -21,21 +21,21 @@ fedServer.onNewVersion((model, oldVersion, newVersion) => {
 
 fedServer.setup().then(() => {
   httpServer.listen(8080);
-})
+});
 ```
 
 ### Setting the Initial Model
 
 ```js
-federated.Server(httpServer, tfModel); // Initialize a federated server from an in-memory tf.Model
-federated.Server(httpServer, 'https://remote.server/tf-model.json'); // or from a URL pointing to one
-federated.Server(httpServer, 'file:///my/local/file/tf-model.json'); // (which can be a file URL in Node)
-federated.Server(httpServer, async () => { // or from an asynchrous function returning one
+new federated.Server(httpServer, tfModel); // Initialize a federated server from an in-memory tf.Model
+new federated.Server(httpServer, 'https://remote.server/tf-model.json'); // or from a URL pointing to one
+new federated.Server(httpServer, 'file:///my/local/file/tf-model.json'); // (which can be a file URL in Node)
+new federated.Server(httpServer, async () => { // or from an asynchrous function returning one
   const model = await tf.loadModel('file:///transfer/learning/model.json');
   model.layers[0].trainable = false;
   return model;
 });
-federated.Server(httpServer, federatedServerModel); // if you need fully custom behavior; see below
+new federated.Server(httpServer, federatedServerModel); // if you need fully custom behavior; see below
 ```
 
 The simplest way to set up a `federated.Server` is to pass a [`tf.Model`](https://js.tensorflow.org/api/latest/#class:Model). However, you can also pass a string that will be delegated to [`tf.loadModel`](https://js.tensorflow.org/api/latest/#loadModel) (both `https?://` and `file://` URLs should work), or an asynchronous function that will return a `tf.Model`. The final option is to define your own `FederatedServerModel`, which has to implement various saving and loading methods. See its [documentation](./models.ts) for more details.

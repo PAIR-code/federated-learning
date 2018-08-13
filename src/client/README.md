@@ -41,13 +41,13 @@ client must first obtain a copy of the full model.
 This can be done in one of the following ways:
 
 ```js
-federated.Client(SERVER_URL, tfModel) // tf.Model instance
-federated.Client(SERVER_URL, 'https://initial.com/model.json') // url pointing to one
-federated.Client(SERVER_URL, async () => { // async function returning one
+new federated.Client(SERVER_URL, tfModel); // tf.Model instance
+new federated.Client(SERVER_URL, 'https://initial.com/model.json'); // url pointing to one
+new federated.Client(SERVER_URL, async () => { // async function returning one
   const model = await tf.loadModel('https://initial.com/model.json')
   return someCustomTransformationOfThe(model);
-})
-federated.Client(SERVER_URL, federatedClientModel) // if you need custom behavior
+});
+new federated.Client(SERVER_URL, federatedClientModel); // if you need custom behavior
 ```
 
 You can pass a `FederatedClientModel` if you need custom behavior not supported by `tf.Model`s. See its [documentation](./models.ts) for the methods you will need to implement.
@@ -98,7 +98,7 @@ federated.Client(SERVER_URL, 'https://initial.com/model.json', {
   modelCompileConfig: {
     loss: 'meanSquaredError'
   }
-})
+});
 ```
 
 This dictionary will be passed to [`tf.Model.compile`](https://js.tensorflow.org/api/latest/#tf.Model.compile), so you can also pass custom `metrics`.
