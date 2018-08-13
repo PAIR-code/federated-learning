@@ -17,7 +17,8 @@
 
 import {Tensor, Variable} from '@tensorflow/tfjs';
 import {FederatedClientModel} from 'federated-learning-client';
-import {FederatedServerModel, FederatedFitConfig} from 'federated-learning-server';
+// tslint:disable-next-line:max-line-length
+import {FederatedFitConfig, FederatedServerModel} from 'federated-learning-server';
 
 export class MockModel implements FederatedServerModel, FederatedClientModel {
   isFederatedClientModel = true;

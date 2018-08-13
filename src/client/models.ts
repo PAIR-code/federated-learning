@@ -32,8 +32,8 @@ export interface FederatedClientModel extends FederatedModel {
  * function returning a `tf.Model`, or a string that can be passed to
  * `tf.loadModel`.
  */
-export class FederatedClientTfModel extends FederatedTfModel
-  implements FederatedClientModel {
+export class FederatedClientTfModel extends FederatedTfModel implements
+    FederatedClientModel {
   isFederatedClientModel = true;
 
   async setup() {
@@ -46,7 +46,8 @@ export class FederatedClientTfModel extends FederatedTfModel
  *
  * @param model any object
  */
+// tslint:disable-next-line:no-any
 export function isFederatedClientModel(model: any):
-  model is FederatedClientModel {
+    model is FederatedClientModel {
   return model && model.isFederatedClientModel;
 }

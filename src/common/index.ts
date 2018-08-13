@@ -162,10 +162,10 @@ export type ClientHyperparams = {
 export type ServerHyperparams = {
   aggregation?: string,
   minUpdatesPerVersion?: number,
-  //minClientsPerVersion?: number,
-  //maxUpdatesPerClient?: number,
-  //maxUpdateL2Norm?: number
-}
+  // minClientsPerVersion?: number,
+  // maxUpdatesPerClient?: number,
+  // maxUpdateL2Norm?: number
+};
 
 export const DEFAULT_CLIENT_HYPERPARAMS: ClientHyperparams = {
   examplesPerUpdate: 5,
@@ -178,17 +178,19 @@ export const DEFAULT_CLIENT_HYPERPARAMS: ClientHyperparams = {
 export const DEFAULT_SERVER_HYPERPARAMS: ServerHyperparams = {
   aggregation: 'mean',
   minUpdatesPerVersion: 20,
-  //minClientsPerVersion: 1,
-  //maxUpdatesPerClient: 20,
-  //maxUpdateL2Norm: 0
+  // minClientsPerVersion: 1,
+  // maxUpdatesPerClient: 20,
+  // maxUpdateL2Norm: 0
 };
 
+// tslint:disable-next-line:no-any
 function override(defaults: any, choices: any) {
+  // tslint:disable-next-line:no-any
   const result: any = {};
-  for (let key in defaults) {
+  for (const key in defaults) {
     result[key] = (choices || {})[key] || defaults[key];
   }
-  for (let key in (choices || {})) {
+  for (const key in (choices || {})) {
     if (!(key in defaults)) {
       throw new Error(`Unrecognized key "${key}"`);
     }
