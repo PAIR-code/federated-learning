@@ -29,8 +29,31 @@ const exists = promisify(fs.exists);
 const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
+const symlink = promisify(fs.symlink);
+const unlink = promisify(fs.unlink);
+const readlink = promisify(fs.readlink);
 
-// Federated server models need to implement a few additional methods
+async function forceSymlink(src: string, dest: string) {
+  try {
+    await symlink(src, dest, 'dir');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw err;
+    }
+    const existingLink = await readlink(dest);
+    if (src !== existingLink) {
+      await unlink(dest);
+      await symlink(src, dest, 'dir');
+    }
+  }
+}
+
+/**
+ * FederatedServerModel describes the interface that models passed to `Server`
+ * must implement.
+ *
+ * See the FederatedModel documentation in src/common/index.ts for more details.
+ */
 export interface FederatedServerModel extends FederatedModel {
   isFederatedServerModel: boolean;
   version: string;
@@ -46,12 +69,25 @@ export interface FederatedServerModel extends FederatedModel {
   save(): Promise<void>;
 }
 
+/**
+ * Type guard for federated server models.
+ *
+ * @param model any object
+ */
 // tslint:disable-next-line:no-any
 export function isFederatedServerModel(model: any):
     model is FederatedServerModel {
   return model && model.isFederatedServerModel;
 }
 
+/**
+ * Specific version of FederatedServerModel that wraps a `tf.Model`,
+ * an async function returning a `tf.Model`, or a string that can be passed to
+ * `tf.loadModel`.
+ *
+ * Stores models as subdirectories of `saveDir`. Different model versions are
+ * identified by timestamps.
+ */
 export class FederatedServerTfModel extends FederatedTfModel implements
     FederatedServerModel {
   isFederatedServerModel = true;
@@ -82,6 +118,10 @@ export class FederatedServerTfModel extends FederatedTfModel implements
 
   async list() {
     const models = await readdir(this.saveDir);
+    const idx = models.indexOf('current');
+    if (idx >= 0) {
+      models.splice(idx);
+    }
     models.sort();
     return models;
   }
@@ -99,7 +139,8 @@ export class FederatedServerTfModel extends FederatedTfModel implements
     const version = new Date().getTime().toString();
     this.version = version;
     const url = `file://${this.saveDir}/${version}`;
-    this.model.save(url);
+    await this.model.save(url);
+    await forceSymlink(`${this.saveDir}/${version}`, `${this.saveDir}/current`);
   }
 
   async load(version: string) {
@@ -107,6 +148,7 @@ export class FederatedServerTfModel extends FederatedTfModel implements
     this.version = version;
     this.model = await tf.loadModel(url);
     this.model.compile(this.compileConfig);
+    await forceSymlink(`${this.saveDir}/${version}`, `${this.saveDir}/current`);
   }
 }
 

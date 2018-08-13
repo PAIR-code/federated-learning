@@ -69,8 +69,8 @@ export class Client {
    * @param model - model to use with federated learning
    */
   constructor(
-      serverUrl: string, model: FederatedClientModel|AsyncTfModel,
-      config?: FederatedClientConfig) {
+    serverUrl: string, model: FederatedClientModel | AsyncTfModel,
+    config?: FederatedClientConfig) {
     this.serverUrl = serverUrl;
     if (isFederatedClientModel(model)) {
       this.model = model;
@@ -127,7 +127,7 @@ export class Client {
       this.setVars(msg.model.vars);
       this.versionUpdateCounts[newVersion] = 0;
       this.versionCallbacks.forEach(
-          cb => cb(this.model, oldVersion, newVersion));
+        cb => cb(this.model, oldVersion, newVersion));
     });
   }
 
@@ -161,9 +161,6 @@ export class Client {
 
     // repeatedly, for as many iterations as we have batches of examples:
     const examplesPerUpdate = this.msg.hyperparams.examplesPerUpdate;
-    this.log(
-        'examplesPerUpdate', examplesPerUpdate,
-        'current training set:', this.x.shape);
     while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
@@ -252,15 +249,15 @@ export class Client {
   }
 
   public numExamples(): number {
-    if (this.x) {
-      return this.x.shape[0];
-    } else {
-      return 0;
-    }
+    return this.x.shape[0];
   }
 
   public numExamplesPerUpdate(): number {
     return this.msg.hyperparams.examplesPerUpdate;
+  }
+
+  public numExamplesRemaining(): number {
+    return this.numExamplesPerUpdate() - this.numExamples();
   }
 
   /**
@@ -270,7 +267,7 @@ export class Client {
   private async uploadVars(msg: ModelMsg): Promise<{}> {
     const prom = new Promise((resolve, reject) => {
       const rejectTimer =
-          setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
+        setTimeout(() => reject(`uploadVars timed out`), UPLOAD_TIMEOUT);
       this.socket.emit(Events.Upload, msg, () => {
         clearTimeout(rejectTimer);
         resolve();
@@ -288,7 +285,7 @@ export class Client {
   private async connectTo(serverURL: string): Promise<DownloadMsg> {
     this.socket = socketio(serverURL);
     return fromEvent<DownloadMsg>(
-        this.socket, Events.Download, CONNECTION_TIMEOUT);
+      this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
 
   // tslint:disable-next-line:no-any
@@ -307,19 +304,19 @@ export class Client {
 }
 
 async function fromEvent<T>(
-    emitter: SocketIOClient.Socket, eventName: string,
-    timeout: number): Promise<T> {
+  emitter: SocketIOClient.Socket, eventName: string,
+  timeout: number): Promise<T> {
   return new Promise((resolve, reject) => {
-           const rejectTimer = setTimeout(
-               () => reject(`${eventName} event timed out`), timeout);
-           const listener = (evtArgs: T) => {
-             emitter.removeListener(eventName, listener);
-             clearTimeout(rejectTimer);
+    const rejectTimer = setTimeout(
+      () => reject(`${eventName} event timed out`), timeout);
+    const listener = (evtArgs: T) => {
+      emitter.removeListener(eventName, listener);
+      clearTimeout(rejectTimer);
 
-             resolve(evtArgs);
-           };
-           emitter.on(eventName, listener);
-         }) as Promise<T>;
+      resolve(evtArgs);
+    };
+    emitter.on(eventName, listener);
+  }) as Promise<T>;
 }
 
 // TODO: remove once tfjs >= 0.12.5 is released
@@ -344,7 +341,7 @@ function sliceWithEmptyTensors(a: tf.Tensor, begin: number, size?: number) {
 function addRows(existing: tf.Tensor, newEls: tf.Tensor, unitShape: number[]) {
   if (tf.util.arraysEqual(newEls.shape, unitShape)) {
     return tf.tidy(
-        () => concatWithEmptyTensors(existing, tf.expandDims(newEls)));
+      () => concatWithEmptyTensors(existing, tf.expandDims(newEls)));
   } else {  // batch dimension
     tf.util.assertShapesMatch(newEls.shape.slice(1), unitShape);
     return tf.tidy(() => concatWithEmptyTensors(existing, newEls));

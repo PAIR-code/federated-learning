@@ -80,7 +80,7 @@ export function setReadyStatus(client) {
   });
 
   let html = 'Ready to listen!';
-  const nx = client.numExamplesPerUpdate() - client.numExamples();
+  const nx = client.numExamplesRemaining();
   html += ` Need <span class='status-number'>${nx}</span> more before training.`
   const trained = client.numUpdates();
   if (trained) {
