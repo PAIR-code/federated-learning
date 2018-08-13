@@ -9,20 +9,17 @@
     "federated-learning-client": "link:./.yalc/federated-learning-client",
     "federated-learning-server": "link:./.yalc/federated-learning-server",
     "node-fetch": "^2.2.0",
-    "p5": "0.6",
-    "ts-node": "^7.0.0"
+    "p5": "0.6"
   },
   "scripts": {
     "postinstall": "./postinstall.sh",
-    "server": "yarn postinstall && yarn run ts-node-dev src/server.ts",
+    "server": "yarn postinstall && node src/server.js",
     "client": "yarn postinstall && yarn run parcel serve src/index.html"
   },
   "devDependencies": {
     "babel-plugin-transform-runtime": "^6.23.0",
     "cross-env": "^5.2.0",
     "parcel": "^1.9.6",
-    "ts-node-dev": "^1.0.0-pre.26",
-    "typescript": "^3.0.1",
     "yalc": "^1.0.0-pre.22"
   }
 }
