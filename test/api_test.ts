@@ -17,57 +17,27 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import {Tensor, test_util, Variable} from '@tensorflow/tfjs';
-import {Client, FederatedClientModel} from 'federated-learning-client';
-import {Server, FederatedServerModel, FederatedFitConfig} from 'federated-learning-server';
+import {test_util} from '@tensorflow/tfjs';
+import {Client} from 'federated-learning-client';
+import {Server} from 'federated-learning-server';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as rimraf from 'rimraf';
 
+import {MockModel} from './mock_model';
+
 const PORT = 3001;
 const socketURL = `http://0.0.0.0:${PORT}`;
 const initWeights =
-  [tf.tensor([1, 1, 1, 1], [2, 2]), tf.tensor([1, 2, 3, 4], [1, 4])];
-const updateThreshold = 2;
+    [tf.tensor([1, 1, 1, 1], [2, 2]), tf.tensor([1, 2, 3, 4], [1, 4])];
 const initVersion = 'initial';
-
-class MockModel implements FederatedServerModel, FederatedClientModel {
-  isFederatedClientModel = true;
-  isFederatedServerModel = true;
-  inputShape = [1];
-  outputShape = [1];
-  vars: Variable[];
-  version: string;
-  constructor(vars: Variable[]) {
-    this.vars = vars;
-  }
-  async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig) {}
-  async setup() {}
-  async save() {
-    this.version = new Date().getTime().toString();
-  }
-  setVars(vars: Tensor[]) {
-    for (let i = 0; i < this.vars.length; i++) {
-      this.vars[i].assign(vars[i]);
-    }
-  }
-  getVars(): Tensor[] {
-    return this.vars;
-  }
-  predict(x: Tensor) {
-    return x;
-  }
-  evaluate(x: Tensor, y: Tensor) {
-    return [0];
-  }
-}
 
 describe('Server-to-client API', () => {
   let dataDir: string;
   let server: Server;
   let client: Client;
-  let clientVars: Variable[];
-  let serverVars: Variable[];
+  let clientVars: tf.Variable[];
+  let serverVars: tf.Variable[];
   let httpServer: http.Server;
 
   beforeEach(async () => {
@@ -86,10 +56,10 @@ describe('Server-to-client API', () => {
 
     server = new Server(httpServer, serverModel, {
       modelDir: dataDir,
-      updatesPerVersion: updateThreshold,
-      clientHyperparams: {
-        examplesPerUpdate: 1
-      }
+      serverHyperparams: {
+        minUpdatesPerVersion: 2,
+      },
+      clientHyperparams: {examplesPerUpdate: 1}
     });
     await server.setup();
 
@@ -124,18 +94,18 @@ describe('Server-to-client API', () => {
   });
 
   it('triggers a download after enough uploads', async (done) => {
-    client.onNewVersion((_, oldVersion, newVersion) => {
+    client.onNewVersion((oldVersion, newVersion) => {
       expect(oldVersion).toBe(initVersion);
       expect(newVersion).not.toBe(initVersion);
       expect(newVersion).toBe(server.model.version);
       test_util.expectArraysClose(
-        clientVars[0], tf.tensor([1.5, 1.5, 1.5, 1.5], [2, 2]));
+          clientVars[0], tf.tensor([1.5, 1.5, 1.5, 1.5], [2, 2]));
       test_util.expectArraysClose(
-        clientVars[1], tf.tensor([3.0, 3.0, 3.0, 2.5], [1, 4]));
+          clientVars[1], tf.tensor([3.0, 3.0, 3.0, 2.5], [1, 4]));
       done();
     });
 
-    const dummyX1 = tf.tensor2d([[0]]);            // 1 example
+    const dummyX1 = tf.tensor2d([[0]]);  // 1 example
     const dummyY1 = tf.tensor2d([[0]]);
     const dummyX3 = tf.tensor2d([[0], [0], [0]]);  // 3 examples
     const dummyY3 = tf.tensor2d([[0], [0], [0]]);

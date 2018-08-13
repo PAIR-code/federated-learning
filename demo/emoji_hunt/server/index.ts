@@ -57,11 +57,13 @@ app.use(cookieParser());
 
 console.log(process.env.USE_OAUTH);
 
-if (process.env.USE_OAUTH && (process.env.USE_OAUTH as any) != false) {
+// tslint:disable-next-line:no-any
+if (process.env.USE_OAUTH && (process.env.USE_OAUTH as any) !== false) {
   app.use(async (req, res, next) => {
     try {
       const token = req.cookies['oauth2token'];
       const userid = await verify(token);
+      // tslint:disable-next-line:no-any
       (req as any).googleUserID = userid;
       next();
     } catch (exn) {
@@ -85,10 +87,9 @@ app.post('/data', (req, res) => {
   }
 
   const file = req.files.file as fileUpload.UploadedFile;
-  return file.mv(
-      `${fileDir}/${file.name}`,
-      err => {err ? res.status(500).send(err.toString()) :
-                    res.send('Uploaded!')});
+  return file.mv(`${fileDir}/${file.name}`, err => {
+    err ? res.status(500).send(err.toString()) : res.send('Uploaded!');
+  });
 });
 
 setupModel(modelDir)
@@ -96,7 +97,7 @@ setupModel(modelDir)
       const federatedServer = new federated.Server(httpServer, model, {
         clientHyperparams:
             {learningRate: 3e-4, batchSize: 1, examplesPerUpdate: 1},
-        updatesPerVersion: 5,
+        serverHyperparams: {minUpdatesPerVersion: 5},
         modelDir
       });
       return federatedServer.setup().then(() => {

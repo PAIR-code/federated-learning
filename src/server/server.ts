@@ -22,12 +22,13 @@ import * as path from 'path';
 import * as io from 'socket.io';
 
 // tslint:disable-next-line:max-line-length
-import {AsyncTfModel, clientHyperparams, ClientHyperparams, deserializeVars, DownloadMsg, Events, FederatedCompileConfig, ModelMsg, SerializedVariable, serializeVars, stackSerialized, VersionCallback} from './common';
+import {AsyncTfModel, clientHyperparams, ClientHyperparams, deserializeVars, DownloadMsg, Events, FederatedCompileConfig, SerializedVariable, serializeVars, serverHyperparams, ServerHyperparams, stackSerialized, UploadCallback, UploadMsg, VersionCallback} from './common';
 // tslint:disable-next-line:max-line-length
 import {FederatedServerModel, FederatedServerTfModel, isFederatedServerModel} from './models';
 
 export type FederatedServerConfig = {
   clientHyperparams?: ClientHyperparams,
+  serverHyperparams?: ServerHyperparams,
   updatesPerVersion?: number,
   modelDir?: string,
   modelCompileConfig?: FederatedCompileConfig,
@@ -53,15 +54,15 @@ export type FederatedServerConfig = {
 export class Server {
   model: FederatedServerModel;
   clientHyperparams: ClientHyperparams;
+  serverHyperparams: ServerHyperparams;
   downloadMsg: DownloadMsg;
   server: io.Server;
   numClients = 0;
+  numUpdates = 0;
   updates: SerializedVariable[][] = [];
   updating = false;
-  aggregation = 'mean';
   versionCallbacks: VersionCallback[];
-
-  updatesPerVersion: number;
+  uploadCallbacks: UploadCallback[];
   verbose: boolean;
 
   constructor(
@@ -84,10 +85,11 @@ export class Server {
       this.model = new FederatedServerTfModel(modelDir, model, compileConfig);
     }
     this.verbose = (!!config.verbose) || (!!process.env.VERBOSE) || false;
-    this.updatesPerVersion = config.updatesPerVersion || 10;
     this.clientHyperparams = clientHyperparams(config.clientHyperparams || {});
+    this.serverHyperparams = serverHyperparams(config.serverHyperparams || {});
     this.downloadMsg = null;
-    this.versionCallbacks = [(model, v1, v2) => {
+    this.uploadCallbacks = [];
+    this.versionCallbacks = [(v1, v2) => {
       this.log(`updated model: ${v1} -> ${v2}`);
     }];
   }
@@ -121,12 +123,16 @@ export class Server {
 
       socket.emit(Events.Download, this.downloadMsg);
 
-      socket.on(Events.Upload, async (msg: ModelMsg, ack) => {
+      socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
         ack(true);
-        if (msg.version === this.model.version && !this.updating) {
-          this.log(`new update from ${socket.client.id}`);
-          this.updates.push(msg.vars);
-          if (this.updates.length >= this.updatesPerVersion) {
+        if (msg.model.version === this.model.version && !this.updating) {
+          this.log(`new update from ${msg.clientId}`);
+          this.updates.push(msg.model.vars);
+          this.numUpdates++;
+          await this.time('upload callbacks', async () => {
+            this.uploadCallbacks.forEach(c => c(msg));
+          });
+          if (this.shouldUpdate()) {
             await this.updateModel();
             this.server.sockets.emit(Events.Download, this.downloadMsg);
           }
@@ -135,13 +141,29 @@ export class Server {
     });
   }
 
+  private shouldUpdate(): boolean {
+    const numUpdates = this.numUpdates;
+    return (numUpdates >= this.serverHyperparams.minUpdatesPerVersion);
+  }
+
   /**
-   * Register a new callback to be invoked whenever the server creates a new
-   * version of the model
-   * @param callback function to be called on each version update.
+   * Register a new callback to be invoked whenever the server updates the model
+   * version.
+   *
+   * @param callback function to be called (w/ old and new version IDs)
    */
   onNewVersion(callback: VersionCallback) {
     this.versionCallbacks.push(callback);
+  }
+
+  /**
+   * Register a new callback to be invoked whenever the client uploads a new set
+   * of weights.
+   *
+   * @param callback function to be called (w/ client's upload msg)
+   */
+  onUpload(callback: UploadCallback) {
+    this.uploadCallbacks.push(callback);
   }
 
   private async computeDownloadMsg(): Promise<DownloadMsg> {
@@ -161,15 +183,16 @@ export class Server {
   private async updateModel() {
     this.updating = true;
     const oldVersion = this.model.version;
+    const aggregation = this.serverHyperparams.aggregation;
 
     await this.time('computing new weights', async () => {
       const newWeights = tf.tidy(() => {
         const stacked = stackSerialized(this.updates);
         const updates = deserializeVars(stacked);
-        if (this.aggregation === 'mean') {
+        if (aggregation === 'mean') {
           return updates.map(update => update.mean(0));
         } else {
-          throw new Error(`unsupported aggregation ${this.aggregation}`);
+          throw new Error(`unsupported aggregation ${aggregation}`);
         }
       });
       this.model.setVars(newWeights);
@@ -178,6 +201,7 @@ export class Server {
     this.model.save();
     this.downloadMsg = await this.computeDownloadMsg();
     this.updates = [];
+    this.numUpdates = 0;
     this.updating = false;
     this.performCallbacks(oldVersion);
   }
@@ -198,8 +222,7 @@ export class Server {
 
   private async performCallbacks(oldVersion?: string) {
     await this.time('performing callbacks', async () => {
-      this.versionCallbacks.forEach(
-          c => c(this.model, oldVersion, this.model.version));
+      this.versionCallbacks.forEach(c => c(oldVersion, this.model.version));
     });
   }
 }

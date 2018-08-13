@@ -14,10 +14,6 @@ const SERVER_URL = 'https://federated.learning.server';
 const INIT_MODEL = 'https://initial.com/tf-model.json';
 const client = new federated.Client(SERVER_URL, INIT_MODEL);
 
-client.onNewVersion((model, oldVersion, newVersion) => {
-  console.log(`updated model from ${oldVersion} to ${newVersion}`);
-});
-
 client.setup().then(() => {
   const yhat = client.predict(x); // make predictions!
   client.federatedUpdate(x, y); // train (and asynchronously update the server)!
@@ -52,7 +48,7 @@ new federated.Client(SERVER_URL, federatedClientModel); // if you need custom be
 
 You can pass a `FederatedClientModel` if you need custom behavior not supported by `tf.Model`s. See its [documentation](./models.ts) for the methods you will need to implement.
 
-Currently, we do not support loading the model automatically from the server (e.g. just doing `federated.Client(SERVER_URL)`). If the model you want to load client-side is only hosted on your federated learning server, but is a `tf.Model`, you can implement this fairly simply by statically serving the model files. Here is an example of how to do this with `express`:
+Currently, we do not support loading the model automatically from the server (e.g. just doing `federated.Client(SERVER_URL)`). If the model you want to load client-side is only hosted on your federated learning server, but is a `tf.Model`, you can implement this fairly simply by statically serving the model files, which are conveniently symlinked. Here is an example of how to do this with `express`:
 
 ```js
 // server
@@ -61,14 +57,14 @@ const dir = '/models';
 app.use(express.static(dir));
 const webServer = http.createServer(app);
 const fedServer = new federated.Server(webServer, initModel, {
-   modelDir: dir // newest model will be symlinked to ${dir}/latest
+   modelDir: dir // current model will be symlinked to ${dir}/current
 });
 await fedServer.setup();
 webServer.listen(80);
 
 // client
 const url = 'http://my.server';
-const fedClient = new federated.Client(url, `${url}/latest/model.json`);
+const fedClient = new federated.Client(url, `${url}/current/model.json`);
 await fedClient.setup();
 ```
 
@@ -105,6 +101,20 @@ This dictionary will be passed to [`tf.Model.compile`](https://js.tensorflow.org
 However, we will always set the `optimizer` to [`tf.SGDOptimizer`](https://js.tensorflow.org/api/latest/#train.sgd) to properly adopt a learning rate based on hyperparameters sent by the server. If you need more flexibility than this, you can define
 a custom [`FederatedClientModel`](./models.ts).
 
+### Client IDs
+
+By default, each federated learning client is assigned a random, anonymous identifier which is persisted in cookie storage. This ID is sent to the server alongside weight updates to enable features that prevent individual clients from dominating the aggregation process. It can also be helpful for anonymized performance metric analysis, e.g. determining if the gains of federated learning are going to one group of users at the expense of a minority.
+
+If you would like to assign your own custom client identifier not stored in a cookie, you can do so as follows:
+
+```js
+new federated.Client(SERVER_URL, MODEL_URL, {
+  clientId: 'custom-id'
+});
+```
+
+In the future, we hope to support client identifiers tied to rate-limited authentication strategies to help prevent bot users from flooding the server with spurious updates.
+
 ### Getting Stats
 
 For printing and debugging purposes, you can get stats about the client using:
@@ -121,13 +131,29 @@ client.numExamplesPerUpdate() // how many examples used in each update
 client.numExamplesRemaining() // how many more examples needed before updating
 ```
 
-You can also listen for changes in the model version by doing:
+You can also listen for changes in the model version (or successful uploads) by doing:
 ```js
-client.onNewVersion((model, oldVersion, newVersion) => {
+client.onNewVersion((oldVersion, newVersion) => {
   console.log(`you've seen ${client.numVersions()} versions now!`);
   $('#model-version').text(`Model Version #${newVersion}`);
 });
+
+client.onUpload(uploadMessage => {
+  console.log(`uploaded another version to the server!`);
+});
 ```
+
+### Sending Metrics
+
+By default, federated clients will only send updated weights to the server. However, you can configure them to also send the results of `client.evaluate(x, y)` by setting the `sendMetrics` config flag to `true`:
+
+```js
+new federated.Client(SERVER_URL, MODEL_URL, {
+  sendMetrics: true
+})
+```
+
+If `evaluate` returns the exact training loss, then sending this information could make the federated learning process slightly less private, but it is helpful for server-side performance monitoring.
 
 ### TODO
 

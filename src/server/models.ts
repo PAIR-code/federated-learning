@@ -214,9 +214,8 @@ export class FederatedServerDynamicModel extends FederatedDynamicModel
     const path = `${this.saveDir}/${version}/`;
     const jsonPath = `${path}/meta.json`;
     const binPath = `${path}/data.bin`;
-    const json =
-        JSON.parse(await readFile(jsonPath, {flag: 'r', encoding: 'utf8'}));
-    const data = await readFile(binPath, {flag: 'rb'});
+    const json = JSON.parse(await readFile(jsonPath, {encoding: 'utf8'}));
+    const data = await readFile(binPath);
     return flatDeserialize({data, json});
   }
 }
