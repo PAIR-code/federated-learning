@@ -80,6 +80,23 @@ export function isFederatedServerModel(model: any):
   return model && model.isFederatedServerModel;
 }
 
+export class FederatedServerInMemoryModel extends FederatedTfModel implements
+    FederatedServerModel {
+  isFederatedServerModel = true;
+  version: string;
+
+  async setup() {
+    tf.ENV.set('IS_BROWSER', true);  // TODO: remove me in tfjs 0.12.5
+    await this.fetchInitial();
+    tf.ENV.set('IS_BROWSER', false);
+    await this.save();
+  }
+
+  async save() {
+    this.version = new Date().getTime().toString();
+  }
+}
+
 /**
  * Specific version of FederatedServerModel that wraps a `tf.Model`,
  * an async function returning a `tf.Model`, or a string that can be passed to

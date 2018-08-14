@@ -279,7 +279,7 @@ async function main() {
 
   $('#sd-range-inputs').html('');
   gaussians.forEach((g, i) => {
-    const input = $('<input type="range" min="0.1" max="10"/>');
+    const input = $('<input type="range" min="0.5" max="10.0" step="0.5"/>');
     const label = $(`<label>Client ${i+1}</label>`);
     label.append(input);
     $('#sd-range-inputs').append(label);

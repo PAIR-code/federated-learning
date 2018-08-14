@@ -108,11 +108,7 @@ export class Server {
     this.downloadMsg = await this.computeDownloadMsg();
     await this.performCallbacks();
 
-    this.server.on('connection', async (socket: io.Socket) => {
-      if (!this.downloadMsg) {
-        this.downloadMsg = await this.computeDownloadMsg();
-      }
-
+    this.server.on('connection', (socket: io.Socket) => {
       this.numClients++;
       this.log(`connection: ${this.numClients} clients`);
 
