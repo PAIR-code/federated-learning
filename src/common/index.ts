@@ -211,10 +211,10 @@ export function serverHyperparams(hps?: ServerHyperparams): ServerHyperparams {
 export async function fetchModel(asyncModel: AsyncTfModel): Promise<tf.Model> {
   if (typeof asyncModel === 'string') {
     return await tf.loadModel(asyncModel);
-  } else if (asyncModel instanceof tf.Model) {
-    return asyncModel;
-  } else {
+  } else if (typeof asyncModel === 'function') {
     return await asyncModel();
+  } else {
+    return asyncModel as tf.Model;
   }
 }
 
