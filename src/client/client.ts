@@ -35,6 +35,8 @@ type CounterObj = {
   [key: string]: number
 };
 
+type SocketCallback = () => SocketIOClient.Socket;
+
 export type FederatedClientConfig = {
   modelCompileConfig?: FederatedCompileConfig,
   hyperparams?: ClientHyperparams,
@@ -67,7 +69,7 @@ export class Client {
   private x: tf.Tensor;
   private y: tf.Tensor;
   private versionUpdateCounts: CounterObj;
-  private server: string|Function;
+  private server: string|SocketCallback;
   private verbose: boolean;
   private sendMetrics: boolean;
   hyperparams: ClientHyperparams;
@@ -79,7 +81,7 @@ export class Client {
    * @param model - model to use with federated learning
    */
   constructor(
-      server: string|Function, model: FederatedClientModel|AsyncTfModel,
+      server: string|SocketCallback, model: FederatedClientModel|AsyncTfModel,
       config?: FederatedClientConfig) {
     this.server = server;
     if (isFederatedClientModel(model)) {
@@ -335,11 +337,11 @@ export class Client {
     });
   }
 
-  private async connectTo(server: string|Function): Promise<DownloadMsg> {
+  private async connectTo(server: string|SocketCallback): Promise<DownloadMsg> {
     if (typeof server === 'string') {
       this.socket = socketio(server);
     } else {
-      this.socket = server() as SocketIOClient.Socket;
+      this.socket = server();
     }
     return fromEvent<DownloadMsg>(
         this.socket, Events.Download, CONNECTION_TIMEOUT);

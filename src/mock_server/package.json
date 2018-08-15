@@ -17,10 +17,11 @@
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "~0.12"
+    "@tensorflow/tfjs": "~0.12",
+    "@types/socket.io": "^1.4.36",
+    "@types/socket.io-client": "^1.4.32"
   },
   "devDependencies": {
-    "@types/socket.io": "^1.4.34",
     "clang-format": "~1.2.2",
     "ts-node": "^7.0.0",
     "tslint": "~5.10.0",

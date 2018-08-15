@@ -38,7 +38,7 @@ The simplest way to set up a `federated.Server` is to pass a [`tf.Model`](https:
 
 Note that by default, different `tf.Model` versions will be saved as files in subfolders of `${process.cwd()}/saved-models/`. If you would like to change this directory, you can pass a `modelDir` configuration parameter, e.g. `federated.Server(httpServer, model, { modelDir: '/mnt/my-vfs' })`.
 
-If you would like to skip the persistence layer, you can instead import `FederatedServerInMemoryModel` which will update a single model in memory. Furthermore, if you want a version this library which omits socket.io in favor of a mocked-out version that works in the browser, check out the [mock server library](../mock_server/README.md).
+If you would like to skip the persistence layer, you can instead import `FederatedServerInMemoryModel` which will update a single model in memory. Furthermore, if you want a version of this library which omits socket.io in favor of a mocked-out version that works in the browser, check out the [mock server library](../mock_server/README.md).
 
 ### Setting Hyperparameters
 

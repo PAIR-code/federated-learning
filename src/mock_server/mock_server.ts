@@ -41,7 +41,7 @@ import {MockitIOClient, MockitIOServer} from './mockit_io';
  * ```
  */
 export class MockServer extends AbstractServer {
-  newClientSocket: Function;
+  newClientSocket: () => SocketIOClient.Socket;
 
   constructor(
       model: AsyncTfModel|FederatedServerModel, config: FederatedServerConfig) {
@@ -60,7 +60,9 @@ export class MockServer extends AbstractServer {
     super(ioServer, fedModel, config);
 
     this.newClientSocket = () => {
-      return new MockitIOClient(server, uuid());
+      const socket = new MockitIOClient(server, uuid());
+      // tslint:disable-next-line:no-any
+      return (socket as any) as SocketIOClient.Socket;
     };
   }
 }
