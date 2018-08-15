@@ -5,17 +5,12 @@
   "license": "MIT",
   "dependencies": {
     "@tensorflow/tfjs": "^0.12",
-    "@tensorflow/tfjs-node": "^0.1.11",
-    "federated-learning-client": "link:./.yalc/federated-learning-client",
-    "federated-learning-server": "link:./.yalc/federated-learning-server",
-    "jquery": "^3.3.1",
-    "node-fetch": "^2.2.0",
-    "p5": "0.6",
-    "poisson-process": "^1.0.0"
+    "federated-learning-client": "file:../../src/client",
+    "federated-learning-mock-server": "file:../../src/mock_server",
+    "jquery": "^3.3.1"
   },
   "scripts": {
     "postinstall": "./postinstall.sh",
-    "server": "yarn postinstall && node src/server.js",
     "client": "yarn postinstall && yarn run parcel serve src/index.html"
   },
   "devDependencies": {

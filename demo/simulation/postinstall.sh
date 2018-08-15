@@ -15,6 +15,7 @@
 # =============================================================================
 
 whereami=`pwd`
+
 cd ../../src/client
 yarn publish-local
 cd $whereami
@@ -23,5 +24,10 @@ cd ../../src/server
 yarn publish-local
 cd $whereami
 
+cd ../../src/mock_server
+yarn publish-local
+cd $whereami
+
 yalc link federated-learning-client
 yalc link federated-learning-server
+yalc link federated-learning-mock-server

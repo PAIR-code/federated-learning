@@ -1,19 +1,17 @@
 import * as tf from '@tensorflow/tfjs';
 import * as federated from 'federated-learning-client';
-//import * as poissonProcess from 'poisson-process';
 import $ from 'jquery';
 import model from './model';
 import {Isotropic2DGaussian} from './gaussian';
+import {MockServer} from 'federated-learning-mock-server';
 
-const serverSocket = new federated.MockitIOServer();
-const mockServer = new federated.MockServer(serverSocket, model, {
+const mockServer = new MockServer(model, {
   serverHyperparams: {
     minUpdatesPerVersion: 5
   },
   verbose: true
 });
 
-//const SERVER_URL = 'http://localhost:3000';
 const RADIUS = 8;
 const N_CLIENTS = 3;
 
@@ -44,11 +42,9 @@ const hyperparams = {
 };
 
 const clients = range(N_CLIENTS).map(i => {
-  const clientId = `client-${i}`;
-  const serverFn = () => new federated.MockitIOClient(serverSocket, clientId);
-  return new federated.Client(serverFn, model, {
+  return new federated.Client(mockServer.newClientSocket, model, {
     verbose: true,
-    clientId: clientId,
+    clientId: `client-${i}`,
     modelCompileConfig: {
       loss: 'binaryCrossentropy'
     },

@@ -1,11 +1,11 @@
 {
-  "name": "federated-learning-client",
+  "name": "federated-learning-mock-server",
   "version": "0.0.1",
   "description": "Hardware-accelerated JavaScript library for machine intelligence",
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "module": "dist/federated-learning-client.esm.js",
+  "module": "dist/federated-learning-mock-server.esm.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/PAIR-code/federated-learning.git"
@@ -17,11 +17,10 @@
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "~0.12",
-    "@types/socket.io-client": "^1.4.32",
-    "socket.io-client": "^2.1.1"
+    "@tensorflow/tfjs": "~0.12"
   },
   "devDependencies": {
+    "@types/socket.io": "^1.4.34",
     "clang-format": "~1.2.2",
     "ts-node": "^7.0.0",
     "tslint": "~5.10.0",

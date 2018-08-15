@@ -21,8 +21,9 @@ import * as tf from '@tensorflow/tfjs';
 import * as fs from 'fs';
 import {promisify} from 'util';
 
+import {FederatedServerModel} from './abstract_server';
 // tslint:disable-next-line:max-line-length
-import {AsyncTfModel, dtypeToTypedArrayCtor, FederatedCompileConfig, FederatedDynamicModel, FederatedModel, FederatedTfModel} from './common';
+import {AsyncTfModel, dtypeToTypedArrayCtor, FederatedCompileConfig, FederatedDynamicModel, FederatedTfModel} from './common';
 
 const readdir = promisify(fs.readdir);
 const exists = promisify(fs.exists);
@@ -45,55 +46,6 @@ async function forceSymlink(src: string, dest: string) {
       await unlink(dest);
       await symlink(src, dest, 'dir');
     }
-  }
-}
-
-/**
- * FederatedServerModel describes the interface that models passed to `Server`
- * must implement.
- *
- * See the FederatedModel documentation in src/common/index.ts for more details.
- */
-export interface FederatedServerModel extends FederatedModel {
-  isFederatedServerModel: boolean;
-  version: string;
-
-  /**
-   * Initialize the model
-   */
-  setup(): Promise<void>;
-
-  /**
-   * Save the current model and update `version`.
-   */
-  save(): Promise<void>;
-}
-
-/**
- * Type guard for federated server models.
- *
- * @param model any object
- */
-// tslint:disable-next-line:no-any
-export function isFederatedServerModel(model: any):
-    model is FederatedServerModel {
-  return model && model.isFederatedServerModel;
-}
-
-export class FederatedServerInMemoryModel extends FederatedTfModel implements
-    FederatedServerModel {
-  isFederatedServerModel = true;
-  version: string;
-
-  async setup() {
-    tf.ENV.set('IS_BROWSER', true);  // TODO: remove me in tfjs 0.12.5
-    await this.fetchInitial();
-    tf.ENV.set('IS_BROWSER', false);
-    await this.save();
-  }
-
-  async save() {
-    this.version = new Date().getTime().toString();
   }
 }
 
