@@ -224,6 +224,7 @@ export class AbstractServer {
         }
       });
       this.model.setVars(newWeights);
+      tf.dispose(newWeights);
     });
 
     this.model.save();

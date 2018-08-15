@@ -47,14 +47,17 @@ export class MockServer extends AbstractServer {
       model: AsyncTfModel|FederatedServerModel, config: FederatedServerConfig) {
     const server = new MockitIOServer();
 
-    let fedModel = model;
-    if (!isFederatedServerModel(model)) {
+    let fedModel: FederatedServerModel;
+    if (isFederatedServerModel(model)) {
+      fedModel = model;
+    } else {
       const compileConfig = config.modelCompileConfig || {};
       fedModel = new FederatedServerInMemoryModel(model, compileConfig);
     }
 
     // tslint:disable-next-line:no-any
-    super(((server as any) as IOServer), fedModel, config);
+    const ioServer = (server as any) as IOServer;
+    super(ioServer, fedModel, config);
 
     this.newClientSocket = () => {
       return new MockitIOClient(server, uuid());
