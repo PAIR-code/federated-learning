@@ -44,9 +44,11 @@ const hyperparams = {
 };
 
 const clients = range(N_CLIENTS).map(i => {
-  return new federated.Client(serverSocket, model, {
+  const clientId = `client-${i}`;
+  const serverFn = () => new federated.MockitIOClient(serverSocket, clientId);
+  return new federated.Client(serverFn, model, {
     verbose: true,
-    clientId: `client-${i}`,
+    clientId: clientId,
     modelCompileConfig: {
       loss: 'binaryCrossentropy'
     },

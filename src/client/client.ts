@@ -21,7 +21,6 @@ import * as uuid from 'uuid/v4';
 
 // tslint:disable-next-line:max-line-length
 import {AsyncTfModel, ClientHyperparams, DEFAULT_CLIENT_HYPERPARAMS, deserializeVar, DownloadMsg, Events, FederatedCompileConfig, SerializedVariable, serializeVars, UploadCallback, UploadMsg, VersionCallback} from './common';
-import {MockitIOClient, MockitIOServer} from './mockit_io';
 // tslint:disable-next-line:max-line-length
 import {FederatedClientModel, FederatedClientTfModel, isFederatedClientModel} from './models';
 
@@ -62,13 +61,13 @@ export type FederatedClientConfig = {
 export class Client {
   private msg: DownloadMsg;
   private model: FederatedClientModel;
-  private socket: SocketIOClient.Socket|MockitIOClient;
+  private socket: SocketIOClient.Socket;
   private versionCallbacks: VersionCallback[];
   private uploadCallbacks: UploadCallback[];
   private x: tf.Tensor;
   private y: tf.Tensor;
   private versionUpdateCounts: CounterObj;
-  private serverUrl: string|MockitIOServer;
+  private server: string|Function;
   private verbose: boolean;
   private sendMetrics: boolean;
   hyperparams: ClientHyperparams;
@@ -80,10 +79,9 @@ export class Client {
    * @param model - model to use with federated learning
    */
   constructor(
-      serverUrl: string|MockitIOServer,
-      model: FederatedClientModel|AsyncTfModel,
+      server: string|Function, model: FederatedClientModel|AsyncTfModel,
       config?: FederatedClientConfig) {
-    this.serverUrl = serverUrl;
+    this.server = server;
     if (isFederatedClientModel(model)) {
       this.model = model;
     } else {
@@ -148,7 +146,7 @@ export class Client {
     this.x = tf.tensor([], [0].concat(this.model.inputShape));
     this.y = tf.tensor([], [0].concat(this.model.outputShape));
     await this.time('Download weights from server', async () => {
-      this.msg = await this.connectTo(this.serverUrl);
+      this.msg = await this.connectTo(this.server);
     });
     this.setVars(this.msg.model.vars);
     const newVersion = this.modelVersion();
@@ -337,12 +335,11 @@ export class Client {
     });
   }
 
-  private async connectTo(serverURL: string|
-                          MockitIOServer): Promise<DownloadMsg> {
-    if (typeof serverURL === 'string') {
-      this.socket = socketio(serverURL);
+  private async connectTo(server: string|Function): Promise<DownloadMsg> {
+    if (typeof server === 'string') {
+      this.socket = socketio(server);
     } else {
-      this.socket = new MockitIOClient(serverURL, this.clientId);
+      this.socket = server() as SocketIOClient.Socket;
     }
     return fromEvent<DownloadMsg>(
         this.socket, Events.Download, CONNECTION_TIMEOUT);
@@ -364,7 +361,7 @@ export class Client {
 }
 
 async function fromEvent<T>(
-    emitter: SocketIOClient.Socket|MockitIOClient, eventName: string,
+    emitter: SocketIOClient.Socket, eventName: string,
     timeout: number): Promise<T> {
   return new Promise((resolve, reject) => {
            const rejectTimer = setTimeout(
