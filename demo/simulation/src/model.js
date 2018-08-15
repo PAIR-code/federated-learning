@@ -15,8 +15,14 @@
  * =============================================================================
  */
 
-export * from './models';
-export * from './client';
-export * from './common';
-export * from './mock_server';
-export * from './mockit_io';
+const tf = require('@tensorflow/tfjs');
+
+async function model() {
+  const m = tf.sequential();
+  m.add(tf.layers.dense({units: 10, inputShape: [2], activation: 'relu'}));
+  m.add(tf.layers.dense({units: 10, activation: 'relu'}));
+  m.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
+  return m;
+}
+
+module.exports = model;

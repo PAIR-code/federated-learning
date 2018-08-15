@@ -1,8 +1,8 @@
 {
   "name": "federated-learning-mock-server",
   "version": "0.0.1",
-  "description": "Hardware-accelerated JavaScript library for machine intelligence",
-  "private": true,
+  "description": "Experimental (browser-mocking-server) library for federated learning in Tensorflow.js",
+  "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/federated-learning-mock-server.esm.js",

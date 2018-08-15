@@ -1,6 +1,6 @@
 /**
- * @license
  * Copyright 2018 Google LLC. All Rights Reserved.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,8 +15,31 @@
  * =============================================================================
  */
 
-export * from './models';
-export * from './client';
-export * from './common';
-export * from './mock_server';
-export * from './mockit_io';
+.scatterlayer .trace:last-child path {
+    pointer-events: all;
+}
+
+.scatterlayer .point:hover {
+  cursor: move;
+  cursor: grab;
+  cursor: -moz-grab;
+  cursor: -webkit-grab;
+  fill-opacity: 0.75 !important;
+}
+
+.scatterlayer .point:active {
+  cursor: grabbing;
+  cursor: -moz-grabbing;
+  cursor: -webkit-grabbing;
+}
+
+.js-plotly-plot, .chart-wrapper {
+  display: inline-block;
+}
+
+label {
+  font-family: "Open Sans", verdana, arial, sans-serif;
+  color: rgb(68, 68, 68);
+  white-space: pre;
+  font-size: 12px;
+}
