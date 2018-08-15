@@ -211,10 +211,10 @@ export function serverHyperparams(hps?: ServerHyperparams): ServerHyperparams {
 export async function fetchModel(asyncModel: AsyncTfModel): Promise<tf.Model> {
   if (typeof asyncModel === 'string') {
     return await tf.loadModel(asyncModel);
-  } else if (asyncModel instanceof tf.Model) {
-    return asyncModel;
-  } else {
+  } else if (typeof asyncModel === 'function') {
     return await asyncModel();
+  } else {
+    return asyncModel as tf.Model;
   }
 }
 
@@ -276,18 +276,16 @@ export interface FederatedModel {
 }
 
 export class FederatedTfModel implements FederatedModel {
-  optimizer: tf.SGDOptimizer;
   model: tf.Model;
   compileConfig: ModelCompileConfig;
   private _initialModel: AsyncTfModel;
 
   constructor(initialModel?: AsyncTfModel, config?: FederatedCompileConfig) {
     this._initialModel = initialModel;
-    this.optimizer = tf.train.sgd(DEFAULT_CLIENT_HYPERPARAMS.learningRate);
     this.compileConfig = {
       loss: config.loss || 'categoricalCrossentropy',
       metrics: config.metrics || ['accuracy'],
-      optimizer: this.optimizer
+      optimizer: 'sgd'
     };
   }
 
@@ -302,7 +300,8 @@ export class FederatedTfModel implements FederatedModel {
 
   async fit(x: Tensor, y: Tensor, config?: FederatedFitConfig) {
     if (config.learningRate) {
-      this.optimizer.setLearningRate(config.learningRate);
+      (this.model.optimizer as tf.SGDOptimizer)
+          .setLearningRate(config.learningRate);
     }
     await this.model.fit(x, y, {
       epochs: config.epochs || DEFAULT_CLIENT_HYPERPARAMS.epochs,
@@ -351,21 +350,20 @@ export class FederatedDynamicModel implements FederatedModel {
   vars: tf.Variable[];
   predict: (inputs: tf.Tensor) => tf.Tensor;
   loss: (labels: tf.Tensor, preds: tf.Tensor) => tf.Scalar;
-  optimizer: tf.Optimizer;
+  optimizer: tf.SGDOptimizer;
   inputShape: number[];
   outputShape: number[];
 
   constructor(args: {
     vars: tf.Variable[]; predict: (inputs: tf.Tensor) => tf.Tensor;
     loss: (labels: tf.Tensor, preds: tf.Tensor) => tf.Scalar;
-    optimizer: tf.Optimizer;
     inputShape: number[];
     outputShape: number[];
   }) {
     this.vars = args.vars;
     this.predict = args.predict;
     this.loss = args.loss;
-    this.optimizer = args.optimizer;
+    this.optimizer = tf.train.sgd(DEFAULT_CLIENT_HYPERPARAMS.learningRate);
     this.inputShape = args.inputShape;
     this.outputShape = args.outputShape;
   }
@@ -377,9 +375,7 @@ export class FederatedDynamicModel implements FederatedModel {
   async fit(x: tf.Tensor, y: tf.Tensor, config?: FederatedFitConfig):
       Promise<void> {
     if (config.learningRate) {
-      if (this.optimizer instanceof tf.SGDOptimizer) {
-        this.optimizer.setLearningRate(config.learningRate);
-      }
+      this.optimizer.setLearningRate(config.learningRate);
     }
     const epochs = (config && config.epochs) || 1;
     for (let i = 0; i < epochs; i++) {
