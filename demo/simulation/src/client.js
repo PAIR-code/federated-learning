@@ -5,7 +5,15 @@ import $ from 'jquery';
 import model from './model';
 import {Isotropic2DGaussian} from './gaussian';
 
-const SERVER_URL = 'http://localhost:3000';
+const serverSocket = new federated.MockitIOServer();
+const mockServer = new federated.MockServer(serverSocket, model, {
+  serverHyperparams: {
+    minUpdatesPerVersion: 5
+  },
+  verbose: true
+});
+
+//const SERVER_URL = 'http://localhost:3000';
 const RADIUS = 8;
 const N_CLIENTS = 3;
 
@@ -28,15 +36,15 @@ x1s.forEach(x1 => {
 const xTensor = tf.tensor2d(xs);
 
 const hyperparams = {
-  learningRate: 1e-3,
-  examplesPerUpdate: 5,
+  learningRate: 1e-2,
+  examplesPerUpdate: 10,
   epochs: 10,
   batchSize: 32,
   weightNoiseStddev: 0
 };
 
-const clients = range(N_CLIENTS).map(i =>
-  new federated.Client(SERVER_URL, model, {
+const clients = range(N_CLIENTS).map(i => {
+  return new federated.Client(serverSocket, model, {
     verbose: true,
     clientId: `client-${i}`,
     modelCompileConfig: {
@@ -45,7 +53,7 @@ const clients = range(N_CLIENTS).map(i =>
     hyperparams: hyperparams,
     sendMetrics: true
   })
-);
+});
 window.clients = clients;
 
 const metricsByClient = {};
@@ -57,6 +65,12 @@ clients.forEach((c, i) => {
 const means = [[-1,5], [6,4], [-4,-6]];
 const stddevs = [4.0, 3.75, 6.25];
 //const rates = [1000, 200, 400];
+
+$('#updatesPerVersion').on('input', (e) => {
+  const val = parseInt(e.target.value);
+  mockServer.serverHyperparams.minUpdatesPerVersion = val;
+  $('#updatesPerVersion + span').text(val);
+}).val(mockServer.serverHyperparams.minUpdatesPerVersion).trigger('input');
 
 $('#examplesPerUpdate').on('input', (e) => {
   const val = parseInt(e.target.value);
@@ -114,9 +128,11 @@ function redraw() {
         name: `Client ${i+1}`
       };
     }), {
-      height: 600,
-      width: 617,
+      height: 400,
+      width: 800,
       title: 'Client Losses',
+      xaxis: { linecolor: 'black', mirror: true, title: 'Update Iteration' },
+      yaxis: { linecolor: 'black', mirror: true, title: 'Training Loss' },
     }, {
       staticPlot: true
     });
@@ -148,8 +164,8 @@ function redraw() {
       height: 600,
       width: 617,
       title: 'True vs. Learned Decision Boundary',
-      xaxis: { range: [-10, 10] },
-      yaxis: { range: [-10, 10] },
+      xaxis: { range: [-10, 10], title: 'Data x<sub>1</sub>' },
+      yaxis: { range: [-10, 10], title: 'Data x<sub>2</sub>' },
       shapes: [{
         type: 'circle',
         xref: 'x',
@@ -190,8 +206,8 @@ function redraw() {
       height: 600,
       width: 617,
       title: 'Clients and Data',
-      xaxis: { range: [-10, 10], linecolor: 'black', mirror: true },
-      yaxis: { range: [-10, 10], linecolor: 'black', mirror: true },
+      xaxis: { range: [-10, 10], linecolor: 'black', mirror: true, title: 'Data x<sub>1</sub>' },
+      yaxis: { range: [-10, 10], linecolor: 'black', mirror: true, title: 'Data x<sub>2</sub>' },
       shapes: range(N_CLIENTS).map(i => {
         return {
           type: 'circle',
@@ -272,13 +288,14 @@ let truePoints = [];
 let falsePoints = [];
 
 async function main() {
+  await mockServer.setup();
   await Promise.all(clients.map(c => c.setup()));
   redraw();
 
   clients[0].onNewVersion(redraw);
 
   const callbacks = clients.map((client, i) => {
-    return () => {
+    return async () => {
       const xs = [];
       const ys = [];
       const n = client.hyperparam('examplesPerUpdate');
@@ -295,31 +312,41 @@ async function main() {
       });
       const xt = tf.tensor2d(xs);
       const yt = tf.tensor2d(ys);
-      client.federatedUpdate(xt, yt).then(() => {
-        tf.dispose([xt, yt]);
-      });
       if (truePoints.length > N_CLIENTS * n) {
         truePoints = truePoints.slice(truePoints.length - N_CLIENTS * n);
       }
       if (falsePoints.length > N_CLIENTS * n) {
         falsePoints = falsePoints.slice(falsePoints.length - N_CLIENTS * n);
       }
+      await client.federatedUpdate(xt, yt);
+      tf.dispose([xt, yt]);
     };
   });
-  let intervals;
+
+  let running = false;
+  const runners = callbacks.map((cb, i) => {
+    return () => {
+      if (running) {
+        cb().then(() => {
+          runners[i]();
+        })
+      }
+    }
+  });
 
   document.getElementById('startButton').addEventListener('click', () => {
-    intervals = callbacks.map(c => setInterval(c, 100));
+    running = true;
+    runners.forEach(r => r());
   });
 
   document.getElementById('pauseButton').addEventListener('click', () => {
-    intervals.map(int => clearInterval(int));
+    running = false;
   });
 
   $('#sd-range-inputs').html('');
   gaussians.forEach((g, i) => {
     const input = $('<input type="range" min="0.5" max="10.0" step="0.5"/>');
-    const label = $(`<label>Client ${i+1}</label>`);
+    const label = $(`<label>Client ${i+1} Stddev</label>`);
     label.append(input);
     $('#sd-range-inputs').append(label);
     input.on('input', () => {

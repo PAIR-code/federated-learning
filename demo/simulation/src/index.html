@@ -26,26 +26,29 @@ limitations under the License.
       <fieldset>
         <legend>Hyperparams</legend>
         <ul>
+          <li>
+            <label>updatesPerVersion: <input type='range' id='updatesPerVersion' min='1' max='20' step='1'> <span></span>
+            </label>
+          </li>
 
           <li>
-
           <label>examplesPerUpdate: <input type='range' id='examplesPerUpdate' min='1' max='32' step='1'> <span></span>
           </label>
           </li>
-          <li>
 
-          <label>learningRate: <input type='range' id='learningRate' min='-5' max='1' step='0.5'> <span></span>
-          </label>
+          <li>
+            <label>learningRate: <input type='range' id='learningRate' min='-5' max='1' step='0.5'> <span></span>
+            </label>
           </li>
-          <li>
 
-          <label>epochs (# sgd steps per update): <input type='range' id='epochs' min='1' max='20' step='1'><span></span>
-          </label>
+          <li>
+            <label>epochs (# sgd steps per update): <input type='range' id='epochs' min='1' max='20' step='1'><span></span>
+            </label>
           </li>
-          <li>
-          <label>weightNoiseStddev: <input type='number' id='weightNoiseStddev'>
-          </label>
 
+          <li>
+            <label>weightNoiseStddev: <input type='number' id='weightNoiseStddev'>
+            </label>
           </li>
         </ul>
       </fieldset>

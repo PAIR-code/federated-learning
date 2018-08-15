@@ -17,9 +17,13 @@
 
 // tslint:disable-next-line:no-any
 type MockitMsg = any;
-type MockitCallback = (msg: MockitMsg) => Promise<void>;
+// tslint:disable-next-line:no-any
+type MockitCallback = (msg: MockitMsg, ack?: any) => void|Promise<void>;
 type MockitCallbackDict = {
-  [key: string]: MockitCallback
+  [key: string]: Function
+};
+type ClientDict = {
+  [key: string]: WrappedClient
 };
 const CONNECTION_TIMEOUT = 10;
 
@@ -47,10 +51,15 @@ class WrappedClient {
 }
 
 export class MockitIOServer {
-  clients: WrappedClient[];
-  onConnect: (socket: WrappedClient) => Promise<void>;
+  clients: ClientDict;
 
-  on(event: string, listener: (socket: WrappedClient) => Promise<void>) {
+  constructor() {
+    this.clients = {};
+  }
+
+  onConnect: (socket: WrappedClient) => void;
+
+  on(event: string, listener: (socket: WrappedClient) => void) {
     if (event !== 'connection') {
       throw new Error(`this mock doesn't support non-connection evts`);
     }
@@ -59,13 +68,12 @@ export class MockitIOServer {
 
   connect(client: MockitIOClient) {
     const wrapped = new WrappedClient(client);
-    this.clients.push(wrapped);
+    this.clients[client.clientId] = wrapped;
     this.onConnect(wrapped);
   }
 
   findClient(client: MockitIOClient): WrappedClient {
-    // TODO
-    return this.clients[0];
+    return this.clients[client.clientId];
   }
 
   get sockets() {
@@ -73,20 +81,22 @@ export class MockitIOServer {
   }
 
   emit(event: string, msg: MockitMsg) {
-    this.clients.forEach(c => c.emit(event, msg));
+    for (const k in this.clients) {
+      this.clients[k].emit(event, msg);
+    }
   }
 }
 
 export class MockitIOClient {
   server: MockitIOServer;
   listeners: MockitCallbackDict;
+  clientId: string;
 
-  constructor(server: MockitIOServer) {
+  constructor(server: MockitIOServer, id: string) {
     this.server = server;
     this.listeners = {};
-    setTimeout(() => {
-      this.server.connect(this);
-    }, CONNECTION_TIMEOUT);
+    this.clientId = id;
+    setTimeout(() => this.server.connect(this), CONNECTION_TIMEOUT);
   }
 
   trigger(event: string, msg: MockitMsg) {
@@ -95,15 +105,23 @@ export class MockitIOClient {
     }
   }
 
-  emit(event: string, message: MockitMsg, callback: MockitCallback) {
+  // tslint:disable-next-line:no-any
+  emit(event: string, ...args: any[]) {
+    const message = args[0] as string;
+    const callback = args[1] as MockitCallback;
     this.server.findClient(this).trigger(event, message).then(callback);
   }
 
-  on(event: string, listener: MockitCallback) {
+  on(event: string, listener: Function) {
     this.listeners[event] = listener;
   }
 
-  removeListener(event: string) {
+  removeListener(event: string, listener: Function) {
+    console.log(`removing ${listener}`);
     this.listeners[event] = null;
+  }
+
+  disconnect() {
+    this.server = null;
   }
 }
