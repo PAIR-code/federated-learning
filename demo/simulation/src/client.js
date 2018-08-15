@@ -1,8 +1,9 @@
 import * as tf from '@tensorflow/tfjs';
 import * as federated from 'federated-learning-client';
-import * as poissonProcess from 'poisson-process';
+//import * as poissonProcess from 'poisson-process';
 import $ from 'jquery';
 import model from './model';
+import {Isotropic2DGaussian} from './gaussian';
 
 const SERVER_URL = 'http://localhost:3000';
 const RADIUS = 8;
@@ -26,20 +27,67 @@ x1s.forEach(x1 => {
 })
 const xTensor = tf.tensor2d(xs);
 
+const hyperparams = {
+  learningRate: 1e-3,
+  examplesPerUpdate: 5,
+  epochs: 10,
+  batchSize: 32,
+  weightNoiseStddev: 0
+};
+
 const clients = range(N_CLIENTS).map(i =>
   new federated.Client(SERVER_URL, model, {
     verbose: true,
     clientId: `client-${i}`,
     modelCompileConfig: {
       loss: 'binaryCrossentropy'
-    }
+    },
+    hyperparams: hyperparams,
+    sendMetrics: true
   })
 );
 window.clients = clients;
 
+const metricsByClient = {};
+clients.forEach((c, i) => {
+  metricsByClient[i] = [];
+  c.onUpload(msg => metricsByClient[i].push(msg.metrics));
+})
+
 const means = [[-1,5], [6,4], [-4,-6]];
 const stddevs = [4.0, 3.75, 6.25];
-const rates = [1000, 200, 400];
+//const rates = [1000, 200, 400];
+
+$('#examplesPerUpdate').on('input', (e) => {
+  const val = parseInt(e.target.value);
+  hyperparams.examplesPerUpdate = val;
+  $('#examplesPerUpdate + span').text(val);
+  clients.forEach(c => c.hyperparams = hyperparams);
+}).val(hyperparams.examplesPerUpdate).trigger('input');
+
+$('#learningRate').on('input', (e) => {
+  const val = 10**(parseFloat(e.target.value));
+  hyperparams.learningRate = val;
+  $('#learningRate + span').text(val);
+  clients.forEach(c => c.hyperparams = hyperparams);
+}).val(Math.log10(hyperparams.learningRate)).trigger('input');
+
+$('#epochs').on('input', (e) => {
+  const val = parseInt(e.target.value);
+  hyperparams.epochs = val;
+  $('#epochs + span').text(val);
+  clients.forEach(c => c.hyperparams = hyperparams);
+}).val(hyperparams.epochs).trigger('input');
+
+$('#weightNoiseStddev').on('change', (e) => {
+  const val = parseFloat(e.target.value);
+  hyperparams.weightNoiseStddev = val;
+  clients.forEach(c => c.hyperparams = hyperparams);
+}).val(hyperparams.weightNoiseStddev);
+
+const gaussians = range(N_CLIENTS).map(i =>
+  new Isotropic2DGaussian(means[i][0], means[i][1], stddevs[i]));
+window.gaussians = gaussians;
 
 function redraw() {
   const zArray = tf.tidy(() => clients[0].predict(xTensor).dataSync());
@@ -57,6 +105,22 @@ function redraw() {
   }
 
   function resetPlot() {
+    Plotly.newPlot('clientLosses', clients.map((c, i) => {
+      return {
+        x: range(metricsByClient[i].length),
+        y: metricsByClient[i].map(m => m[0]),
+        type: 'scatter',
+        mode: 'markers+lines',
+        name: `Client ${i+1}`
+      };
+    }), {
+      height: 600,
+      width: 617,
+      title: 'Client Losses',
+    }, {
+      staticPlot: true
+    });
+
     Plotly.newPlot('canvasContainer', [{
       x: x1s,
       y: x2s,
@@ -104,13 +168,15 @@ function redraw() {
       y: falsePoints.map(x => x[1]),
       type: 'scatter',
       mode: 'markers',
-      marker: { size: 10 }
+      marker: { size: 10 },
+      name: 'y=0'
     }, {
       x: truePoints.map(x => x[0]),
       y: truePoints.map(x => x[1]),
       type: 'scatter',
       mode: 'markers',
-      marker: { size: 15 }
+      marker: { size: 10 },
+      name: 'y=1'
     }, {
       x: gaussians.map(g => g.x),
       y: gaussians.map(g => g.y),
@@ -118,7 +184,8 @@ function redraw() {
       textposition: 'bottom',
       type: 'scatter',
       mode: 'markers+text',
-      marker: { size: 15 }
+      marker: { size: 15 },
+      name: 'Clients'
     }], {
       height: 600,
       width: 617,
@@ -197,48 +264,9 @@ function redraw() {
   startDragBehavior();
 }
 
-function randomNormal(mu, sd) {
-  return tf.tidy(() => tf.randomNormal([1], mu, sd).dataSync()[0]);
-}
-
 function clamp(x, lower, upper) {
   return Math.max(lower, Math.min(x, upper));
 }
-
-function round(x, to) {
-  return Math.round(x * 10**to) / 10**to;
-}
-
-
-class Isotropic2DGaussian {
-  constructor(x, y, sd) {
-    this.x = x;
-    this.y = y;
-    this.sd = sd;
-  }
-
-  sample() {
-    const x = randomNormal(this.x, this.sd);
-    const y = randomNormal(this.y, this.sd);
-    return [x, y];
-  }
-
-  kl(other) {
-    return 0.5 * (
-      2 * (other.sd / this.sd) +
-      (Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2)) / this.sd +
-      (-2) +
-      Math.log(Math.pow(this.sd, 2) / Math.pow(other.sd, 2))
-    );
-  }
-
-  toString() {
-    return `<i>N</i>([${round(this.x, 2)},${round(this.y, 2)}], ${this.sd}<sup>2</sup><i>I</i>)`;
-  }
-}
-
-const gaussians = range(N_CLIENTS).map(i =>
-  new Isotropic2DGaussian(means[i][0], means[i][1], stddevs[i]));
 
 let truePoints = [];
 let falsePoints = [];
@@ -251,20 +279,31 @@ async function main() {
 
   const callbacks = clients.map((client, i) => {
     return () => {
-      const x = gaussians[i].sample();
-      const y = 0 + ((x[0]*x[0] + x[1]*x[1]) < RADIUS*RADIUS);
-      if (y) {
-        truePoints.push(x);
-        if (truePoints.length > 100) {
-          truePoints = truePoints.slice(1);
+      const xs = [];
+      const ys = [];
+      const n = client.hyperparam('examplesPerUpdate');
+      range(n).forEach(() => {
+        const x = gaussians[i].sample();
+        const y = 0 + ((x[0]*x[0] + x[1]*x[1]) < RADIUS*RADIUS);
+        if (y) {
+          truePoints.push(x);
+        } else {
+          falsePoints.push(x);
         }
-      } else {
-        falsePoints.push(x);
-        if (falsePoints.length > 100) {
-          falsePoints = falsePoints.slice(1);
-        }
+        xs.push(x);
+        ys.push([y]);
+      });
+      const xt = tf.tensor2d(xs);
+      const yt = tf.tensor2d(ys);
+      client.federatedUpdate(xt, yt).then(() => {
+        tf.dispose([xt, yt]);
+      });
+      if (truePoints.length > N_CLIENTS * n) {
+        truePoints = truePoints.slice(truePoints.length - N_CLIENTS * n);
       }
-      client.federatedUpdate(tf.tensor2d([x]), tf.tensor1d([y]));
+      if (falsePoints.length > N_CLIENTS * n) {
+        falsePoints = falsePoints.slice(falsePoints.length - N_CLIENTS * n);
+      }
     };
   });
   let intervals;

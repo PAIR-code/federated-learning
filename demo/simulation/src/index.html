@@ -23,11 +23,32 @@ limitations under the License.
     <button id='pauseButton'>Pause</button>
 
     <div>
+      <fieldset>
+        <legend>Hyperparams</legend>
+        <ul>
 
-    <label>
-      Examples per update:
-      <input type='number' id='examplesPerUpdate'>
-    </label>
+          <li>
+
+          <label>examplesPerUpdate: <input type='range' id='examplesPerUpdate' min='1' max='32' step='1'> <span></span>
+          </label>
+          </li>
+          <li>
+
+          <label>learningRate: <input type='range' id='learningRate' min='-5' max='1' step='0.5'> <span></span>
+          </label>
+          </li>
+          <li>
+
+          <label>epochs (# sgd steps per update): <input type='range' id='epochs' min='1' max='20' step='1'><span></span>
+          </label>
+          </li>
+          <li>
+          <label>weightNoiseStddev: <input type='number' id='weightNoiseStddev'>
+          </label>
+
+          </li>
+        </ul>
+      </fieldset>
     </div>
 
     <div id="canvasContainer"></div>
@@ -36,6 +57,7 @@ limitations under the License.
       <div id='sd-range-inputs'></div>
     </div>
     <div id="clientKLs"></div>
+    <div id="clientLosses"></div>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="./client.js"></script>
   </body>
