@@ -1,6 +1,6 @@
 # Tensorflow.js Federated Learning Server
 
-This library sets up a simple websocket-based server for transmitting and receiving
+This library sets up a simple [socket.io](https://socket.io/)-based server for transmitting and receiving
 TensorflowJS model weights.
 
 ## Usage
@@ -37,6 +37,8 @@ new federated.Server(httpServer, federatedServerModel); // if you need fully cus
 The simplest way to set up a `federated.Server` is to pass a [`tf.Model`](https://js.tensorflow.org/api/latest/#class:Model). However, you can also pass a string that will be delegated to [`tf.loadModel`](https://js.tensorflow.org/api/latest/#loadModel) (both `https?://` and `file://` URLs should work), or an asynchronous function that will return a `tf.Model`. The final option is to define your own `FederatedServerModel`, which has to implement various saving and loading methods. See its [documentation](./models.ts) for more details.
 
 Note that by default, different `tf.Model` versions will be saved as files in subfolders of `${process.cwd()}/saved-models/`. If you would like to change this directory, you can pass a `modelDir` configuration parameter, e.g. `federated.Server(httpServer, model, { modelDir: '/mnt/my-vfs' })`.
+
+If you would like to skip the persistence layer, you can instead import `FederatedServerInMemoryModel` which will update a single model in memory. Furthermore, if you want a version of this library which omits socket.io in favor of a mocked-out version that works in the browser, check out the [mock server library](../mock_server/README.md).
 
 ### Setting Hyperparameters
 

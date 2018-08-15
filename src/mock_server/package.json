@@ -1,0 +1,31 @@
+{
+  "name": "federated-learning-mock-server",
+  "version": "0.0.1",
+  "description": "Hardware-accelerated JavaScript library for machine intelligence",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/federated-learning-mock-server.esm.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PAIR-code/federated-learning.git"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "publish-local": "rm -rf dist/ && yarn && yarn build && yalc publish",
+    "build": "tsc",
+    "lint": "tslint -p . -t verbose"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "~0.12",
+    "@types/socket.io": "^1.4.36",
+    "@types/socket.io-client": "^1.4.32"
+  },
+  "devDependencies": {
+    "clang-format": "~1.2.2",
+    "ts-node": "^7.0.0",
+    "tslint": "~5.10.0",
+    "typescript": "2.9.2",
+    "yalc": "^1.0.0-pre.22"
+  }
+}
