@@ -20,7 +20,7 @@ import * as socketProxy from 'socket.io-client';
 import * as uuid from 'uuid/v4';
 
 // tslint:disable-next-line:max-line-length
-import {AsyncTfModel, deserializeVar, DownloadMsg, Events, FederatedCompileConfig, SerializedVariable, serializeVars, UploadCallback, UploadMsg, VersionCallback} from './common';
+import {AsyncTfModel, ClientHyperparams, DEFAULT_CLIENT_HYPERPARAMS, deserializeVar, DownloadMsg, Events, FederatedCompileConfig, SerializedVariable, serializeVars, UploadCallback, UploadMsg, VersionCallback} from './common';
 // tslint:disable-next-line:max-line-length
 import {FederatedClientModel, FederatedClientTfModel, isFederatedClientModel} from './models';
 
@@ -37,6 +37,7 @@ type CounterObj = {
 
 export type FederatedClientConfig = {
   modelCompileConfig?: FederatedCompileConfig,
+  hyperparams?: ClientHyperparams,
   verbose?: boolean,
   clientId?: string,
   sendMetrics?: boolean
@@ -66,9 +67,10 @@ export class Client {
   private x: tf.Tensor;
   private y: tf.Tensor;
   private versionUpdateCounts: CounterObj;
-  private serverUrl: string;
+  private server: string|Function;
   private verbose: boolean;
   private sendMetrics: boolean;
+  hyperparams: ClientHyperparams;
   clientId: string;
 
   /**
@@ -77,9 +79,9 @@ export class Client {
    * @param model - model to use with federated learning
    */
   constructor(
-      serverUrl: string, model: FederatedClientModel|AsyncTfModel,
+      server: string|Function, model: FederatedClientModel|AsyncTfModel,
       config?: FederatedClientConfig) {
-    this.serverUrl = serverUrl;
+    this.server = server;
     if (isFederatedClientModel(model)) {
       this.model = model;
     } else {
@@ -101,6 +103,7 @@ export class Client {
       this.clientId = uuid();
       setCookie(COOKIE_NAME, this.clientId);
     }
+    this.hyperparams = (config || {}).hyperparams || {};
   }
 
   /**
@@ -143,7 +146,7 @@ export class Client {
     this.x = tf.tensor([], [0].concat(this.model.inputShape));
     this.y = tf.tensor([], [0].concat(this.model.outputShape));
     await this.time('Download weights from server', async () => {
-      this.msg = await this.connectTo(this.serverUrl);
+      this.msg = await this.connectTo(this.server);
     });
     this.setVars(this.msg.model.vars);
     const newVersion = this.modelVersion();
@@ -189,7 +192,7 @@ export class Client {
     this.y = yNew;
 
     // repeatedly, for as many iterations as we have batches of examples:
-    const examplesPerUpdate = this.msg.hyperparams.examplesPerUpdate;
+    const examplesPerUpdate = this.hyperparam('examplesPerUpdate');
     while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
@@ -198,9 +201,9 @@ export class Client {
       const xTrain = sliceWithEmptyTensors(this.x, 0, examplesPerUpdate);
       const yTrain = sliceWithEmptyTensors(this.y, 0, examplesPerUpdate);
       const fitConfig = {
-        epochs: this.msg.hyperparams.epochs,
-        batchSize: this.msg.hyperparams.batchSize,
-        learningRate: this.msg.hyperparams.learningRate
+        epochs: this.hyperparam('epochs'),
+        batchSize: this.hyperparam('batchSize'),
+        learningRate: this.hyperparam('learningRate')
       };
 
       // optionally compute evaluation metrics for them
@@ -220,7 +223,7 @@ export class Client {
       });
 
       // serialize, possibly adding noise
-      const stdDev = this.msg.hyperparams.weightNoiseStddev;
+      const stdDev = this.hyperparam('weightNoiseStddev');
       let newVars: SerializedVariable[];
       if (stdDev) {
         const newTensors = tf.tidy(() => {
@@ -295,8 +298,15 @@ export class Client {
     return this.x.shape[0];
   }
 
+  private hyperparam(key: 'batchSize'|'learningRate'|'epochs'|
+                     'examplesPerUpdate'|'weightNoiseStddev'): number {
+    return (
+        this.hyperparams[key] || this.msg.hyperparams[key] ||
+        DEFAULT_CLIENT_HYPERPARAMS[key]);
+  }
+
   public numExamplesPerUpdate(): number {
-    return this.msg.hyperparams.examplesPerUpdate;
+    return this.hyperparam('examplesPerUpdate');
   }
 
   public numExamplesRemaining(): number {
@@ -325,8 +335,12 @@ export class Client {
     });
   }
 
-  private async connectTo(serverURL: string): Promise<DownloadMsg> {
-    this.socket = socketio(serverURL);
+  private async connectTo(server: string|Function): Promise<DownloadMsg> {
+    if (typeof server === 'string') {
+      this.socket = socketio(server);
+    } else {
+      this.socket = server() as SocketIOClient.Socket;
+    }
     return fromEvent<DownloadMsg>(
         this.socket, Events.Download, CONNECTION_TIMEOUT);
   }
