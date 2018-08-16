@@ -16,7 +16,7 @@ const mockServer = new MockServer(model, {
 });
 
 const RADIUS = 8;
-const N_CLIENTS = 1;
+const N_CLIENTS = 3;
 
 function range(n) {
   return Array.from(new Array(n).keys());

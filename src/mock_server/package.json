@@ -1,11 +1,12 @@
 {
   "name": "federated-learning-mock-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Experimental (browser-mocking-server) library for federated learning in Tensorflow.js",
   "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "module": "dist/federated-learning-mock-server.esm.js",
+  "jsdelivr": "dist/bundle.js",
+  "unpkg": "dist/bundle.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/PAIR-code/federated-learning.git"
@@ -14,6 +15,7 @@
   "scripts": {
     "publish-local": "rm -rf dist/ && yarn && yarn build && yalc publish",
     "build": "tsc",
+    "build-npm": "./scripts/build-npm.sh",
     "lint": "tslint -p . -t verbose"
   },
   "dependencies": {
@@ -22,8 +24,10 @@
     "@types/socket.io-client": "^1.4.32"
   },
   "devDependencies": {
+    "browserify": "^16.2.2",
     "clang-format": "~1.2.2",
     "ts-node": "^7.0.0",
+    "tsify": "^4.0.0",
     "tslint": "~5.10.0",
     "typescript": "2.9.2",
     "yalc": "^1.0.0-pre.22"
