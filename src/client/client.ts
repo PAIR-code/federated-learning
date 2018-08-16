@@ -17,7 +17,6 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as socketProxy from 'socket.io-client';
-import * as uuid from 'uuid/v4';
 
 // tslint:disable-next-line:max-line-length
 import {AsyncTfModel, ClientHyperparams, DEFAULT_CLIENT_HYPERPARAMS, deserializeVar, DownloadMsg, Events, FederatedCompileConfig, SerializedVariable, serializeVars, UploadCallback, UploadMsg, VersionCallback} from './common';
@@ -422,4 +421,11 @@ function setCookie(name: string, value: string) {
   const d = new Date();
   d.setTime(d.getTime() + YEAR_IN_MS);
   document.cookie = name + '=' + value + ';path=/;expires=' + d.toUTCString();
+}
+
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }

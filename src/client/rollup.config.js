@@ -15,7 +15,9 @@
  * =============================================================================
  */
 
+import builtins from 'rollup-plugin-node-builtins';
 import commonjs from 'rollup-plugin-commonjs';
+import node from 'rollup-plugin-node-resolve';
 import typescript from 'rollup-plugin-typescript2';
 import uglify from 'rollup-plugin-uglify';
 
@@ -45,6 +47,8 @@ function config({plugins = [], output = {}, external = []}) {
     input: 'index.ts',
     plugins: [
       typescript({tsconfigOverride: {compilerOptions: {module: 'ES2015'}}}),
+      builtins(),
+      node(),
       commonjs({
         include: 'node_modules/**'
       }),

@@ -19,14 +19,14 @@
   "dependencies": {
     "@tensorflow/tfjs": "~0.12",
     "@types/socket.io-client": "^1.4.32",
-    "@types/uuid": "^3.4.3",
-    "socket.io-client": "^2.1.1",
-    "uuid": "^3.3.2"
+    "socket.io-client": "^2.1.1"
   },
   "devDependencies": {
     "clang-format": "~1.2.2",
     "rollup": "~0.64.1",
     "rollup-plugin-commonjs": "~9.1.5",
+    "rollup-plugin-node-builtins": "^2.1.2",
+    "rollup-plugin-node-resolve": "~3.3.0",
     "rollup-plugin-typescript2": "~0.13.0",
     "rollup-plugin-uglify": "~3.0.0",
     "ts-node": "^7.0.0",
