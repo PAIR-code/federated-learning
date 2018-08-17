@@ -1,6 +1,6 @@
 {
   "name": "federated-learning-server",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "description": "Experimental server library for federated learning in Tensorflow.js",
   "private": false,
   "main": "dist/index.js",
@@ -12,6 +12,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "publish-local": "rm -rf dist/ && yarn && yarn build && yalc publish",
+    "build-npm": "rm -rf dist/ && yarn && yarn build && npm pack",
     "build": "tsc",
     "lint": "tslint -p . -t verbose"
   },
