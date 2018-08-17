@@ -6,7 +6,7 @@ This library serves as a browser-compatible mock of the [Node.js server library]
 
 ```js
 // client-side javascript
-import {MockServer as FederatedServer} from 'federated-learning-mock-server';
+import {Server as FederatedServer} from 'federated-learning-mock-server';
 import {Client as FederatedClient} from 'federated-learning-client';
 
 const model = await tf.loadModel('https://my.model.json');
