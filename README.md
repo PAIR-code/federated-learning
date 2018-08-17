@@ -18,7 +18,7 @@ On the server (NodeJS) side:
 
 ```js
 import * as http from 'http';
-import * as federated from 'tfjs-federated-learning-server';
+import * as federated from 'federated-learning-server';
 
 const INIT_MODEL = 'file:///initial/model.json';
 const webServer = http.createServer(); // can also use https
@@ -32,7 +32,7 @@ fedServer.setup().then(() => {
 On the client (browser) side:
 
 ```js
-import * as federated from 'tfjs-federated-learning-client';
+import * as federated from 'federated-learning-client';
 
 const INIT_MODEL = 'http://my.initial/model.json';
 const SERVER_URL = 'http://federated.learning.server'; // URL of server above
@@ -46,6 +46,6 @@ client.setup().then(() => {
 
 ## Documentation and Examples
 
-See the [server](./src/server/README.md) and [client](./src/client/README.md)
-READMEs for documentation, and the [emoji](./demo/emoji/README.md) or
-[Hogwarts](./demo/audio/README.md) demos for more fully fleshed out examples.
+See the [server](./src/server) and [client](./src/client)
+READMEs for documentation, and the [emoji](./demo/emoji_hunt) or
+[Hogwarts](./demo/audio) demos for more fully fleshed out examples.

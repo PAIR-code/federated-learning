@@ -9,7 +9,7 @@ TensorflowJS model weights.
 
 ```js
 import * as http from 'http';
-import * as federated from 'tfjs-federated-learning-server';
+import * as federated from 'federated-learning-server';
 
 const INIT_MODEL = 'file:///initial/model.json';
 const httpServer = http.createServer();

@@ -8,7 +8,7 @@ Tensorflow.js model weights.
 ### Basic
 
 ```js
-import * as federated from 'tfjs-federated-learning-client';
+import * as federated from 'federated-learning-client';
 
 const SERVER_URL = 'https://federated.learning.server';
 const INIT_MODEL = 'https://initial.com/tf-model.json';
