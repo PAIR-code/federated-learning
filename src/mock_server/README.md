@@ -1,6 +1,6 @@
 # Tensorflow.js Federated Learning Mock Server
 
-This library serves as a browser-compatible mock of the [../server/README.md](Node.js server library).
+This library serves as a browser-compatible mock of the [Node.js server library](../server).
 
 ## Usage
 
