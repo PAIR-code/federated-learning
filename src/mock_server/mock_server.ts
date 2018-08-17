@@ -28,7 +28,7 @@ import {MockitIOClient, MockitIOServer} from './mockit_io';
  *
  * Example usage:
  * ```js
- * import {MockServer as FederatedServer} from 'federated-learning-mock-server';
+ * import {Server as FederatedServer} from 'federated-learning-mock-server';
  * import {Client as FederatedClient} from 'federated-learning-client';
  *
  * const model = await tf.loadModel('https://my.model.json');
