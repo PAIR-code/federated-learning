@@ -1,11 +1,10 @@
 {
   "name": "federated-learning-server",
   "version": "0.0.1",
-  "description": "Hardware-accelerated JavaScript library for machine intelligence",
-  "private": true,
+  "description": "Experimental server library for federated learning in Tensorflow.js",
+  "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "module": "dist/federated-learning-client.esm.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/PAIR-code/federated-learning.git"
@@ -21,11 +20,9 @@
     "@tensorflow/tfjs-node": "^0.1.9",
     "@types/node-fetch": "^2.1.1",
     "@types/socket.io": "^1.4.34",
-    "@types/uuid": "^3.4.3",
     "es6-promise": "^4.2.4",
     "node-fetch": "^2.1.2",
-    "socket.io": "^2.1.1",
-    "uuid": "^3.3.2"
+    "socket.io": "^2.1.1"
   },
   "devDependencies": {
     "@types/jasmine": "^2.8.8",

@@ -40,7 +40,7 @@ import {MockitIOClient, MockitIOServer} from './mockit_io';
  * await client.setup();
  * ```
  */
-export class MockServer extends AbstractServer {
+export class Server extends AbstractServer {
   newClientSocket: () => SocketIOClient.Socket;
 
   constructor(

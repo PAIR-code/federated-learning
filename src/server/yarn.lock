@@ -147,12 +147,6 @@
   version "0.0.30"
   resolved "https://registry.yarnpkg.com/@types/strip-json-comments/-/strip-json-comments-0.0.30.tgz#9aa30c04db212a9a0649d6ae6fd50accc40748a1"
 
-"@types/uuid@^3.4.3":
-  version "3.4.3"
-  resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-3.4.3.tgz#121ace265f5569ce40f4f6d0ff78a338c732a754"
-  dependencies:
-    "@types/node" "*"
-
 "@types/webgl-ext@~0.0.29":
   version "0.0.29"
   resolved "https://registry.yarnpkg.com/@types/webgl-ext/-/webgl-ext-0.0.29.tgz#4d479baf1124795f53d54bdc85b386e0f194d90a"
@@ -1406,10 +1400,6 @@ user-home@^2.0.0:
   resolved "https://registry.yarnpkg.com/user-home/-/user-home-2.0.0.tgz#9c70bfd8169bc1dcbf48604e0f04b8b49cde9e9f"
   dependencies:
     os-homedir "^1.0.0"
-
-uuid@^3.3.2:
-  version "3.3.2"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.3.2.tgz#1b4af4955eb3077c501c23872fc6513811587131"
 
 validate-npm-package-license@^3.0.1:
   version "3.0.3"
