@@ -19,7 +19,7 @@ mkdir -p dist/client
 cd ../../../src/server
 yarn publish-local
 cd $whereami
-yalc link federated-learning-server
+yarn yalc link federated-learning-server
 if [ -e ../client ]
 then
   cd ../client
