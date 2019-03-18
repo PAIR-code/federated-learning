@@ -24,8 +24,8 @@ yarn publish-local
 echo ''
 echo '***** link packages *****'
 cd ../../test
-yalc link federated-learning-client
-yalc link federated-learning-server
+yarn yalc link federated-learning-client
+yarn yalc link federated-learning-server
 echo ''
 echo '***** run tests *****'
 ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json

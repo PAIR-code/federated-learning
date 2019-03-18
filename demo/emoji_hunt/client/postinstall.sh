@@ -18,4 +18,4 @@ whereami=`pwd`
 cd ../../../src/client
 yarn publish-local
 cd $whereami
-yalc link federated-learning-client
+yarn yalc link federated-learning-client

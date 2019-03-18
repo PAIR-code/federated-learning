@@ -36,4 +36,4 @@ cd $whereami
 rm -rf client-dist
 cp -R ../client/dist client-dist
 
-yalc link federated-learning-server
+yarn yalc link federated-learning-server
