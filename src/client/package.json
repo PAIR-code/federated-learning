@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "babel-core": "^6.26.3",
-    "browserify": "^16.2.2",
+    "browserify": "^16.2.3",
     "clang-format": "~1.2.2",
     "ts-node": "^7.0.0",
     "tsify": "^4.0.0",
