@@ -1,6 +1,6 @@
 # Federated Learning in TensorFlow.js
 
-## *This is not an official federated learning framework for TensorFlow. This is an experimental library for TensorFlow.js that is currently ***unmaintained***. If you would like to use an official federated learning library, check out the [tensorflow/federated](https://github.com/tensorflow/federated).*
+## *This is not an official federated learning framework for TensorFlow. This is an experimental library for TensorFlow.js that is currently ***unmaintained***. If you would like to use an official federated learning library, check out [tensorflow/federated](https://github.com/tensorflow/federated).*
 
 This is the parent repository for an (experimental and demonstration-only)
 implementation of [Federated
