@@ -185,6 +185,13 @@ export class Client {
    * @param x Training inputs
    * @param y Training labels
    */
+
+  /*
+      federatedUpdate을 하는 핵심 부분.
+      https://arxiv.org/pdf/1902.01046.pdf
+      Appendix B FEDERATED AVERAGING 참고
+      ClientUpdate(w)
+   */
   public async federatedUpdate(x: tf.Tensor, y: tf.Tensor): Promise<void> {
     // incorporate examples into our stored `x` and `y`
     const xNew = addRows(this.x, x, this.model.inputShape);
@@ -195,11 +202,18 @@ export class Client {
 
     // repeatedly, for as many iterations as we have batches of examples:
     const examplesPerUpdate = this.hyperparam('examplesPerUpdate');
+    /*
+      this.x.shape[0]는 mini-batch size를 나타냄.
+      'examplesPerUpdate'는 hyperparam로, FL이 일어날 threshold 값임.
+     */
     while (this.x.shape[0] >= examplesPerUpdate) {
       // save original ID (in case it changes during training/serialization)
       const modelVersion = this.modelVersion();
 
       // grab the right number of examples
+      /*
+          mini-batch 만큼 자른다.
+       */
       const xTrain = sliceWithEmptyTensors(this.x, 0, examplesPerUpdate);
       const yTrain = sliceWithEmptyTensors(this.y, 0, examplesPerUpdate);
       const fitConfig = {
@@ -225,6 +239,13 @@ export class Client {
       });
 
       // serialize, possibly adding noise
+      /*
+         `weightNoiseStddev`가 있다면 맨 마지막 layer에
+         tf.randomNormal을 추가하여, `newVars`에 추가.
+         adding noise를 하는 부분은 https://github.com/PAIR-code/federated-learning/pull/28
+         을 참고하면 `to make updates differentially private`으로
+         설명되어 있음.
+       */
       const stdDev = this.hyperparam('weightNoiseStddev');
       let newVars: SerializedVariable[];
       if (stdDev) {
@@ -243,6 +264,9 @@ export class Client {
       this.setVars(this.msg.model.vars);
 
       // upload the updates to the server
+      /*
+        FL Server에는 noise가 추가된 weight를 보낸다.
+       */
       const uploadMsg: UploadMsg = {
         model: {version: modelVersion, vars: newVars},
         clientId: this.clientId,
@@ -260,6 +284,7 @@ export class Client {
       // TODO: consider storing some examples longer-term and reusing them for
       // updates for multiple versions, if session is long-lived.
       tf.dispose([xTrain, yTrain]);
+      // xRest와, yRest초기화.
       const xRest = sliceWithEmptyTensors(this.x, examplesPerUpdate);
       const yRest = sliceWithEmptyTensors(this.y, examplesPerUpdate);
       tf.dispose([this.x, this.y]);

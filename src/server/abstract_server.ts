@@ -149,8 +149,12 @@ export class AbstractServer {
         this.log(`disconnection: ${this.numClients} clients`);
       });
 
+      // 처음에 서버에 connection이되면 서버의 model을 다운로드.
       socket.emit(Events.Download, this.downloadMsg);
 
+      /*
+        FL Client(Mobile)에서 weight를 보내면 이 함수로 도착.
+       */
       socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
         ack(true);
         if (msg.model.version === this.model.version && !this.updating) {
@@ -161,7 +165,13 @@ export class AbstractServer {
             this.uploadCallbacks.forEach(c => c(msg));
           });
           if (this.shouldUpdate()) {
+            /*
+                FL Server의  FEDERATED AVERAGING
+                https://arxiv.org/pdf/1902.01046.pdf
+                Appendix, B FEDERATED AVERAGING
+             */
             await this.updateModel();
+            // update된 모델을 Client에 배포
             this.server.sockets.emit(Events.Download, this.downloadMsg);
           }
         }
@@ -213,6 +223,10 @@ export class AbstractServer {
     const oldVersion = this.model.version;
     const aggregation = this.serverHyperparams.aggregation;
 
+    /*
+      모델의 weight가 list형식으로 저장되어 있는 `this.updates`를
+      `deserializeVars`로 layer로 쪼갠후 mean으로 Average하는 함수.
+     */
     await this.time('computing new weights', async () => {
       const newWeights = tf.tidy(() => {
         const stacked = stackSerialized(this.updates);
