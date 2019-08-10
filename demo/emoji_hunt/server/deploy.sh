@@ -36,7 +36,7 @@ cd ../client
 
 if [ "$DEV_ENV" = true ]
 then
-  yarn run parcel watch --no-hmr index.html &
+  parcel watch --no-hmr index.html &
 else
   yarn build
 fi
