@@ -92,6 +92,11 @@ app.post('/data', (req, res) => {
   });
 });
 
+/*
+  FL Client는 examplesPerUpdate가 1이므로 1개 마다 model.fit을
+  FL Server는 minUpdatesPerVersion가 5이므로 5개마다 model.mean을 실행
+ */
+
 setupModel(modelDir)
     .then((model) => {
       const federatedServer = new federated.Server(httpServer, model, {
