@@ -30,7 +30,6 @@ const WEIGHT_MANIFEST =
     'https://storage.googleapis.com/learnjs-data/emoji_scavenger_hunt/weights_manifest.json';
 
 const SERVER_URL = `//${location.hostname}:3000`;
-const UPLOAD_URL = `//${location.hostname}:3000/data`;
 const USE_OAUTH = false;
 
 console.log('server url:', SERVER_URL)
@@ -186,11 +185,6 @@ async function main() {
 
       try {
         await client.federatedUpdate(input, label);
-
-        if (ui.uploadAllowed()) {
-          upload(UPLOAD_URL, lookingFor.targetIdx, webcam)
-              .catch(err => ui.status(err));
-        }
 
       } catch (err) {
         ui.status(err);
