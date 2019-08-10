@@ -142,11 +142,11 @@ export class AbstractServer {
 
     this.server.on('connection', (socket) => {
       this.numClients++;
-      this.log(`connection: ${this.numClients} clients`);
+      console.log(`connection: ${this.numClients} clients`);
 
       socket.on('disconnect', () => {
         this.numClients--;
-        this.log(`disconnection: ${this.numClients} clients`);
+        console.log(`disconnection: ${this.numClients} clients`);
       });
 
       // 처음에 서버에 connection이되면 서버의 model을 다운로드.
@@ -158,7 +158,7 @@ export class AbstractServer {
       socket.on(Events.Upload, async (msg: UploadMsg, ack) => {
         ack(true);
         if (msg.model.version === this.model.version && !this.updating) {
-          this.log(`new update from ${msg.clientId}`);
+          console.log(`new update from ${msg.clientId}`);
           this.updates.push(msg.model.vars);
           this.numUpdates++;
           await this.time('upload callbacks', async () => {
