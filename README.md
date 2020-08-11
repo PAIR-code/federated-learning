@@ -1,6 +1,6 @@
 # Federated Learning in TensorFlow.js
 
-## *This is not an official federated learning framework for TensorFlow. This is an experimental library for TensorFlow.js that is currently ***unmaintained***. If you would like to use an official federated learning library, check out [tensorflow/federated](https://github.com/tensorflow/federated).*
+## *This is not an official federated learning framework for TensorFlow. This is an experimental library for TensorFlow.js that is currently ***unmaintained***. If you would like to use an official federated learning library for Python, check out [tensorflow/federated](https://github.com/tensorflow/federated). If you would like to use a federated learning library for web browsers and Node, check out [OpenMined/syft.js](https://github.com/OpenMined/syft.js).*
 
 This is the parent repository for an (experimental and demonstration-only)
 implementation of [Federated
