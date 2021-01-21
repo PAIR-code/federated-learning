@@ -15,7 +15,7 @@
     "express-fileupload": "^0.4.0",
     "federated-learning-server": "file:../../../src/server",
     "google-auth-library": "^1.6.1",
-    "socket.io": "^2.1.1"
+    "socket.io": "^2.4.0"
   },
   "scripts": {
     "postinstall": "./postinstall.sh",
