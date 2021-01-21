@@ -20,7 +20,7 @@
     "express-basic-auth": "^1.1.5",
     "express-fileupload": "^0.4.0",
     "federated-learning-server": "file:../../../src/server",
-    "socket.io": "^2.1.1",
+    "socket.io": "^2.4.0",
     "tfjs-npy": "https://github.com/co2meal/tfjs-npy.git#07b8066",
     "uuid": "^3.3.2"
   },
