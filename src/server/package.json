@@ -22,7 +22,7 @@
     "@types/node-fetch": "^2.1.1",
     "@types/socket.io": "^1.4.34",
     "es6-promise": "^4.2.4",
-    "node-fetch": "^2.1.2",
+    "node-fetch": "^3.1.1",
     "socket.io": "^2.1.1"
   },
   "devDependencies": {
